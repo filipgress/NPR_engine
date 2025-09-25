@@ -1,3 +1,21 @@
+# Test assets
+assets/
+
+# Bin directories
+out/
+build/
+build_*/
+bin/
+bin_*/
+cmake-build-*/
+
+# IDE-specific and editor files
+.cache/
+.config/
+.vscode/
+.idea/
+*.swp
+
 # Cmake
 CMakeLists.txt.user
 CMakeCache.txt
