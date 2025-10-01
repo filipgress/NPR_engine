@@ -71,8 +71,8 @@ endif()
 # Project build setup
 # ---------------------------------------
 
-set(HEADER_FILES ./src/core/pch.h)
-set(SOURCE_FILES ./src/core/main.cc)
+set(HEADER_FILES ./src/core/pch.h ./src/core/utils.h)
+set(SOURCE_FILES ./src/core/main.cc ./src/core/utils.cc)
 
 add_executable(${PROJECT_NAME} ${HEADER_FILES} ${SOURCE_FILES})
 target_sources(${PROJECT_NAME} PRIVATE ${IMGUI_SOURCES})
