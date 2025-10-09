@@ -75,6 +75,8 @@ set(HEADER_FILES
     ./src/core/pch.h
     ./src/core/utils.h
     ./src/core/app.h
+    ./src/core/frame_timer.h
+    ./src/core/input_handler.h
     ./src/window/window.h
     ./src/window/event.h
     ./src/window/key_event.h
@@ -85,6 +87,7 @@ set(SOURCE_FILES
     ./src/core/main.cc
     ./src/core/utils.cc
     ./src/core/app.cc
+    ./src/core/frame_timer.cc
     ./src/window/window.cc
 )
 

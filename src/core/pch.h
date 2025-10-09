@@ -5,12 +5,16 @@
 #include <sstream>
 #include <fstream>
 #include <iomanip>
-#include <mutex>
-#include <set>
-#include <map>
-#include <unordered_set>
+
 #include <functional>
+#include <mutex>
+#include <numeric>
+
 #include <memory>
+#include <deque>
+#include <set>
+#include <unordered_set>
+#include <map>
 
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
 #include <vulkan/vulkan.hpp>
