@@ -29,6 +29,8 @@ class KeyPressEvent : public KeyEvent {
     return ss.str();
   }
 
+  EVENT_TYPE(kKeyPress)
+
  private:
   bool repeat_ = false;
 };
@@ -43,6 +45,8 @@ class KeyReleaseEvent : public KeyEvent {
 
     return ss.str();
   }
+
+  EVENT_TYPE(kKeyRelease)
 };
 }  // namespace npr_window
 

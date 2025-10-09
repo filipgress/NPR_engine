@@ -15,6 +15,8 @@ class WindowResizeEvent : public Event {
     return ss.str();
   }
 
+  EVENT_TYPE(kWindowResize)
+
  private:
   glm::ivec2 size_;
 };
@@ -22,6 +24,8 @@ class WindowResizeEvent : public Event {
 class WindowCloseEvent : public Event {
  public:
   std::string ToString() const override { return "WindowCloseEvent"; }
+
+  EVENT_TYPE(kWindowClose)
 };
 }  // namespace npr_window
 

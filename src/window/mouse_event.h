@@ -25,6 +25,8 @@ class MousePressEvent : public MouseButtonEvent {
     ss << "MouseButtonPressEvent: " << button_;
     return ss.str();
   }
+
+  EVENT_TYPE(kMousePress)
 };
 
 class MouseReleaseEvent : public MouseButtonEvent {
@@ -36,6 +38,8 @@ class MouseReleaseEvent : public MouseButtonEvent {
     ss << "MouseButtonReleaseEvent: " << button_;
     return ss.str();
   }
+
+  EVENT_TYPE(kMouseRelease)
 };
 
 class MouseScrollEvent : public Event {
@@ -48,6 +52,8 @@ class MouseScrollEvent : public Event {
     ss << "MouseScrollEvent: " << offset_.x << ", " << offset_.y;
     return ss.str();
   }
+
+  EVENT_TYPE(kMouseScroll)
 
  private:
   glm::vec2 offset_;
@@ -63,6 +69,8 @@ class MouseMoveEvent : public Event {
     ss << "MouseMovedEvent: " << move_.x << ", " << move_.y;
     return ss.str();
   }
+
+  EVENT_TYPE(kMouseMove)
 
  private:
   glm::vec2 move_;
