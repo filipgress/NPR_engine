@@ -2,6 +2,8 @@
 #define UTILS_H_
 
 #define BIT(x) x ? (1ull << (x - 1)) : 0
+#define CHECK_DEVICE_FEATURE(FEATURE) \
+  if (device_feats_.FEATURE && !supported.FEATURE) return false;
 
 #define ERR(...) npr_core::Logger::GetInstance().log(true, __VA_ARGS__)
 #ifdef NDEBUG

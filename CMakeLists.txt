@@ -71,9 +71,24 @@ endif()
 # Project build setup
 # ---------------------------------------
 
-set(HEADER_FILES ./src/core/pch.h ./src/core/utils.h)
-set(SOURCE_FILES ./src/core/main.cc ./src/core/utils.cc)
+set(HEADER_FILES
+    ./src/core/pch.h
+    ./src/core/utils.h
+    ./src/core/app.h
+    ./src/window/window.h
+    ./src/window/event.h
+    ./src/window/key_event.h
+    ./src/window/mouse_event.h
+    ./src/window/window_event.h
+)
+set(SOURCE_FILES
+    ./src/core/main.cc
+    ./src/core/utils.cc
+    ./src/core/app.cc
+    ./src/window/window.cc
+)
 
+configure_file(src/core/config.h.in config.h)
 add_executable(${PROJECT_NAME} ${HEADER_FILES} ${SOURCE_FILES})
 target_sources(${PROJECT_NAME} PRIVATE ${IMGUI_SOURCES})
 target_compile_definitions(
@@ -87,6 +102,7 @@ target_include_directories(
     ${PROJECT_NAME}
     PRIVATE
         ./src/
+        ${CMAKE_CURRENT_BINARY_DIR}
         ${vulkan_headers_SOURCE_DIR}/include
         ${IMGUI_DIR}
         ${IMGUI_DIR}/backends

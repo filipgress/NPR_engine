@@ -1,0 +1,10 @@
+#ifndef CONFIG_H_
+#define CONFIG_H_
+
+// clang-format off
+#define PROJECT_NAME "@PROJECT_NAME@"
+#define PROJECT_VERSION_MAJOR @PROJECT_VERSION_MAJOR@
+#define PROJECT_VERSION_MINOR @PROJECT_VERSION_MINOR@
+// clang-format on 
+
+#endif //CONFIG_H_
