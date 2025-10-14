@@ -1,9 +1,17 @@
-#ifndef WINDOW_EVENT_H_
-#define WINDOW_EVENT_H_
+#ifndef APP_EVENT_H_
+#define APP_EVENT_H_
 
 #include "event.h"
 
 namespace npr_window {
+class AppTickEvent : public Event {
+ public:
+  AppTickEvent() = default;
+
+  EVENT_TYPE(kAppTick)
+  std::string ToString() const override { return GetName(); }
+};
+
 class WindowResizeEvent : public Event {
  public:
   WindowResizeEvent(const glm::ivec2& size) : size_{size} {}
@@ -29,4 +37,4 @@ class WindowCloseEvent : public Event {
 };
 }  // namespace npr_window
 
-#endif  // WINDOW_EVENT_H_
+#endif  // APP_EVENT_H_

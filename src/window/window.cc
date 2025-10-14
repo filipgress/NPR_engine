@@ -1,7 +1,8 @@
-#include "window/window.h"
-#include "window/window_event.h"
-#include "window/mouse_event.h"
-#include "window/key_event.h"
+#include "window.h"
+
+#include "app_event.h"
+#include "mouse_event.h"
+#include "key_event.h"
 
 namespace npr_window {
 

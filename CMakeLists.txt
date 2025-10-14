@@ -5,12 +5,18 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 
+if("${CMAKE_BUILD_TYPE}" STREQUAL "")
+    message(STATUS "No build type selected, default to Debug")
+    set(CMAKE_BUILD_TYPE "Debug")
+endif()
+
 # ---------------------------------------
 # Fetch external dependencies
 # ---------------------------------------
 
 include(FetchContent)
 
+# vulkan haders (vulkan-hpp)
 FetchContent_Declare(
     vulkan_headers
     GIT_REPOSITORY https://github.com/KhronosGroup/Vulkan-Headers.git
@@ -18,13 +24,19 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(vulkan_headers)
 
+# glfw
 FetchContent_Declare(
     glfw
     GIT_REPOSITORY https://github.com/glfw/glfw.git
     GIT_TAG 3.4
 )
+
+set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
+set(GLFW_INSTALL OFF CACHE BOOL "" FORCE)
+
 FetchContent_MakeAvailable(glfw)
 
+# glm
 FetchContent_Declare(
     glm
     GIT_REPOSITORY https://github.com/g-truc/glm.git
@@ -32,15 +44,21 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(glm)
 
-set(TINYGLTF_HEADER_ONLY ON CACHE BOOL "" FORCE)
-set(TINYGLTF_BUILD_LOADER_EXAMPLE OFF CACHE BOOL "" FORCE)
+# tinygltf
 FetchContent_Declare(
     tinygltf
     GIT_REPOSITORY https://github.com/syoyo/tinygltf.git
     GIT_TAG v2.9.6
 )
+
+set(TINYGLTF_HEADER_ONLY ON CACHE BOOL "" FORCE)
+set(TINYGLTF_BUILD_LOADER_EXAMPLE OFF CACHE BOOL "" FORCE)
+set(TINYGLTF_INSTALL OFF CACHE BOOL "" FORCE)
+set(TINYGLTF_INSTALL_VENDOR OFF CACHE BOOL "" FORCE)
+
 FetchContent_MakeAvailable(tinygltf)
 
+# imgui
 FetchContent_Declare(
     imgui
     GIT_REPOSITORY https://github.com/ocornut/imgui.git
@@ -81,7 +99,15 @@ set(HEADER_FILES
     ./src/window/event.h
     ./src/window/key_event.h
     ./src/window/mouse_event.h
-    ./src/window/window_event.h
+    ./src/window/app_event.h
+    ./src/graphics/renderer.h
+    ./src/graphics/vulkan_context.h
+    ./src/graphics/swapchain.h
+    ./src/graphics/sync.h
+    ./src/graphics/command_pool.h
+    ./src/graphics/shader.h
+    ./src/graphics/render_pass.h
+    ./src/graphics/pipeline.h
 )
 set(SOURCE_FILES
     ./src/core/main.cc
@@ -89,6 +115,14 @@ set(SOURCE_FILES
     ./src/core/app.cc
     ./src/core/frame_timer.cc
     ./src/window/window.cc
+    ./src/graphics/renderer.cc
+    ./src/graphics/vulkan_context.cc
+    ./src/graphics/swapchain.cc
+    ./src/graphics/sync.cc
+    ./src/graphics/command_pool.cc
+    ./src/graphics/shader.cc
+    ./src/graphics/render_pass.cc
+    ./src/graphics/pipeline.cc
 )
 
 configure_file(src/core/config.h.in config.h)

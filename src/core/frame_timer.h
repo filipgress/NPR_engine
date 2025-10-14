@@ -1,9 +1,17 @@
 #ifndef FRAME_TIMER_H_
 #define FRAME_TIMER_H_
 
+namespace npr_window {
+class Event;
+}
+
 namespace npr_core {
 class FrameTimer {
+  using EventCallbackFn = std::function<void(npr_window::Event&)>;
+
  public:
+  FrameTimer(EventCallbackFn callback_fn) : callback_fn_{callback_fn} {}
+
   int GetMinFPS() const { return min_fps_; }
   int GetMaxFPS() const { return max_fps_; }
   int GetAvgFPS() const { return avg_fps_; }
@@ -15,6 +23,7 @@ class FrameTimer {
 
  private:
   void CalculateStats();
+  void Tick();
 
  private:
   std::deque<int> frame_times_;
@@ -26,7 +35,11 @@ class FrameTimer {
   float delta_{};
   float elapsed_{};
 
-  std::chrono::steady_clock::time_point lst = std::chrono::steady_clock::now();
+  std::chrono::steady_clock::time_point lst_ = std::chrono::steady_clock::now();
+  std::chrono::steady_clock::time_point lst_tick_ =
+      std::chrono::steady_clock::now();
+
+  EventCallbackFn callback_fn_;
 };
 }  // namespace npr_core
 

@@ -3,6 +3,7 @@
 
 namespace npr_window {
 enum class EventType {
+  kAppTick,
   kWindowClose,
   kWindowResize,
   kKeyPress,

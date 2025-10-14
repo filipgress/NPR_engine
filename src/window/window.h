@@ -11,7 +11,10 @@ class Window {
 
  public:
   Window(EventCallbackFn callback_fn);
-  ~Window() { glfwTerminate(); }
+  ~Window() {
+    glfwDestroyWindow(window_);
+    glfwTerminate();
+  }
 
   vk::SurfaceKHR CreateSurface(vk::Instance instance) const;
   void PollEvents() const { glfwPollEvents(); }

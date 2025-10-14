@@ -5,9 +5,10 @@
 #include "input_handler.h"
 
 #include "window/window.h"
+#include "graphics/renderer.h"
 
 namespace npr_core {
-class App {
+class App : public NonCopyable {
  public:
   void Run();
 
@@ -16,8 +17,9 @@ class App {
 
  private:
   npr_window::Window window_{[this](npr_window::Event& e) { OnEvent(e); }};
+  npr_graphics::Renderer renderer_{window_};
 
-  FrameTimer timer_;
+  FrameTimer timer_{[this](npr_window::Event& e) { return OnEvent(e); }};
   InputHandler inputs_;
   bool running_{true};
 };

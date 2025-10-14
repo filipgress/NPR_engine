@@ -2,20 +2,22 @@
 #define UTILS_H_
 
 #define BIT(x) x ? (1ull << (x - 1)) : 0
-#define CHECK_DEVICE_FEATURE(FEATURE) \
-  if (device_feats_.FEATURE && !supported.FEATURE) return false;
 
 #define ERR(...) npr_core::Logger::GetInstance().log(true, __VA_ARGS__)
 #ifdef NDEBUG
-constexpr bool kEnabledDebug{false};
+constexpr bool kEnableDebug{false};
+constexpr bool kEnableShaderReload{false};
+
   #define INFO(...)
 #else
-constexpr bool kEnabledDebug{true};
-  #define TIMER_ENABLED
+constexpr bool kEnableDebug{true};
+constexpr bool kEnableShaderReload{true};
+
+  // #define TIMER_ENABLE
   #define INFO(...) npr_core::Logger::GetInstance().log(false, __VA_ARGS__)
 #endif
 
-#ifdef TIMER_ENABLED
+#ifdef TIMER_ENABLE
   #define TIMER_START(name) \
     auto name##_start = std::chrono::high_resolution_clock::now();
 
@@ -83,7 +85,7 @@ class Logger : public Singleton<Logger> {
 
     if (is_err)
       std::cerr << msg.str();
-    else if (kEnabledDebug)
+    else if (kEnableDebug)
       std::cout << msg.str();
 
     log_to_file(msg.str());

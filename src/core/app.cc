@@ -1,6 +1,6 @@
 #include "app.h"
 
-#include "window/window_event.h"
+#include "window/app_event.h"
 #include "window/mouse_event.h"
 #include "window/key_event.h"
 
@@ -13,11 +13,10 @@ void App::Run() {
     window_.PollEvents();
     inputs_.Update(window_.GetSize());
 
-    INFO(timer_.GetAvgFPS(), "fps");
+    // INFO(timer_.GetAvgFPS(), "fps");
 
     if (window_.IsMinimized()) continue;
-
-    // render
+    renderer_.Update();
   }
 }
 
@@ -25,14 +24,19 @@ void App::OnEvent(npr_window::Event& e) {
   using namespace npr_window;
   EventDispatcher dispatcher(e);
 
+  // app events
+  dispatcher.Dispatch<AppTickEvent>([this](AppTickEvent& /*e*/) {
+    renderer_.OnTick();
+    return true;
+  });
+
   // window events
-  dispatcher.Dispatch<WindowCloseEvent>([this](WindowCloseEvent& e) {
-    (void)e;
+  dispatcher.Dispatch<WindowCloseEvent>([this](WindowCloseEvent& /*e*/) {
     running_ = false;
     return true;
   });
-  dispatcher.Dispatch<WindowResizeEvent>([](WindowResizeEvent& e) {
-    (void)e;
+  dispatcher.Dispatch<WindowResizeEvent>([this](WindowResizeEvent& /*e*/) {
+    renderer_.OnResize();
     return true;
   });
 
@@ -57,6 +61,13 @@ void App::OnEvent(npr_window::Event& e) {
   // key events
   dispatcher.Dispatch<KeyPressEvent>([this](KeyPressEvent& e) {
     inputs_.key_tokens[e.GetKeyCode()] = e.IsRepeat();
+
+    if (inputs_.key_tokens.contains(GLFW_KEY_LEFT_CONTROL) &&
+        inputs_.key_tokens.contains(GLFW_KEY_R)) {
+      renderer_.OnReload();
+      return true;
+    }
+
     return false;
   });
   dispatcher.Dispatch<KeyReleaseEvent>([this](KeyReleaseEvent& e) {
