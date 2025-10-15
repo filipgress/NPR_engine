@@ -55,7 +55,8 @@ class Pipeline : public npr_core::NonCopyable {
     // Initialize device properties for cache validation
     device_properties_ = c_.GetPhysicalDevice().getProperties();
     
-    // Set cache file path - using pipeline name would be better but we'll use a generic name
+    // Use a shared cache file for all pipelines (best practice for performance)
+    // Sharing cache across pipeline types improves compilation time
     cache_file_path_ = "pipeline_cache.bin";
   }
   virtual ~Pipeline() { Destroy(); }
