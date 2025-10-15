@@ -1,14 +1,16 @@
 #include "pipeline.h"
 
 namespace npr_graphics {
-void Pipeline::Destroy() {
+
+Pipeline::~Pipeline() {
+  DestroyPipeline();
+  if (layout_) c_.GetDevice().destroyPipelineLayout(layout_);
+}
+
+void Pipeline::DestroyPipeline() {
   if (pipeline_) {
     c_.GetDevice().destroyPipeline(pipeline_);
     pipeline_ = nullptr;
-  }
-  if (layout_) {
-    c_.GetDevice().destroyPipelineLayout(layout_);
-    layout_ = nullptr;
   }
 }
 
@@ -49,6 +51,7 @@ void Pipeline::CreatePipeline(size_t subpass, bool use_vbo,
                               const std::string& vert_entry,
                               const std::string& frag_entry,
                               const std::vector<SpecConstInfo>& spec_consts) {
+  DestroyPipeline();
   PipelineData data;
 
   auto shader_stages =
@@ -77,11 +80,15 @@ void Pipeline::CreatePipeline(size_t subpass, bool use_vbo,
   pipeline_info.renderPass = render_pass_.GetRenderPass();
   pipeline_info.subpass = subpass;
 
+  TIMER_START(pipeline_creation)
+
   pipeline_ = c_.GetDevice()
-                  .createGraphicsPipeline(VK_NULL_HANDLE, pipeline_info)
+                  .createGraphicsPipeline(cache_.GetCache(), pipeline_info)
                   .value;
   c_.SetDbgName((uint64_t)(VkPipeline)pipeline_, vk::ObjectType::ePipeline,
                 GetDbgName());
+
+  TIMER_END(pipeline_creation)
 }
 
 std::array<vk::PipelineShaderStageCreateInfo, 2> Pipeline::GetShaderStages(

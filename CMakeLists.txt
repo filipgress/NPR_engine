@@ -108,6 +108,7 @@ set(HEADER_FILES
     ./src/graphics/shader.h
     ./src/graphics/render_pass.h
     ./src/graphics/pipeline.h
+    ./src/graphics/pipeline_cache.h
 )
 set(SOURCE_FILES
     ./src/core/main.cc
@@ -123,6 +124,7 @@ set(SOURCE_FILES
     ./src/graphics/shader.cc
     ./src/graphics/render_pass.cc
     ./src/graphics/pipeline.cc
+    ./src/graphics/pipeline_cache.cc
 )
 
 configure_file(src/core/config.h.in config.h)

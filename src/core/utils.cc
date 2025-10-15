@@ -27,4 +27,23 @@ void Logger::log_to_file(const std::string& msg) {
   log_file_.flush();
 }
 
+std::vector<uint8_t> ReadFile(const std::string& filepath) {
+  std::ifstream file(filepath, std::ios::ate | std::ios::binary);
+  if (!file) {
+    std::ostringstream err;
+    err << "unable to read the file: \'" << npr_core::GetFilename(filepath)
+        << "'";
+    throw std::runtime_error(err.str());
+  }
+
+  size_t file_size = file.tellg();
+  std::vector<uint8_t> buff(file_size, '\0');
+
+  file.seekg(0);
+  file.read(reinterpret_cast<char*>(buff.data()), file_size);
+  file.close();
+
+  return buff;
+}
+
 }  // namespace npr_core

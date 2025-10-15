@@ -24,7 +24,7 @@ void Shader::DestroyShaderModule() {
 
 void Shader::CreateShaderModule() {
   DestroyShaderModule();
-  std::string spirv = ReadFile(spirv_path_);
+  auto spirv = npr_core::ReadFile(spirv_path_);
 
   vk::ShaderModuleCreateInfo createInfo{};
   createInfo.codeSize = spirv.size();
@@ -36,24 +36,6 @@ void Shader::CreateShaderModule() {
 
   version_++;
   dirty_ = false;
-}
-
-std::string Shader::ReadFile(const std::string& filepath) {
-  std::ifstream file(filepath, std::ios::ate | std::ios::binary);
-  if (!file) {
-    std::ostringstream err;
-    err << "unable to load shader \"" << npr_core::GetFilename(filepath) << "\""
-        << std::endl;
-    throw std::runtime_error(err.str());
-  }
-
-  size_t fileSize = file.tellg();
-  std::string buffer(fileSize, '\0');
-  file.seekg(0);
-  file.read(buffer.data(), fileSize);
-  file.close();
-
-  return buffer;
 }
 
 vk::PipelineShaderStageCreateInfo Shader::GetShaderStageInfo(

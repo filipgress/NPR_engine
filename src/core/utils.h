@@ -24,10 +24,10 @@ constexpr bool kEnableShaderReload{true};
   #define TIMER_END(name)                                               \
     auto name##_end = std::chrono::high_resolution_clock::now();        \
     std::cout << #name << ": "                                          \
-              << std::chrono::duration_cast<std::chrono::milliseconds>( \
+              << std::chrono::duration_cast<std::chrono::microseconds>( \
                      name##_end - name##_start)                         \
                      .count()                                           \
-              << " ms\n";
+              << " us\n";
 #else
   #define TIMER_START(...)
   #define TIMER_END(...)
@@ -35,6 +35,7 @@ constexpr bool kEnableShaderReload{true};
 
 namespace npr_core {
 
+std::vector<uint8_t> ReadFile(const std::string& filepath);
 inline std::string GetFilename(const std::string& filepath) {
   return filepath.substr(filepath.find_last_of("/\\") + 1);
 }
@@ -70,10 +71,6 @@ class Singleton : public NonCopyable {
 class Logger : public Singleton<Logger> {
   friend class Singleton<Logger>;
 
- protected:
-  Logger();
-  ~Logger();
-
  public:
   template <typename... Args>
   void log(bool is_err, Args... args) {
@@ -92,6 +89,9 @@ class Logger : public Singleton<Logger> {
   }
 
  private:
+  Logger();
+  ~Logger();
+
   void log_to_file(const std::string& msg);
 
  private:

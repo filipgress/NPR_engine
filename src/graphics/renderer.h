@@ -8,6 +8,7 @@
 #include "shader.h"
 #include "render_pass.h"
 #include "pipeline.h"
+#include "pipeline_cache.h"
 
 namespace npr_graphics {
 class Renderer : public npr_core::NonCopyable {
@@ -40,7 +41,11 @@ class Renderer : public npr_core::NonCopyable {
       {{c_, "shaders/main_frag.spv", "../shaders/main.frag"}}};
 
   SwapPass swap_pass_{c_, swapchain_};
-  SwapPipe swap_pipe_{c_, swap_pass_, vert_shaders_[0], frag_shaders_[0]};
+
+  // pipelines
+  PipelineCache pipe_cache_{c_};
+  SwapPipe swap_pipe_{c_, pipe_cache_, swap_pass_, vert_shaders_[0],
+                      frag_shaders_[0]};
 };
 }  // namespace npr_graphics
 

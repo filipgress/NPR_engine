@@ -2,6 +2,7 @@
 #define PIPELINE_H_
 
 #include "vulkan_context.h"
+#include "pipeline_cache.h"
 #include "render_pass.h"
 #include "shader.h"
 
@@ -33,13 +34,15 @@ struct PipelineData {
 
 class Pipeline : public npr_core::NonCopyable {
  public:
-  Pipeline(const VulkanContext& context, const BasePass& render_pass,
-           VertexShader& vert_shader, FragmentShader& frag_shader)
+  Pipeline(const VulkanContext& context, const PipelineCache& cache,
+           const BasePass& render_pass, VertexShader& vert_shader,
+           FragmentShader& frag_shader)
       : c_{context},
+        cache_{cache},
         render_pass_{render_pass},
         vert_shader_{vert_shader},
         frag_shader_{frag_shader} {}
-  virtual ~Pipeline() { Destroy(); }
+  virtual ~Pipeline();
 
   vk::Pipeline GetPipeline() const { return pipeline_; }
   vk::PipelineLayout GetLayout() const { return layout_; }
@@ -51,12 +54,12 @@ class Pipeline : public npr_core::NonCopyable {
   }
 
  protected:
-  void Destroy();
   void CreatePipeline(
       size_t subpass = 0, bool use_vbo = false,
       const std::string& vert_entry = "main",
       const std::string& frag_entry = "main",
       const std::vector<SpecConstInfo>& specialization_consts = {});
+  void DestroyPipeline();
 
   void CreateLayout(
       const std::vector<vk::DescriptorSetLayout>& set_layouts = {},
@@ -95,6 +98,8 @@ class Pipeline : public npr_core::NonCopyable {
 
  protected:
   const VulkanContext& c_;
+  const PipelineCache& cache_;
+
   const BasePass& render_pass_;
 
   VertexShader& vert_shader_;
@@ -110,18 +115,15 @@ class Pipeline : public npr_core::NonCopyable {
 
 class SwapPipe : public Pipeline {
  public:
-  SwapPipe(const VulkanContext& context, const SwapPass& render_pass,
-           VertexShader& vert_shader, FragmentShader& frag_shader)
-      : Pipeline(context, render_pass, vert_shader, frag_shader) {
+  SwapPipe(const VulkanContext& context, const PipelineCache& cache,
+           const SwapPass& render_pass, VertexShader& vert_shader,
+           FragmentShader& frag_shader)
+      : Pipeline(context, cache, render_pass, vert_shader, frag_shader) {
+    CreateLayout({}, {});
     Recreate();
   }
 
-  void Recreate() {
-    Destroy();
-
-    CreateLayout();
-    CreatePipeline(0, false, "main", "main", {});
-  }
+  void Recreate() { CreatePipeline(0, false, "main", "main", {}); }
 
  private:
   const char* GetDbgName() const { return "SwapPipe"; }

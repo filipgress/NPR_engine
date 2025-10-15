@@ -23,8 +23,6 @@ class Shader : public npr_core::NonCopyable {
   bool IsDirty();
 
  protected:
-  std::string ReadFile(const std::string& filepath);
-
   bool IsUpToDate() const;
   bool Compile();
 

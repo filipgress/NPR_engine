@@ -37,6 +37,10 @@ class VulkanContext : public npr_core::NonCopyable {
   SwapSupport GetSwapSupp() const { return GetSwapSupport(phys_device_); }
   QFamilies GetQFamilies() const { return GetQueueFamilies(phys_device_); }
 
+  vk::PhysicalDeviceProperties GetProperties() const {
+    return phys_device_.getProperties();
+  }
+
   void SetDbgName(uint64_t object_handle, vk::ObjectType object_type,
                   const std::string& name) const;
 
