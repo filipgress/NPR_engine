@@ -7,6 +7,19 @@
 
 namespace npr_graphics {
 
+// Header for robust pipeline cache serialization
+// Based on "Robust pipeline cache serialization" article
+struct PipelineCachePrefixHeader {
+  uint32_t magic_number;        // Magic number for identification
+  uint32_t data_size;            // Size of cache data after header
+  uint64_t hash;                 // Hash of cache data for integrity
+  uint32_t vendor_id;            // GPU vendor ID
+  uint32_t device_id;            // GPU device ID
+  uint32_t driver_version;       // Driver version
+  uint32_t driver_abi;           // Driver ABI
+  uint8_t uuid[VK_UUID_SIZE];    // Pipeline cache UUID
+};
+
 struct PushConstInfo {
   size_t size;
   vk::ShaderStageFlags stage;
@@ -38,7 +51,13 @@ class Pipeline : public npr_core::NonCopyable {
       : c_{context},
         render_pass_{render_pass},
         vert_shader_{vert_shader},
-        frag_shader_{frag_shader} {}
+        frag_shader_{frag_shader} {
+    // Initialize device properties for cache validation
+    device_properties_ = c_.GetPhysicalDevice().getProperties();
+    
+    // Set cache file path - using pipeline name would be better but we'll use a generic name
+    cache_file_path_ = "pipeline_cache.bin";
+  }
   virtual ~Pipeline() { Destroy(); }
 
   vk::Pipeline GetPipeline() const { return pipeline_; }
@@ -93,6 +112,12 @@ class Pipeline : public npr_core::NonCopyable {
     return {constant_id, sizeof(T), &value};
   }
 
+ private:
+  // Pipeline cache management
+  bool LoadPipelineCache();
+  void SavePipelineCache();
+  uint64_t ComputeHash(const void* data, size_t size);
+
  protected:
   const VulkanContext& c_;
   const BasePass& render_pass_;
@@ -102,6 +127,11 @@ class Pipeline : public npr_core::NonCopyable {
 
   vk::Pipeline pipeline_{nullptr};
   vk::PipelineLayout layout_{nullptr};
+  vk::PipelineCache pipeline_cache_{nullptr};
+
+  // Device properties for cache validation
+  vk::PhysicalDeviceProperties device_properties_;
+  std::string cache_file_path_;
 
   // track currently used shader version for hot-reloading
   uint64_t vert_shader_ver_;

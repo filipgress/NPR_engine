@@ -29,6 +29,7 @@ class VulkanContext : public npr_core::NonCopyable {
   ~VulkanContext();
 
   vk::Device GetDevice() const { return device_; }
+  vk::PhysicalDevice GetPhysicalDevice() const { return phys_device_; }
   vk::SurfaceKHR GetSurface() const { return surface_; }
 
   vk::Queue GetGraphicsQ() const { return graphics_q_; }
