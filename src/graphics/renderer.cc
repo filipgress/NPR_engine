@@ -1,26 +1,22 @@
 #include "renderer.h"
 
 namespace npr_graphics {
-void Renderer::Update() {
+void Renderer::Render() {
   auto device = c_.GetDevice();
-  auto swapchain = swapchain_.GetSwapchain();
-  auto frame_sync = sync_.GetFrameSyncObjs();
-
-  TIMER_START(in_flight)
 
   // wait for in flight fence
+  auto [in_flight, image_available] = sync_.GetFrameSyncObjs();
   vk::Result res_in_flight =
-      device.waitForFences(frame_sync.in_flight, VK_TRUE, UINT64_MAX);
+      device.waitForFences(in_flight, VK_TRUE, UINT64_MAX);
+
   if (res_in_flight != vk::Result::eSuccess)
     throw std::runtime_error("error while waiting for in_flight fence: " +
                              vk::to_string(res_in_flight));
 
-  TIMER_END(in_flight)
-  TIMER_START(acquire_image)
-
   // acquire next image
+  auto swapchain = swapchain_.GetSwapchain();
   auto [res_acquire, image_idx] = device.acquireNextImageKHR(
-      swapchain, UINT64_MAX, frame_sync.image_available, nullptr);
+      swapchain, UINT64_MAX, image_available, nullptr);
 
   switch (res_acquire) {
     case vk::Result::eSuccess:
@@ -30,25 +26,22 @@ void Renderer::Update() {
     case vk::Result::eNotReady:
       return;  // Skip frame gracefully
     case vk::Result::eErrorOutOfDateKHR:
-      RecreateOnResize();
+      RenderTargetResize();
       return;
     default:
       throw std::runtime_error("failed to acquire swapchain image: " +
                                vk::to_string(res_acquire));
   }
 
-  device.resetFences(frame_sync.in_flight);
-
-  TIMER_END(acquire_image)
-  TIMER_START(render_finished)
+  device.resetFences(in_flight);
 
   // record & submit commands
   auto cmd_buff = Record(image_idx);
-  vk::Semaphore render_finished = sync_.GetRenderFinishedSemaphore(image_idx);
+  auto render_finished = sync_.GetRenderFinished(image_idx);
 
   vk::SubmitInfo submit_info{};
   submit_info.waitSemaphoreCount = 1;
-  submit_info.pWaitSemaphores = &frame_sync.image_available;
+  submit_info.pWaitSemaphores = &image_available;
   vk::PipelineStageFlags waitStages[]{
       vk::PipelineStageFlagBits::eColorAttachmentOutput};
   submit_info.pWaitDstStageMask = waitStages;
@@ -57,10 +50,7 @@ void Renderer::Update() {
   submit_info.signalSemaphoreCount = 1;
   submit_info.pSignalSemaphores = &render_finished;
 
-  c_.GetGraphicsQ().submit(submit_info, frame_sync.in_flight);
-
-  TIMER_END(render_finished)
-  TIMER_START(present_image)
+  c_.GetGraphicsQ().submit(submit_info, in_flight);
 
   // present to screen
   vk::PresentInfoKHR present_info{};
@@ -74,13 +64,11 @@ void Renderer::Update() {
   if (res_present == vk::Result::eErrorOutOfDateKHR ||
       res_present == vk::Result::eSuboptimalKHR ||
       swapchain_.GetProps().dirty) {
-    RecreateOnResize();
+    RenderTargetResize();
   } else if (res_present != vk::Result::eSuccess) {
     throw std::runtime_error("failed to present image: " +
                              vk::to_string(res_present));
   }
-
-  TIMER_END(present_image)
 
   sync_.Increment();
 }
@@ -124,7 +112,7 @@ vk::CommandBuffer Renderer::Record(uint image_idx) {
   return cmd_buff;
 }
 
-void Renderer::RecreateOnResize() {
+void Renderer::RenderTargetResize() {
   c_.GetDevice().waitIdle();
 
   swapchain_.Recreate(window_.GetSize());

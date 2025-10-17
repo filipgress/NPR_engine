@@ -16,12 +16,13 @@ class Sync : public npr_core::NonCopyable {
   ~Sync();
 
   PerFrameSync GetFrameSyncObjs() const { return frame_sync_objs_[frame_idx_]; }
-  vk::Semaphore GetRenderFinishedSemaphore(uint image_idx) const {
+  vk::Semaphore GetRenderFinished(uint image_idx) const {
     return render_finished_semaphores_[image_idx];
   }
 
   uint GetFrameIdx() const { return frame_idx_; }
   uint GetMaxFramesInFlight() const { return max_frames_in_flight_; }
+
   void Increment() { frame_idx_ = (frame_idx_ + 1) % max_frames_in_flight_; }
 
  private:

@@ -80,15 +80,11 @@ void Pipeline::CreatePipeline(size_t subpass, bool use_vbo,
   pipeline_info.renderPass = render_pass_.GetRenderPass();
   pipeline_info.subpass = subpass;
 
-  TIMER_START(pipeline_creation)
-
   pipeline_ = c_.GetDevice()
                   .createGraphicsPipeline(cache_.GetCache(), pipeline_info)
                   .value;
   c_.SetDbgName((uint64_t)(VkPipeline)pipeline_, vk::ObjectType::ePipeline,
                 GetDbgName());
-
-  TIMER_END(pipeline_creation)
 }
 
 std::array<vk::PipelineShaderStageCreateInfo, 2> Pipeline::GetShaderStages(

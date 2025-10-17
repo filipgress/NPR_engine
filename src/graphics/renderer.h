@@ -16,7 +16,7 @@ class Renderer : public npr_core::NonCopyable {
   Renderer(const npr_window::Window& window) : window_{window} {}
   ~Renderer() { c_.GetDevice().waitIdle(); }
 
-  void Update();
+  void Render();
 
   void OnResize() { swapchain_.GetProps().dirty = true; }
   void OnReload();
@@ -24,7 +24,7 @@ class Renderer : public npr_core::NonCopyable {
 
  private:
   vk::CommandBuffer Record(uint image_idx);
-  void RecreateOnResize();
+  void RenderTargetResize();
 
  private:
   const npr_window::Window& window_;

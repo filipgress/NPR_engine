@@ -16,7 +16,7 @@ void App::Run() {
     // INFO(timer_.GetAvgFPS(), "fps");
 
     if (window_.IsMinimized()) continue;
-    renderer_.Update();
+    renderer_.Render();
   }
 }
 
