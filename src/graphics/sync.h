@@ -21,9 +21,9 @@ class Sync : public npr_core::NonCopyable {
   }
 
   uint GetFrameIdx() const { return frame_idx_; }
-  uint GetMaxFramesInFlight() const { return max_frames_in_flight_; }
+  uint GetFrameCount() const { return frame_count_; }
 
-  void Increment() { frame_idx_ = (frame_idx_ + 1) % max_frames_in_flight_; }
+  void Increment() { frame_idx_ = (frame_idx_ + 1) % frame_count_; }
 
  private:
   const VulkanContext& c_;
@@ -32,7 +32,7 @@ class Sync : public npr_core::NonCopyable {
   std::vector<vk::Semaphore> render_finished_semaphores_;
 
   uint frame_idx_{0};
-  uint max_frames_in_flight_;
+  uint frame_count_;  // max frames in flight
 };
 
 }  // namespace npr_graphics

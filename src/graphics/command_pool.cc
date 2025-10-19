@@ -1,11 +1,10 @@
 #include "command_pool.h"
 
 namespace npr_graphics {
-CommandPool::CommandPool(const VulkanContext& context,
-                         uint max_frames_in_flight)
+CommandPool::CommandPool(const VulkanContext& context, uint frame_count)
     : c_{context} {
   CreateCommandPool();
-  CreateCommandBuffers(max_frames_in_flight);
+  CreateCommandBuffers(frame_count);
 }
 
 CommandPool::~CommandPool() {
@@ -24,11 +23,11 @@ void CommandPool::CreateCommandPool() {
                 vk::ObjectType::eCommandPool, "MainCommandPool");
 }
 
-void CommandPool::CreateCommandBuffers(uint max_frames_in_flight) {
+void CommandPool::CreateCommandBuffers(uint frame_count) {
   vk::CommandBufferAllocateInfo alloc_info{};
   alloc_info.commandPool = cmd_pool_;
   alloc_info.level = vk::CommandBufferLevel::ePrimary;
-  alloc_info.commandBufferCount = max_frames_in_flight;
+  alloc_info.commandBufferCount = frame_count;
 
   cmd_buffs_ = c_.GetDevice().allocateCommandBuffers(alloc_info);
   for (size_t i = 0; i < cmd_buffs_.size(); ++i)

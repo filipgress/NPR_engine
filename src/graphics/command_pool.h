@@ -6,7 +6,7 @@
 namespace npr_graphics {
 class CommandPool : public npr_core::NonCopyable {
  public:
-  CommandPool(const VulkanContext& context, uint max_frames_in_flight);
+  CommandPool(const VulkanContext& context, uint frame_count);
   ~CommandPool();
 
   vk::CommandBuffer GetCmdBuff(uint frame_idx) const {
@@ -18,7 +18,7 @@ class CommandPool : public npr_core::NonCopyable {
 
  private:
   void CreateCommandPool();
-  void CreateCommandBuffers(uint max_frames_in_flight);
+  void CreateCommandBuffers(uint frame_count);
 
  private:
   const VulkanContext& c_;

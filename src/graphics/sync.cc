@@ -4,13 +4,13 @@ namespace npr_graphics {
 Sync::Sync(const VulkanContext& context, uint image_count) : c_{context} {
   auto device = c_.GetDevice();
 
-  max_frames_in_flight_ = std::min(image_count, 3u);
-  INFO("max frames(in flight): ", max_frames_in_flight_);
+  frame_count_ = std::min(image_count, 3u);
+  INFO("max frames(in flight): ", frame_count_);
 
-  frame_sync_objs_.resize(max_frames_in_flight_);
+  frame_sync_objs_.resize(frame_count_);
   render_finished_semaphores_.resize(image_count);
 
-  for (uint i = 0; i < max_frames_in_flight_; i++) {
+  for (uint i = 0; i < frame_count_; i++) {
     frame_sync_objs_[i].image_available = device.createSemaphore({});
     c_.SetDbgName((uint64_t)(VkSemaphore)frame_sync_objs_[i].image_available,
                   vk::ObjectType::eSemaphore,
