@@ -101,6 +101,9 @@ void SwapPass::CreateFramebuffers() {
     framebuff_info.layers = 1;
 
     framebuffers_[i] = c_.GetDevice().createFramebuffer(framebuff_info);
+    c_.SetDbgName((uint64_t)(VkFramebuffer)framebuffers_[i],
+                  vk::ObjectType::eFramebuffer,
+                  GetDbgName() + "_framebuffer_" + std::to_string(i));
   }
 }
 

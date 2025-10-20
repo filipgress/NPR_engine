@@ -65,7 +65,7 @@ class Pipeline : public npr_core::NonCopyable {
       const std::vector<vk::DescriptorSetLayout>& set_layouts = {},
       const std::vector<PushConstInfo>& push_consts = {});
 
-  virtual const char* GetDbgName() const = 0;
+  virtual const std::string GetDbgName() const = 0;
 
   std::array<vk::PipelineShaderStageCreateInfo, 2> GetShaderStages(
       PipelineData& data, const std::string& vert_entry,
@@ -126,7 +126,7 @@ class SwapPipe : public Pipeline {
   void Recreate() { CreatePipeline(0, false, "main", "main", {}); }
 
  private:
-  const char* GetDbgName() const { return "SwapPipe"; }
+  const std::string GetDbgName() const { return "swap_pipe"; }
 };
 
 }  // namespace npr_graphics

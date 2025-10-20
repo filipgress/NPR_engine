@@ -16,6 +16,7 @@ struct SwapSupport {
 struct QFamilies {
   std::optional<uint32_t> graphics_i;
   std::optional<uint32_t> present_i;
+  std::optional<uint32_t> transfer_i;
 
   bool IsComplete() { return graphics_i.has_value() && present_i.has_value(); }
   bool IsUnique() {
@@ -33,6 +34,7 @@ class VulkanContext : public npr_core::NonCopyable {
 
   vk::Queue GetGraphicsQ() const { return graphics_q_; }
   vk::Queue GetPresentQ() const { return present_q_; }
+  vk::Queue GetTransferQ() const { return transfer_q_; }
 
   SwapSupport GetSwapSupp() const { return GetSwapSupport(phys_device_); }
   QFamilies GetQFamilies() const { return GetQueueFamilies(phys_device_); }
@@ -40,6 +42,9 @@ class VulkanContext : public npr_core::NonCopyable {
   vk::PhysicalDeviceProperties GetProperties() const {
     return phys_device_.getProperties();
   }
+
+  uint32_t FindMemTypeIdx(uint32_t typ_bits,
+                          vk::MemoryPropertyFlags properties) const;
 
   void SetDbgName(uint64_t object_handle, vk::ObjectType object_type,
                   const std::string& name) const;
@@ -81,6 +86,7 @@ class VulkanContext : public npr_core::NonCopyable {
 
   vk::Queue graphics_q_{nullptr};
   vk::Queue present_q_{nullptr};
+  vk::Queue transfer_q_{nullptr};
 
   std::vector<const char*> layers_;
   std::vector<const char*> exts_{VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME};

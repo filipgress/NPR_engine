@@ -26,7 +26,7 @@ class BasePass : public npr_core::NonCopyable {
   void DestroyFramebuffers();
 
   virtual void SetClearValues() = 0;
-  virtual const char* GetDbgName() const = 0;
+  virtual const std::string GetDbgName() const = 0;
 
   virtual std::vector<vk::AttachmentDescription> GetAttachments() const = 0;
   virtual std::vector<vk::SubpassDependency> GetDependencies() const = 0;
@@ -53,7 +53,7 @@ class SwapPass : public BasePass {
   void CreateFramebuffers() override;
   void SetClearValues() override;
 
-  const char* GetDbgName() const override { return "SwapPass"; }
+  const std::string GetDbgName() const override { return "swap_pass"; }
 
   std::vector<vk::AttachmentDescription> GetAttachments() const override;
   std::vector<vk::SubpassDependency> GetDependencies() const override;

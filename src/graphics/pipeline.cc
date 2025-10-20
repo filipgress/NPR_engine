@@ -43,8 +43,7 @@ void Pipeline::CreateLayout(
 
   layout_ = c_.GetDevice().createPipelineLayout(pipeline_layout_info);
   c_.SetDbgName((uint64_t)(VkPipelineLayout)layout_,
-                vk::ObjectType::ePipelineLayout,
-                std::string(GetDbgName()) + "_Layout");
+                vk::ObjectType::ePipelineLayout, GetDbgName() + "_layout");
 }
 
 void Pipeline::CreatePipeline(size_t subpass, bool use_vbo,

@@ -104,6 +104,9 @@ void Swapchain::CreateImageViews() {
                                         0, 1};
 
     image_views_[i] = c_.GetDevice().createImageView(image_view_info);
+    c_.SetDbgName((uint64_t)(VkImageView)image_views_[i],
+                  vk::ObjectType::eImageView,
+                  "swap_image_view_" + std::to_string(i));
   }
 }
 

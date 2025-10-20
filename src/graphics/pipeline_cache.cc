@@ -11,7 +11,7 @@ PipelineCache::PipelineCache(const VulkanContext& context) : c_{context} {
 
   pipeline_cache_ = c_.GetDevice().createPipelineCache(cache_info);
   c_.SetDbgName((uint64_t)(VkPipelineCache)pipeline_cache_,
-                vk::ObjectType::ePipelineCache, "PipelineCache");
+                vk::ObjectType::ePipelineCache, "pipeline_cache");
 }
 
 PipelineCache::~PipelineCache() {

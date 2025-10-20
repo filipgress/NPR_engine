@@ -77,6 +77,9 @@ void VulkanContext::CreateDevice() {
       q_families.present_i.value(),
   };
 
+  if (q_families.transfer_i.has_value())
+    unique_queue_indices.insert(q_families.transfer_i.value());
+
   std::vector<vk::DeviceQueueCreateInfo> queue_infos;
   float queue_priority{1.0f};
   for (uint32_t queue_index : unique_queue_indices) {
@@ -101,6 +104,13 @@ void VulkanContext::CreateDevice() {
 
   graphics_q_ = device_.getQueue(q_families.graphics_i.value(), 0);
   present_q_ = device_.getQueue(q_families.present_i.value(), 0);
+
+  if (q_families.transfer_i.has_value()) {
+    transfer_q_ = device_.getQueue(q_families.transfer_i.value(), 0);
+  } else {
+    transfer_q_ = graphics_q_;
+    INFO("transfer queue not found (using graphics queue)");
+  }
 }
 
 /*
@@ -182,8 +192,9 @@ int VulkanContext::RateDevice(vk::PhysicalDevice device) const {
 
   if (!swap_supp.IsAdequate() || !q_indices.IsComplete()) return 0;
 
-  // favor devices with different present & graphics queue
-  if (q_indices.IsUnique()) score += 25;
+  // favor devices with different present & graphics & transfer queue
+  if (q_indices.IsUnique()) score += 50;
+  if (q_indices.transfer_i.has_value()) score += 25;
 
   return score;
 }
@@ -309,13 +320,21 @@ QFamilies VulkanContext::GetQueueFamilies(vk::PhysicalDevice device) const {
 
   std::vector<uint32_t> graphics_candidates;
   std::vector<uint32_t> present_candidates;
+  std::optional<uint32_t> transfer;
 
   for (const auto& queueFamily : device.getQueueFamilyProperties()) {
+    // graphics
     if (queueFamily.queueFlags & vk::QueueFlagBits::eGraphics)
       graphics_candidates.push_back(i);
 
+    // present
     if (device.getSurfaceSupportKHR(i, surface_))
       present_candidates.push_back(i);
+
+    // tranfer
+    if (queueFamily.queueFlags & vk::QueueFlagBits::eTransfer &&
+        !(queueFamily.queueFlags & vk::QueueFlagBits::eGraphics))
+      transfer = i;
 
     i++;
   }
@@ -325,10 +344,22 @@ QFamilies VulkanContext::GetQueueFamilies(vk::PhysicalDevice device) const {
   // first unique combination
   for (auto graphics : graphics_candidates)
     for (auto present : present_candidates)
-      if (graphics != present) return {graphics, present};
+      if (graphics != present) return {graphics, present, transfer};
 
   // fallback (graphics and present indices are same)
-  return {graphics_candidates[0], present_candidates[0]};
+  return {graphics_candidates[0], present_candidates[0], transfer};
+}
+
+uint32_t VulkanContext::FindMemTypeIdx(
+    uint32_t type_bits, vk::MemoryPropertyFlags properties) const {
+  auto mem_props = phys_device_.getMemoryProperties();
+
+  for (uint32_t i = 0; i < mem_props.memoryTypeCount; i++)
+    if ((type_bits & (1 << i)) &&
+        (mem_props.memoryTypes[i].propertyFlags & properties) == properties)
+      return i;
+
+  throw std::runtime_error("Failed to find suitable memory type!");
 }
 
 void VulkanContext::SetDbgName(uint64_t object_handle,
