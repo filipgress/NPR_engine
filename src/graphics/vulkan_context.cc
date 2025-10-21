@@ -72,17 +72,17 @@ void VulkanContext::CreateInstance() {
 void VulkanContext::CreateDevice() {
   auto q_families = GetQFamilies();
 
-  std::set<uint32_t> unique_queue_indices{
+  std::set<uint32_t> unique_q_indices{
       q_families.graphics_i.value(),
       q_families.present_i.value(),
   };
 
   if (q_families.transfer_i.has_value())
-    unique_queue_indices.insert(q_families.transfer_i.value());
+    unique_q_indices.insert(q_families.transfer_i.value());
 
   std::vector<vk::DeviceQueueCreateInfo> queue_infos;
   float queue_priority{1.0f};
-  for (uint32_t queue_index : unique_queue_indices) {
+  for (uint32_t queue_index : unique_q_indices) {
     vk::DeviceQueueCreateInfo queue_info;
     queue_info.flags = vk::DeviceQueueCreateFlags();
     queue_info.pQueuePriorities = &queue_priority;

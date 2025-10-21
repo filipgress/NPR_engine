@@ -77,6 +77,13 @@ set(IMGUI_SOURCES
     ${IMGUI_DIR}/backends/imgui_impl_glfw.cpp
 )
 
+FetchContent_Declare(
+    flecs
+    GIT_REPOSITORY https://github.com/SanderMertens/flecs.git
+    GIT_TAG v4.1.1
+)
+FetchContent_MakeAvailable(flecs)
+
 # Require Vulkan SDK to be present for Debug builds
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     find_package(Vulkan)
@@ -104,9 +111,13 @@ set(HEADER_FILES
     ./src/graphics/vulkan_context.h
     ./src/graphics/swapchain.h
     ./src/graphics/sync.h
+    ./src/graphics/resources.h
+    ./src/graphics/buffer.h
     ./src/graphics/command_pool.h
-    ./src/graphics/shader.h
+    ./src/graphics/descriptor_pool.h
+    ./src/graphics/descriptor_sets.h
     ./src/graphics/render_pass.h
+    ./src/graphics/shader.h
     ./src/graphics/pipeline.h
     ./src/graphics/pipeline_cache.h
 )
@@ -120,9 +131,13 @@ set(SOURCE_FILES
     ./src/graphics/vulkan_context.cc
     ./src/graphics/swapchain.cc
     ./src/graphics/sync.cc
+    ./src/graphics/resources.cc
+    ./src/graphics/buffer.cc
     ./src/graphics/command_pool.cc
-    ./src/graphics/shader.cc
+    ./src/graphics/descriptor_pool.cc
+    ./src/graphics/descriptor_sets.cc
     ./src/graphics/render_pass.cc
+    ./src/graphics/shader.cc
     ./src/graphics/pipeline.cc
     ./src/graphics/pipeline_cache.cc
 )
@@ -146,7 +161,7 @@ target_include_directories(
         ${IMGUI_DIR}
         ${IMGUI_DIR}/backends
 )
-target_link_libraries(${PROJECT_NAME} PRIVATE glfw glm tinygltf)
+target_link_libraries(${PROJECT_NAME} PRIVATE glfw glm tinygltf flecs::flecs)
 
 # ---------------------------------------
 # Enable additional debug flags

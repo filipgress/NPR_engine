@@ -33,16 +33,17 @@ class Renderer : public npr_core::NonCopyable {
   Swapchain swapchain_{c_, window_.GetSize()};
 
   Sync sync_{c_, swapchain_.GetProps().image_count};
-  CommandPool cmd_pool_{c_, sync_.GetMaxFramesInFlight()};
+
+  GraphicsCommandPool cmd_pool_{c_, sync_.GetFrameCount()};
+  // DescriptorPool desc_pool_{c_, res_};
+
+  SwapPass swap_pass_{c_, swapchain_};
 
   std::array<VertexShader, 1> vert_shaders_{
       {{c_, "shaders/main_vert.spv", "../shaders/main.vert"}}};
   std::array<FragmentShader, 1> frag_shaders_{
       {{c_, "shaders/main_frag.spv", "../shaders/main.frag"}}};
 
-  SwapPass swap_pass_{c_, swapchain_};
-
-  // pipelines
   PipelineCache pipe_cache_{c_};
   SwapPipe swap_pipe_{c_, pipe_cache_, swap_pass_, vert_shaders_[0],
                       frag_shaders_[0]};

@@ -1,4 +1,5 @@
 #include "pipeline.h"
+#include "buffer.h"
 
 namespace npr_graphics {
 
@@ -123,56 +124,6 @@ std::array<vk::PipelineShaderStageCreateInfo, 2> Pipeline::GetShaderStages(
 
   shader_stages[1].pSpecializationInfo = &data.specialization_info;
   return shader_stages;
-}
-
-struct Vertex {
-  glm::vec3 pos;
-  glm::vec2 uv;
-
-  glm::vec3 normal;
-  glm::vec4 tangent;
-
-  static vk::VertexInputBindingDescription GetBindingDesc();
-  static std::vector<vk::VertexInputAttributeDescription> GetAttributeDescs();
-};
-
-vk::VertexInputBindingDescription Vertex::GetBindingDesc() {
-  vk::VertexInputBindingDescription binding_desc{};
-  binding_desc.binding = 0;
-  binding_desc.stride = sizeof(Vertex);
-  binding_desc.inputRate = vk::VertexInputRate::eVertex;
-
-  return binding_desc;
-}
-
-std::vector<vk::VertexInputAttributeDescription> Vertex::GetAttributeDescs() {
-  std::vector<vk::VertexInputAttributeDescription> descs(4);
-
-  // position
-  descs[0].binding = 0;
-  descs[0].location = 0;
-  descs[0].format = vk::Format::eR32G32B32Sfloat;
-  descs[0].offset = offsetof(Vertex, pos);
-
-  // uv
-  descs[1].binding = 0;
-  descs[1].location = 1;
-  descs[1].format = vk::Format::eR32G32Sfloat;
-  descs[1].offset = offsetof(Vertex, uv);
-
-  // normal
-  descs[2].binding = 0;
-  descs[2].location = 2;
-  descs[2].format = vk::Format::eR32G32B32Sfloat;
-  descs[2].offset = offsetof(Vertex, normal);
-
-  // tan
-  descs[3].binding = 0;
-  descs[3].location = 3;
-  descs[3].format = vk::Format::eR32G32B32A32Sfloat;
-  descs[3].offset = offsetof(Vertex, tangent);
-
-  return descs;
 }
 
 vk::PipelineVertexInputStateCreateInfo Pipeline::GetVertexInputState(
