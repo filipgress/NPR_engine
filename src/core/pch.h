@@ -14,6 +14,7 @@
 #include <numeric>
 
 #include <memory>
+#include <stack>
 #include <deque>
 #include <set>
 #include <unordered_set>

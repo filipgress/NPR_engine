@@ -11,7 +11,7 @@ class CommandPool : public npr_core::NonCopyable {
               const std::string& dbg_name);
   ~CommandPool();
 
-  vk::CommandBuffer GetCmdBuff(uint idx) const { return cmd_buffs_[idx]; }
+  vk::CommandBuffer GetCmdBuff(uint idx = 0) const { return cmd_buffs_[idx]; }
 
  private:
   void CreateCommandPool(vk::CommandPoolCreateFlags usage, uint32_t queue_idx);

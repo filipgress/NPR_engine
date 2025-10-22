@@ -3,10 +3,10 @@
 
 #include "vulkan_context.h"
 #include "descriptor_sets.h"
-#include "resources.h"
 
 namespace npr_graphics {
 
+class Resources;
 class DescriptorPool : public npr_core::NonCopyable {
  public:
   DescriptorPool(const VulkanContext& context, const Resources& res);

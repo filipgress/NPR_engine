@@ -10,6 +10,8 @@ class Buffer : public npr_core::NonCopyable {
   Buffer(const VulkanContext& context, vk::BufferUsageFlags usage,
          vk::MemoryPropertyFlags properties, uint32_t size,
          const std::string& dbg_name);
+  Buffer(Buffer&&) = default;
+
   virtual ~Buffer();
 
   void Write(vk::CommandBuffer cmd_buff, const void* data);
@@ -39,8 +41,8 @@ struct Vertex {
   glm::vec3 pos;
   glm::vec2 uv;
 
-  glm::vec3 normal;
-  glm::vec4 tangent;
+  glm::vec3 normal{0.0f};
+  glm::vec4 tangent{1.0f};
 
   static vk::VertexInputBindingDescription GetBindingDesc();
   static std::vector<vk::VertexInputAttributeDescription> GetAttributeDescs();
@@ -48,25 +50,29 @@ struct Vertex {
 
 class VertexBuffer : public Buffer {
  public:
-  VertexBuffer(const VulkanContext& context,
-               const std::vector<Vertex>& vertices)
+  VertexBuffer(const VulkanContext& context, vk::CommandBuffer cmd_buff,
+               const std::vector<Vertex>& vertices, const std::string& dbg_name)
       : Buffer(context,
                vk::BufferUsageFlagBits::eVertexBuffer |
                    vk::BufferUsageFlagBits::eTransferDst,
                vk::MemoryPropertyFlagBits::eDeviceLocal,
-               vertices.size() * sizeof(Vertex), "vertex_buffer") {}
+               vertices.size() * sizeof(Vertex), dbg_name) {
+    Write(cmd_buff, vertices.data());
+  }
 };
 
 class IndexBuffer : public Buffer {
  public:
-  IndexBuffer(const VulkanContext& context,
-              const std::vector<uint32_t>& indices)
+  IndexBuffer(const VulkanContext& context, vk::CommandBuffer cmd_buff,
+              const std::vector<uint32_t>& indices, const std::string& dbg_name)
       : Buffer(context,
                vk::BufferUsageFlagBits::eIndexBuffer |
                    vk::BufferUsageFlagBits::eTransferDst,
                vk::MemoryPropertyFlagBits::eDeviceLocal,
-               indices.size() * sizeof(indices[0]), "index_buffer"),
-        count_{static_cast<uint32_t>(indices.size())} {}
+               indices.size() * sizeof(indices[0]), dbg_name),
+        count_{indices.size()} {
+    Write(cmd_buff, indices.data());
+  }
 
   size_t GetCount() const { return count_; }
 

@@ -1,4 +1,5 @@
 #include "descriptor_sets.h"
+#include "resources.h"
 
 namespace npr_graphics {
 

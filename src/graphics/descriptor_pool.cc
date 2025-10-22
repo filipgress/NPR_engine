@@ -1,4 +1,5 @@
 #include "descriptor_pool.h"
+#include "resources.h"
 
 namespace npr_graphics {
 

@@ -18,9 +18,10 @@ class Renderer : public npr_core::NonCopyable {
 
   void Render();
 
-  void OnResize() { swapchain_.GetProps().dirty = true; }
-  void OnReload();
-  void OnTick();
+  void OnWindowResize() { swapchain_.GetProps().dirty = true; }
+
+  void RecompileShaders();
+  void UpdateShaders();
 
  private:
   vk::CommandBuffer Record(uint image_idx);

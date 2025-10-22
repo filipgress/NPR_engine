@@ -70,15 +70,15 @@ void VulkanContext::CreateInstance() {
 }
 
 void VulkanContext::CreateDevice() {
-  auto q_families = GetQFamilies();
+  q_families_ = GetQueueFamilies(phys_device_);
 
   std::set<uint32_t> unique_q_indices{
-      q_families.graphics_i.value(),
-      q_families.present_i.value(),
+      q_families_.graphics_i.value(),
+      q_families_.present_i.value(),
   };
 
-  if (q_families.transfer_i.has_value())
-    unique_q_indices.insert(q_families.transfer_i.value());
+  if (q_families_.transfer_i.has_value())
+    unique_q_indices.insert(q_families_.transfer_i.value());
 
   std::vector<vk::DeviceQueueCreateInfo> queue_infos;
   float queue_priority{1.0f};
@@ -102,11 +102,11 @@ void VulkanContext::CreateDevice() {
   device_ = phys_device_.createDevice(device_info);
   vk::detail::defaultDispatchLoaderDynamic.init(device_);
 
-  graphics_q_ = device_.getQueue(q_families.graphics_i.value(), 0);
-  present_q_ = device_.getQueue(q_families.present_i.value(), 0);
+  graphics_q_ = device_.getQueue(q_families_.graphics_i.value(), 0);
+  present_q_ = device_.getQueue(q_families_.present_i.value(), 0);
 
-  if (q_families.transfer_i.has_value()) {
-    transfer_q_ = device_.getQueue(q_families.transfer_i.value(), 0);
+  if (q_families_.transfer_i.has_value()) {
+    transfer_q_ = device_.getQueue(q_families_.transfer_i.value(), 0);
   } else {
     transfer_q_ = graphics_q_;
     INFO("transfer queue not found (using graphics queue)");

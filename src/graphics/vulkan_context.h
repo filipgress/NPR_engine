@@ -37,7 +37,7 @@ class VulkanContext : public npr_core::NonCopyable {
   vk::Queue GetTransferQ() const { return transfer_q_; }
 
   SwapSupport GetSwapSupp() const { return GetSwapSupport(phys_device_); }
-  QFamilies GetQFamilies() const { return GetQueueFamilies(phys_device_); }
+  QFamilies GetQFamilies() const { return q_families_; }
 
   vk::PhysicalDeviceProperties GetProperties() const {
     return phys_device_.getProperties();
@@ -84,6 +84,7 @@ class VulkanContext : public npr_core::NonCopyable {
   vk::PhysicalDevice phys_device_{nullptr};
   vk::Device device_{nullptr};
 
+  QFamilies q_families_;
   vk::Queue graphics_q_{nullptr};
   vk::Queue present_q_{nullptr};
   vk::Queue transfer_q_{nullptr};

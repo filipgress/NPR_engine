@@ -19,7 +19,7 @@ class App : public NonCopyable {
   npr_window::Window window_{[this](npr_window::Event& e) { OnEvent(e); }};
   npr_graphics::Renderer renderer_{window_};
 
-  FrameTimer timer_{60, [this](npr_window::Event& e) { return OnEvent(e); }};
+  FrameTimer timer_{0, [this](npr_window::Event& e) { return OnEvent(e); }};
   InputHandler inputs_;
   bool running_{true};
 };

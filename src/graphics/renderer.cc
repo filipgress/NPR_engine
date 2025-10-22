@@ -119,7 +119,7 @@ void Renderer::RenderTargetResize() {
   swap_pass_.Recreate();  // swapchain framebuffers
 }
 
-void Renderer::OnReload() {
+void Renderer::RecompileShaders() {
   if (!kEnableShaderReload) return;
 
   INFO("Reloading shaders");
@@ -128,11 +128,10 @@ void Renderer::OnReload() {
   for (auto& frag_shader : frag_shaders_) frag_shader.ReloadAsync();
 }
 
-void Renderer::OnTick() {
+void Renderer::UpdateShaders() {
   if (!kEnableShaderReload) return;
 
   bool is_dirty{false};
-
   for (auto& vert_shader : vert_shaders_) {
     if (vert_shader.IsDirty()) {
       is_dirty = true;

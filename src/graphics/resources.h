@@ -2,17 +2,9 @@
 #define RESOURCES_H_
 
 #include "vulkan_context.h"
-#include "buffer.h"
-
 #include "scene/scene.h"
 
 namespace npr_graphics {
-
-struct SceneResources {
-  std::vector<npr_graphics::IndexBuffer> index_buffs;
-  std::vector<npr_graphics::VertexBuffer> vertex_buffs;
-  // std::vector<Textures> textures;
-};
 
 struct FrameProps {};
 struct FrameResources {};

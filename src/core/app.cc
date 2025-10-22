@@ -26,7 +26,7 @@ void App::OnEvent(npr_window::Event& e) {
 
   // app events
   dispatcher.Dispatch<AppTickEvent>([this](AppTickEvent& /*e*/) {
-    renderer_.OnTick();
+    renderer_.UpdateShaders();
     return true;
   });
 
@@ -36,7 +36,7 @@ void App::OnEvent(npr_window::Event& e) {
     return true;
   });
   dispatcher.Dispatch<WindowResizeEvent>([this](WindowResizeEvent& /*e*/) {
-    renderer_.OnResize();
+    renderer_.OnWindowResize();
     return true;
   });
 
@@ -64,7 +64,7 @@ void App::OnEvent(npr_window::Event& e) {
 
     if (inputs_.key_tokens.contains(GLFW_KEY_LEFT_CONTROL) &&
         inputs_.key_tokens.contains(GLFW_KEY_R)) {
-      renderer_.OnReload();
+      renderer_.RecompileShaders();
       return true;
     }
 

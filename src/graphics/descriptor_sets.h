@@ -2,9 +2,9 @@
 #define DESCRIPTOR_SETS_H_
 
 #include "vulkan_context.h"
-#include "resources.h"
 
 namespace npr_graphics {
+class Resources;
 class DescriptorSets : public npr_core::NonCopyable {
  public:
   DescriptorSets(const VulkanContext& context) : c_{context} {}
