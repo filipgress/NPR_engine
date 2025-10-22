@@ -63,7 +63,7 @@ void Swapchain::CreateSwapchain(glm::ivec2 frame_size,
   uint32_t queueFamilyIndices[]{q_families.graphics_i.value(),
                                 q_families.present_i.value()};
 
-  if (q_families.IsUnique()) {
+  if (q_families.graphics_i.value() != q_families.present_i.value()) {
     swapchain_info.imageSharingMode = vk::SharingMode::eConcurrent;
     swapchain_info.queueFamilyIndexCount = 2;
     swapchain_info.pQueueFamilyIndices = queueFamilyIndices;

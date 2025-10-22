@@ -18,9 +18,9 @@ struct QFamilies {
   std::optional<uint32_t> present_i;
   std::optional<uint32_t> transfer_i;
 
-  bool IsComplete() { return graphics_i.has_value() && present_i.has_value(); }
-  bool IsUnique() {
-    return IsComplete() && graphics_i.value() != present_i.value();
+  bool IsComplete() {
+    return graphics_i.has_value() && present_i.has_value() &&
+           transfer_i.has_value();
   }
 };
 

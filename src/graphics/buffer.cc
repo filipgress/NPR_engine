@@ -40,7 +40,7 @@ void Buffer::CreateBuffer() {
 
   auto q_families = c_.GetQFamilies();
   if (properties_ & vk::MemoryPropertyFlagBits::eHostVisible ||
-      !q_families.transfer_i.has_value()) {
+      q_families.graphics_i.value() == q_families.transfer_i.value()) {
     buffer_info.sharingMode = vk::SharingMode::eExclusive;
   } else {
     uint32_t indices[] = {q_families.graphics_i.value(),

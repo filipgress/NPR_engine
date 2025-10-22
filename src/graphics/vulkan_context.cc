@@ -75,10 +75,8 @@ void VulkanContext::CreateDevice() {
   std::set<uint32_t> unique_q_indices{
       q_families_.graphics_i.value(),
       q_families_.present_i.value(),
+      q_families_.transfer_i.value(),
   };
-
-  if (q_families_.transfer_i.has_value())
-    unique_q_indices.insert(q_families_.transfer_i.value());
 
   std::vector<vk::DeviceQueueCreateInfo> queue_infos;
   float queue_priority{1.0f};
@@ -104,13 +102,11 @@ void VulkanContext::CreateDevice() {
 
   graphics_q_ = device_.getQueue(q_families_.graphics_i.value(), 0);
   present_q_ = device_.getQueue(q_families_.present_i.value(), 0);
+  transfer_q_ = device_.getQueue(q_families_.transfer_i.value(), 0);
 
-  if (q_families_.transfer_i.has_value()) {
-    transfer_q_ = device_.getQueue(q_families_.transfer_i.value(), 0);
-  } else {
-    transfer_q_ = graphics_q_;
-    INFO("transfer queue not found (using graphics queue)");
-  }
+  INFO("queues (graphics, present, transfer): ", q_families_.graphics_i.value(),
+       ", ", q_families_.present_i.value(), ", ",
+       q_families_.transfer_i.value());
 }
 
 /*
@@ -180,21 +176,18 @@ void VulkanContext::PickPhysDevice() {
 int VulkanContext::RateDevice(vk::PhysicalDevice device) const {
   int score{1};
 
-  vk::PhysicalDeviceProperties props = device.getProperties();
-
-  // favor discrete over integrated GPU
-  if (props.deviceType == vk::PhysicalDeviceType::eDiscreteGpu) score += 100;
-
   if (!DeviceExtsSupported(device) || !DeviceFeatsSupported(device)) return 0;
 
   auto swap_supp = GetSwapSupport(device);
-  auto q_indices = GetQueueFamilies(device);
+  auto q_families = GetQueueFamilies(device);
 
-  if (!swap_supp.IsAdequate() || !q_indices.IsComplete()) return 0;
+  if (!swap_supp.IsAdequate() || !q_families.IsComplete()) return 0;
+  if (q_families.graphics_i != q_families.present_i) score += 50;
+  if (q_families.graphics_i != q_families.transfer_i) score += 25;
+  if (q_families.present_i != q_families.transfer_i) score += 10;
 
-  // favor devices with different present & graphics & transfer queue
-  if (q_indices.IsUnique()) score += 50;
-  if (q_indices.transfer_i.has_value()) score += 25;
+  auto props = device.getProperties();
+  if (props.deviceType == vk::PhysicalDeviceType::eDiscreteGpu) score += 100;
 
   return score;
 }
@@ -318,36 +311,54 @@ SwapSupport VulkanContext::GetSwapSupport(vk::PhysicalDevice device) const {
 QFamilies VulkanContext::GetQueueFamilies(vk::PhysicalDevice device) const {
   uint32_t i = 0;
 
-  std::vector<uint32_t> graphics_candidates;
-  std::vector<uint32_t> present_candidates;
-  std::optional<uint32_t> transfer;
+  std::vector<uint32_t> g_candidates;
+  std::vector<uint32_t> p_candidates;
+  std::vector<uint32_t> t_candidates;
 
   for (const auto& queueFamily : device.getQueueFamilyProperties()) {
-    // graphics
     if (queueFamily.queueFlags & vk::QueueFlagBits::eGraphics)
-      graphics_candidates.push_back(i);
+      g_candidates.push_back(i);
 
-    // present
-    if (device.getSurfaceSupportKHR(i, surface_))
-      present_candidates.push_back(i);
+    if (device.getSurfaceSupportKHR(i, surface_)) p_candidates.push_back(i);
 
-    // tranfer
     if (queueFamily.queueFlags & vk::QueueFlagBits::eTransfer &&
         !(queueFamily.queueFlags & vk::QueueFlagBits::eGraphics))
-      transfer = i;
+      t_candidates.push_back(i);
 
     i++;
   }
 
-  if (graphics_candidates.empty() || present_candidates.empty()) return {};
+  if (g_candidates.empty() || p_candidates.empty()) return {};
 
-  // first unique combination
-  for (auto graphics : graphics_candidates)
-    for (auto present : present_candidates)
-      if (graphics != present) return {graphics, present, transfer};
+  QFamilies gpp;
+  QFamilies gpg;
+  QFamilies ggt;
+  QFamilies ggg;
 
-  // fallback (graphics and present indices are same)
-  return {graphics_candidates[0], present_candidates[0], transfer};
+  for (uint32_t g : g_candidates) {
+    for (uint32_t p : p_candidates) {
+      if (g != p) {
+        gpg = {g, p, g};
+
+        for (uint32_t t : t_candidates) {
+          if (t != p) return {g, p, t};  // all unique
+          gpp = {g, p, p};
+        }
+      } else {
+        ggg = {g, g, g};
+
+        for (uint32_t t : t_candidates)
+          if (t != p) ggt = {g, g, t};
+      }
+    }
+  }
+
+  if (gpp.graphics_i.has_value()) return gpp;
+  if (gpg.graphics_i.has_value()) return gpg;
+  if (ggt.graphics_i.has_value()) return ggt;
+  if (ggg.graphics_i.has_value()) return ggg;
+
+  assert(false);
 }
 
 uint32_t VulkanContext::FindMemTypeIdx(

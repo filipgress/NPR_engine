@@ -18,8 +18,9 @@ class Renderer : public npr_core::NonCopyable {
 
   void Render();
 
-  void OnWindowResize() { swapchain_.GetProps().dirty = true; }
+  const VulkanContext& GetContext() const { return c_; }
 
+  void OnWindowResize() { swapchain_.GetProps().dirty = true; }
   void RecompileShaders();
   void UpdateShaders();
 
