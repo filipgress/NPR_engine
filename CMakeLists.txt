@@ -97,16 +97,23 @@ endif()
 # ---------------------------------------
 
 set(HEADER_FILES
+    # core
     ./src/core/pch.h
     ./src/core/utils.h
     ./src/core/app.h
     ./src/core/frame_timer.h
     ./src/core/input_handler.h
+    # scene
+    ./src/scene/scene.h
+    ./src/scene/scene_loader.h
+    ./src/scene/components.h
+    # window
     ./src/window/window.h
     ./src/window/event.h
     ./src/window/key_event.h
     ./src/window/mouse_event.h
     ./src/window/app_event.h
+    # graphics
     ./src/graphics/renderer.h
     ./src/graphics/vulkan_context.h
     ./src/graphics/swapchain.h
@@ -122,11 +129,17 @@ set(HEADER_FILES
     ./src/graphics/pipeline_cache.h
 )
 set(SOURCE_FILES
+    # core
     ./src/core/main.cc
     ./src/core/utils.cc
     ./src/core/app.cc
     ./src/core/frame_timer.cc
+    # scene
+    ./src/scene/scene.cc
+    ./src/scene/scene_loader.cc
+    # window
     ./src/window/window.cc
+    # graphics
     ./src/graphics/renderer.cc
     ./src/graphics/vulkan_context.cc
     ./src/graphics/swapchain.cc

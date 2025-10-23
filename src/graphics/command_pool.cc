@@ -11,6 +11,7 @@ CommandPool::CommandPool(const VulkanContext& context, uint count,
 }
 
 CommandPool::~CommandPool() {
+  c_.GetDevice().waitIdle();
   if (cmd_pool_) c_.GetDevice().destroyCommandPool(cmd_pool_);
 }
 

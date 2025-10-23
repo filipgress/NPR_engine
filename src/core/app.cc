@@ -4,16 +4,37 @@
 #include "window/mouse_event.h"
 #include "window/key_event.h"
 
+#include "scene/scene_loader.h"
+
 namespace npr_core {
 
 void App::Run() {
+  npr_scene::Scene scene;
+  npr_scene::Scene scene2;
+  bool load = true;
+  npr_scene::SceneLoader::LoadAsync(renderer_.GetContext(), scene,
+                                    "../assets/ds/scene.gltf");
+  npr_scene::SceneLoader::LoadAsync(renderer_.GetContext(), scene2,
+                                    "../assets/ds/scene.gltf");
+
   while (running_) {
     timer_.Update();
 
     window_.PollEvents();
     inputs_.Update(window_.GetSize());
 
-    // INFO(timer_.GetAvgFPS(), "fps");
+    if (scene.IsValid() && load) {
+      load = false;
+      auto cmd_buff = scene.GetGpuResources().cmd_pool->GetCmdBuff();
+
+      vk::SubmitInfo submit_info{};
+      submit_info.commandBufferCount = 1;
+      submit_info.pCommandBuffers = &cmd_buff;
+
+      renderer_.GetContext().GetTransferQ().submit(submit_info);
+    }
+
+    INFO(timer_.GetAvgFPS(), "fps");
 
     if (window_.IsMinimized()) continue;
     renderer_.Render();

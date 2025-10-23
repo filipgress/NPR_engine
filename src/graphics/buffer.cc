@@ -39,16 +39,21 @@ void Buffer::CreateBuffer() {
   buffer_info.usage = usage_;
 
   auto q_families = c_.GetQFamilies();
-  if (properties_ & vk::MemoryPropertyFlagBits::eHostVisible ||
-      q_families.graphics_i.value() == q_families.transfer_i.value()) {
-    buffer_info.sharingMode = vk::SharingMode::eExclusive;
-  } else {
+
+  // only vertex & index buffers can be eConcurrent as
+  // they are loaded from file and written using transfer queue
+  if (q_families.graphics_i.value() != q_families.transfer_i.value() &&
+      properties_ & vk::MemoryPropertyFlagBits::eDeviceLocal &&
+      (usage_ & vk::BufferUsageFlagBits::eIndexBuffer ||
+       usage_ & vk::BufferUsageFlagBits::eVertexBuffer)) {
     uint32_t indices[] = {q_families.graphics_i.value(),
                           q_families.transfer_i.value()};
 
     buffer_info.sharingMode = vk::SharingMode::eConcurrent;
     buffer_info.queueFamilyIndexCount = 2;
     buffer_info.pQueueFamilyIndices = indices;
+  } else {
+    buffer_info.sharingMode = vk::SharingMode::eExclusive;
   }
 
   buff_ = c_.GetDevice().createBuffer(buffer_info);
@@ -58,13 +63,11 @@ void Buffer::CreateBuffer() {
 void Buffer::AllocMem() {
   auto device = c_.GetDevice();
 
-  vk::MemoryRequirements mem_requirements =
-      device.getBufferMemoryRequirements(buff_);
-
+  vk::MemoryRequirements mem_req = device.getBufferMemoryRequirements(buff_);
   vk::MemoryAllocateInfo allocInfo{};
-  allocInfo.allocationSize = mem_requirements.size;
+  allocInfo.allocationSize = mem_req.size;
   allocInfo.memoryTypeIndex =
-      c_.FindMemTypeIdx(mem_requirements.memoryTypeBits, properties_);
+      c_.FindMemTypeIdx(mem_req.memoryTypeBits, properties_);
 
   buff_mem_ = device.allocateMemory(allocInfo);
   device.bindBufferMemory(buff_, buff_mem_, 0);
