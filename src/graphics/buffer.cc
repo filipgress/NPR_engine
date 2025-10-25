@@ -3,49 +3,48 @@
 namespace npr_graphics {
 
 Buffer::Buffer(const VulkanContext& context, vk::BufferUsageFlags usage,
-               vk::MemoryPropertyFlags properties, uint32_t size,
-               const std::string& dbg_name)
+               vk::MemoryPropertyFlags mem_props, vk::SharingMode sharing_mode,
+               uint32_t size, const std::string& dbg_name)
     : c_{context},
-      properties_{properties},
+      mem_props_{mem_props},
       usage_{usage},
       size_{size},
       dbg_name_{dbg_name} {
   assert(size_);
 
-  CreateBuffer();
+  CreateBuffer(sharing_mode);
   AllocMem();
+}
+
+Buffer::Buffer(Buffer&& other) noexcept
+    : c_(other.c_),
+      buff_(std::move(other.buff_)),
+      buff_mem_(std::move(other.buff_mem_)),
+      staging_buff_(std::move(other.staging_buff_)),
+      mem_props_(other.mem_props_),
+      usage_(other.usage_),
+      size_(other.size_),
+      dbg_name_(std::move(other.dbg_name_)) {
+  other.buff_ = nullptr;
+  other.buff_mem_ = nullptr;
+  other.size_ = 0;
 }
 
 Buffer::~Buffer() {
   auto device = c_.GetDevice();
-  device.waitIdle();
-
   if (buff_mem_) device.freeMemory(buff_mem_);
   if (buff_) device.destroyBuffer(buff_);
 }
 
-void Buffer::CreateStagingBuffer() {
-  if (staging_buff_) return;
-  staging_buff_ =
-      std::make_unique<Buffer>(c_, vk::BufferUsageFlagBits::eTransferSrc,
-                               vk::MemoryPropertyFlagBits::eHostVisible |
-                                   vk::MemoryPropertyFlagBits::eHostCoherent,
-                               size_, "staging_buff");
-}
-
-void Buffer::CreateBuffer() {
+void Buffer::CreateBuffer(vk::SharingMode sharing_mode) {
   vk::BufferCreateInfo buffer_info;
   buffer_info.size = size_;
   buffer_info.usage = usage_;
 
   auto q_families = c_.GetQFamilies();
-
-  // only vertex & index buffers can be eConcurrent as
-  // they are loaded from file and written using transfer queue
-  if (q_families.graphics_i.value() != q_families.transfer_i.value() &&
-      properties_ & vk::MemoryPropertyFlagBits::eDeviceLocal &&
-      (usage_ & vk::BufferUsageFlagBits::eIndexBuffer ||
-       usage_ & vk::BufferUsageFlagBits::eVertexBuffer)) {
+  if (sharing_mode == vk::SharingMode::eConcurrent &&
+      mem_props_ & vk::MemoryPropertyFlagBits::eDeviceLocal &&
+      q_families.graphics_i.value() != q_families.transfer_i.value()) {
     uint32_t indices[] = {q_families.graphics_i.value(),
                           q_families.transfer_i.value()};
 
@@ -67,7 +66,7 @@ void Buffer::AllocMem() {
   vk::MemoryAllocateInfo allocInfo{};
   allocInfo.allocationSize = mem_req.size;
   allocInfo.memoryTypeIndex =
-      c_.FindMemTypeIdx(mem_req.memoryTypeBits, properties_);
+      c_.FindMemTypeIdx(mem_req.memoryTypeBits, mem_props_);
 
   buff_mem_ = device.allocateMemory(allocInfo);
   device.bindBufferMemory(buff_, buff_mem_, 0);
@@ -76,7 +75,7 @@ void Buffer::AllocMem() {
 void Buffer::Write(vk::CommandBuffer cmd_buff, const void* data) {
   auto device = c_.GetDevice();
 
-  if (properties_ & vk::MemoryPropertyFlagBits::eHostVisible) {
+  if (mem_props_ & vk::MemoryPropertyFlagBits::eHostVisible) {
     void* mapped_mem = device.mapMemory(buff_mem_, 0, size_);
     memcpy(mapped_mem, data, size_);
     device.unmapMemory(buff_mem_);
@@ -113,7 +112,7 @@ void Buffer::Write(vk::CommandBuffer cmd_buff, const void* data) {
     pre_copy_barrier.dstAccessMask = vk::AccessFlagBits::eTransferWrite;
     pre_copy_barrier.buffer = buff_;
     pre_copy_barrier.offset = 0;
-    pre_copy_barrier.size = size_;
+    pre_copy_barrier.size = VK_WHOLE_SIZE;
     pre_copy_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     pre_copy_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 
@@ -121,16 +120,19 @@ void Buffer::Write(vk::CommandBuffer cmd_buff, const void* data) {
                              vk::DependencyFlagBits::eByRegion, 0, nullptr, 1,
                              &pre_copy_barrier, 0, nullptr);
 
-    CreateStagingBuffer();
+    if (!staging_buff_)
+      staging_buff_ = std::make_unique<StagingBuffer>(c_, size_);
     staging_buff_->Write(nullptr, data);
-    cmd_buff.copyBuffer(staging_buff_->buff_, buff_, {0, 0, size_});
+
+    vk::BufferCopy region{0, 0, size_};
+    cmd_buff.copyBuffer(staging_buff_->buff_, buff_, region);
 
     vk::BufferMemoryBarrier post_copy_barrier{};
     post_copy_barrier.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
     post_copy_barrier.dstAccessMask = access;
     post_copy_barrier.buffer = buff_;
     post_copy_barrier.offset = 0;
-    post_copy_barrier.size = size_;
+    post_copy_barrier.size = VK_WHOLE_SIZE;
     post_copy_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     post_copy_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 

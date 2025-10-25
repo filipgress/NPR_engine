@@ -1,0 +1,101 @@
+#ifndef IMAGE_H_
+#define IMAGE_H_
+
+#include "vulkan_context.h"
+#include "buffer.h"
+
+namespace npr_graphics {
+
+class Image : public npr_core::NonCopyable {
+ public:
+  Image(const VulkanContext& context, vk::Format format, vk::Extent2D extent,
+        vk::ImageUsageFlags usage, vk::ImageAspectFlags aspect,
+        vk::SharingMode sharing_mode, vk::SampleCountFlagBits samples,
+        uint32_t mip_levels, std::string dbg_name);
+  Image(Image&&) noexcept;
+  virtual ~Image();
+
+  vk::ImageView GetImageView() const { return image_view_; }
+
+ private:
+  void CreateImage(vk::ImageUsageFlags usage, vk::SampleCountFlagBits samples,
+                   vk::SharingMode sharing_mode);
+  void CreateImageView();
+  void AllocMem();
+
+  uint32_t CalculateMipLevels(uint32_t mip_levels) {
+    uint32_t max_mip_levels =
+        std::floor(std::log2(std::max(extent_.width, extent_.height))) + 1;
+    return std::clamp(mip_levels, 1u, max_mip_levels);
+  }
+
+ protected:
+  const VulkanContext& c_;
+
+  vk::Image image_{nullptr};
+  vk::DeviceMemory image_mem_{nullptr};
+  vk::ImageView image_view_{nullptr};
+
+  vk::Format format_;
+  vk::ImageAspectFlags aspect_;
+  vk::Extent2D extent_;
+  uint32_t mip_levels_;
+
+  std::string dbg_name_;
+};
+
+enum class TextureType { kColor, kNormal, kMetallicRoughness, kEmissive };
+struct TextureInfo {
+  vk::Format format;
+  int component;
+  std::string name;
+};
+
+struct TextureData {
+  std::string name;
+  TextureType type;
+  uint32_t width, height;
+};
+
+struct SamplerProps {
+  vk::Filter mag_filter{vk::Filter::eNearest};
+  vk::Filter min_filter{vk::Filter::eNearest};
+  vk::SamplerMipmapMode mipmap_mode{vk::SamplerMipmapMode::eLinear};
+
+  vk::SamplerAddressMode address_mode_U{vk::SamplerAddressMode::eClampToBorder};
+  vk::SamplerAddressMode address_mode_V{vk::SamplerAddressMode::eClampToBorder};
+
+  float mip_bias{0.0f};
+};
+
+class Texture : public Image {
+ public:
+  Texture(const VulkanContext& context, const TextureData& data,
+          const SamplerProps& sampler_props);
+  Texture(Texture&&) noexcept;
+  ~Texture();
+
+  vk::Sampler GetSampler() const { return sampler_; }
+  static TextureInfo GetTypeInfo(TextureType type);
+
+  void DestroyStagingBuff() { staging_buff_.reset(); }
+  void Write(vk::CommandBuffer cmd_buff, const std::vector<unsigned char>& data,
+             vk::ImageLayout src_layout = vk::ImageLayout::eUndefined);
+
+ private:
+  void CreateSampler(const SamplerProps& props);
+
+  void Transition(vk::CommandBuffer cmd_buff, vk::ImageLayout old_layout,
+                  vk::ImageLayout new_layout, uint32_t start_mip_level,
+                  uint32_t mip_level_count);
+  void CopyFromBuffer(vk::CommandBuffer cmd_buff);
+  void GenerateMipmaps(vk::CommandBuffer cmd_buff);
+
+ private:
+  vk::Sampler sampler_;
+  std::unique_ptr<StagingBuffer> staging_buff_;
+};
+
+}  // namespace npr_graphics
+
+#endif  // IMAGE_H_

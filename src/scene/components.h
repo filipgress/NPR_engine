@@ -5,9 +5,14 @@
 
 namespace npr_scene {
 
-struct ObjectTag {};
-struct LightTag {};
-struct CameraTag {};
+struct PrimitiveTag {
+  /* MeshComp */
+  /* MaterialComp */
+};
+
+struct ObjectTag {
+  /* TransformComp */
+};
 
 struct TransformComp {
   glm::vec3 pos{0.0f};
@@ -21,6 +26,24 @@ struct TransformComp {
 struct MeshComp {
   int vbo_idx{-1};
   int ibo_idx{-1};
+};
+
+struct MaterialComp {
+  int color_map_idx{-1};
+  int normal_map_idx{-1};
+  int metallic_roughness_map_idx{-1};
+  int emissive_map_idx{-1};
+
+  glm::vec4 color_factor{1.0f};
+  glm::vec3 emissive_factor{0.0f};
+  float metallic_factor{0.0f};
+  float roughness_factor{1.0f};
+
+  float alpha_cutoff{0.5f};
+
+  bool double_sided{false};
+  bool is_opaque{false};
+  bool is_mask{false};
 };
 
 }  // namespace npr_scene

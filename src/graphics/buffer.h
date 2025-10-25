@@ -5,21 +5,22 @@
 
 namespace npr_graphics {
 
+class StagingBuffer;
 class Buffer : public npr_core::NonCopyable {
  public:
   Buffer(const VulkanContext& context, vk::BufferUsageFlags usage,
-         vk::MemoryPropertyFlags properties, uint32_t size,
-         const std::string& dbg_name);
-  Buffer(Buffer&&) = default;
-
+         vk::MemoryPropertyFlags mem_props, vk::SharingMode sharing_mode,
+         uint32_t size, const std::string& dbg_name);
+  Buffer(Buffer&&) noexcept;
   virtual ~Buffer();
+
+  vk::Buffer GetBuffer() const { return buff_; }
 
   void Write(vk::CommandBuffer cmd_buff, const void* data);
   void DestroyStagingBuff() { staging_buff_.reset(); }
 
  private:
-  void CreateBuffer();
-  void CreateStagingBuffer();
+  void CreateBuffer(vk::SharingMode sharing_mode);
   void AllocMem();
 
  private:
@@ -27,14 +28,23 @@ class Buffer : public npr_core::NonCopyable {
 
   vk::Buffer buff_;
   vk::DeviceMemory buff_mem_;
-  std::unique_ptr<Buffer> staging_buff_;
+  std::unique_ptr<StagingBuffer> staging_buff_;
 
-  vk::MemoryPropertyFlags properties_;
+  vk::MemoryPropertyFlags mem_props_;
   vk::BufferUsageFlags usage_;
 
   uint32_t size_{0};
 
   std::string dbg_name_;
+};
+
+class StagingBuffer : public Buffer {
+ public:
+  StagingBuffer(const VulkanContext& context, uint32_t size)
+      : Buffer(context, vk::BufferUsageFlagBits::eTransferSrc,
+               vk::MemoryPropertyFlagBits::eHostVisible |
+                   vk::MemoryPropertyFlagBits::eHostCoherent,
+               vk::SharingMode::eExclusive, size, "staging_buff") {}
 };
 
 struct Vertex {
@@ -56,7 +66,8 @@ class VertexBuffer : public Buffer {
                vk::BufferUsageFlagBits::eVertexBuffer |
                    vk::BufferUsageFlagBits::eTransferDst,
                vk::MemoryPropertyFlagBits::eDeviceLocal,
-               vertices.size() * sizeof(Vertex), dbg_name) {
+               vk::SharingMode::eExclusive, vertices.size() * sizeof(Vertex),
+               dbg_name) {
     Write(cmd_buff, vertices.data());
   }
 };
@@ -69,7 +80,8 @@ class IndexBuffer : public Buffer {
                vk::BufferUsageFlagBits::eIndexBuffer |
                    vk::BufferUsageFlagBits::eTransferDst,
                vk::MemoryPropertyFlagBits::eDeviceLocal,
-               indices.size() * sizeof(indices[0]), dbg_name),
+               vk::SharingMode::eExclusive, indices.size() * sizeof(indices[0]),
+               dbg_name),
         count_{indices.size()} {
     Write(cmd_buff, indices.data());
   }

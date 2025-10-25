@@ -3,18 +3,20 @@
 
 #include <flecs.h>
 
-#include "graphics/buffer.h"
 #include "graphics/command_pool.h"
 #include "graphics/descriptor_pool.h"
+#include "graphics/buffer.h"
+#include "graphics/image.h"
 
 namespace npr_scene {
-struct GpuResources {
-  std::vector<npr_graphics::IndexBuffer> ibos;
-  std::vector<npr_graphics::VertexBuffer> vbos;
-  // std::vector<Textures> textures;
 
+struct GpuResources {
   std::unique_ptr<npr_graphics::CommandPool> cmd_pool;
   std::unique_ptr<npr_graphics::DescriptorPool> desc_pool;
+
+  std::vector<npr_graphics::IndexBuffer> ibos;
+  std::vector<npr_graphics::VertexBuffer> vbos;
+  std::vector<npr_graphics::Texture> textures;
 };
 
 class Scene : npr_core::NonCopyable {

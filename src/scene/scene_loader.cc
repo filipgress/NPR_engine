@@ -9,31 +9,36 @@
 #include <glm/gtx/matrix_decompose.hpp>
 
 namespace npr_scene {
+using namespace npr_graphics;
 
-void SceneLoader::LoadAsync(const npr_graphics::VulkanContext& context,
-                            Scene& scene, const std::string& scene_file) {
+void SceneLoader::LoadAsync(const VulkanContext& context, Scene& scene,
+                            const std::string& filepath,
+                            const std::string& scene_name) {
   if (scene.handle_.valid()) return;
-  scene.handle_ = std::async(std::launch::async, &SceneLoader::LoadScene,
-                             std::cref(context), std::ref(scene), scene_file);
+  scene.handle_ =
+      std::async(std::launch::async, &SceneLoader::LoadScene,
+                 std::cref(context), std::ref(scene), filepath, scene_name);
 }
 
-void SceneLoader::Load(const npr_graphics::VulkanContext& context, Scene& scene,
-                       const std::string& scene_file) {
+void SceneLoader::Load(const VulkanContext& context, Scene& scene,
+                       const std::string& filepath,
+                       const std::string& scene_name) {
   scene.WaitForAsync();
-  scene.valid_ = LoadScene(context, scene, scene_file);
+  scene.valid_ = LoadScene(context, scene, filepath, scene_name);
 }
 
-bool SceneLoader::LoadScene(const npr_graphics::VulkanContext& context,
-                            Scene& scene, const std::string& scene_file) {
-  LoaderCache cache{context, scene_file};
-  INFO("loading scene: ", cache.name);
+bool SceneLoader::LoadScene(const VulkanContext& context, Scene& scene,
+                            const std::string& filepath,
+                            const std::string& scene_name) {
+  LoaderCache cache{context, filepath, scene_name};
+  INFO("loading scene: ", cache.filename, "(", cache.scene_name, ")");
 
   try {
     tinygltf::Model model;
     tinygltf::TinyGLTF loader;
 
     std::string err, warn;
-    bool ret = loader.LoadASCIIFromFile(&model, &err, &warn, scene_file);
+    bool ret = loader.LoadASCIIFromFile(&model, &err, &warn, filepath);
 
     if (!warn.empty()) throw std::runtime_error("gltf warn: " + warn);
     if (!err.empty()) throw std::runtime_error("gltf err: " + err);
@@ -43,92 +48,117 @@ bool SceneLoader::LoadScene(const npr_graphics::VulkanContext& context,
     if (!cache.light_supp) INFO("scene doesn't support lights");
 
     PrepareScene(scene, cache);
-    cache.cmd_buff.begin({vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
+    {
+      cache.cmd_buff.begin({vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
 
-    for (int node_idx : model.scenes[model.defaultScene].nodes)
-      LoadEntity(scene, model, flecs::entity::null(), node_idx, cache);
+      int scene_idx = GetSceneIdx(model, scene_name, cache);
+      for (int node_idx : model.scenes[scene_idx].nodes)
+        LoadEntity(scene, flecs::entity::null(), model, node_idx, cache);
 
-    cache.cmd_buff.end();
-
-    INFO("scene loaded: ", cache.name);
-    return true;
+      cache.cmd_buff.end();
+    }
 
   } catch (const std::runtime_error& e) {
     ERR("failed to load scene: ", e.what());
     return false;
   }
+
+  INFO("scene loaded: ", cache.filename, "(", cache.scene_name, ")");
+  return true;
 }
 
 void SceneLoader::PrepareScene(Scene& scene, LoaderCache& cache) {
   scene.Clear();
-  scene.name_ = cache.name;
+  scene.name_ = cache.scene_name;
 
+  // custom command pool
   if (scene.gpu_resources_.cmd_pool) {
     cache.cmd_buff = scene.gpu_resources_.cmd_pool->GetCmdBuff();
     cache.cmd_buff.reset(vk::CommandBufferResetFlagBits::eReleaseResources);
   } else {
-    const auto& q_families = cache.context.GetQFamilies();
-    uint32_t q_idx = q_families.transfer_i.has_value()
-                         ? q_families.transfer_i.value()
-                         : q_families.graphics_i.value();
-
-    scene.gpu_resources_.cmd_pool = std::make_unique<npr_graphics::CommandPool>(
+    uint32_t q_idx = cache.context.GetQFamilies().graphics_i.value();
+    scene.gpu_resources_.cmd_pool = std::make_unique<CommandPool>(
         cache.context, 1,
         vk::CommandPoolCreateFlagBits::eTransient |
             vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-        q_idx, "cmd_pool_" + cache.name);
+        q_idx, "cmd_pool_" + scene.name_);
 
     cache.cmd_buff = scene.gpu_resources_.cmd_pool->GetCmdBuff();
   }
 
+  // custom descriptor pool
   // if (!scene.gpu_resources_.desc_pool) {
   //   scene.gpu_resources_.desc_pool =
-  //       std::make_unique<npr_graphics::DescriptorPool>();
+  //       std::make_unique<DescriptorPool>();
   // }
 }
 
-void SceneLoader::LoadEntity(Scene& scene, const tinygltf::Model& model,
-                             flecs::entity parent, int gltf_node_idx,
+void SceneLoader::LoadEntity(Scene& scene, flecs::entity parent_ent,
+                             const tinygltf::Model& model, int node_idx,
                              LoaderCache& cache) {
   std::stack<std::pair<flecs::entity, int>> s;
-  s.push({parent, gltf_node_idx});
+  s.push({parent_ent, node_idx});
 
   while (!s.empty()) {
-    auto [parent_ent, gltf_node_idx] = s.top();
+    auto [parent_ent, node_idx] = s.top();
     s.pop();
 
-    const auto& gltf_node = model.nodes[gltf_node_idx];
+    const auto& node = model.nodes[node_idx];
 
-    flecs::entity child_ent = scene.entities_.entity(gltf_node.name.c_str());
+    flecs::entity child_ent = scene.entities_.entity(node.name.c_str());
     if (parent_ent.is_valid()) child_ent.child_of(parent_ent);
 
-    if (gltf_node.camera) {
-      child_ent.add<CameraTag>();
+    if (node.camera != -1) {
+      // child_ent.add<CameraTag>();
 
-    } else if (int light_idx = GetLightIdx(gltf_node, cache); light_idx == -1) {
+    } else if (int light_idx = GetLightIdx(node, cache); light_idx == -1) {
       child_ent.add<ObjectTag>();
-      LoadObject(scene, child_ent, model, gltf_node, cache);
+      LoadObject(scene, child_ent, model, node, cache);
 
     } else {
-      child_ent.add<LightTag>();
+      // child_ent.add<LightTag>();
     }
 
-    for (int glfw_node_child_idx : gltf_node.children)
-      s.push({child_ent, glfw_node_child_idx});
+    for (int glfw_child_node_idx : node.children)
+      s.push({child_ent, glfw_child_node_idx});
   }
 }
 
-void SceneLoader::LoadObject(Scene& scene, flecs::entity entity,
+void SceneLoader::LoadObject(Scene& scene, flecs::entity node_ent,
                              const tinygltf::Model& model,
                              const tinygltf::Node& node, LoaderCache& cache) {
-  AddTransformComp(entity, node);
-  AddMeshComp(scene, entity, model, node.mesh, cache);
-  // AddMaterial(entity, model, node.mesh, cache);
+  AddTransformComp(node_ent, node);
+
+  if (node.mesh == -1) return;
+  const auto& mesh = model.meshes[node.mesh];
+
+  int prim_idx{0};
+  for (const auto& prim : mesh.primitives) {
+    if (prim.mode != TINYGLTF_MODE_TRIANGLES) {
+      INFO("[warn]: skipping unsupported geometry primitive");
+      continue;
+    }
+    if (prim.material == -1) {
+      INFO("[warn]: skipping primitive without material");
+      continue;
+    }
+
+    std::string prim_name = node.name + "_prim_" + std::to_string(prim_idx);
+    flecs::entity prim_ent = scene.entities_.entity(prim_name.c_str());
+
+    prim_ent.child_of(node_ent);
+    prim_ent.add<PrimitiveTag>();
+
+    AddMeshComp(scene, prim_ent, model, node, prim_idx, cache);
+    AddMaterialComp(scene, prim_ent, model, node, prim_idx, cache);
+
+    prim_idx++;
+  }
 }
 
-void SceneLoader::AddTransformComp(flecs::entity entity,
+void SceneLoader::AddTransformComp(flecs::entity ent,
                                    const tinygltf::Node& node) {
-  TransformComp transform;
+  TransformComp transform_comp;
 
   if (!node.matrix.empty()) {
     glm::mat4 mat;
@@ -136,39 +166,36 @@ void SceneLoader::AddTransformComp(flecs::entity entity,
 
     glm::vec3 skew;
     glm::vec4 perspective;
-    glm::decompose(transform.local_mat, transform.scale, transform.rot,
-                   transform.pos, skew, perspective);
+    glm::decompose(transform_comp.local_mat, transform_comp.scale,
+                   transform_comp.rot, transform_comp.pos, skew, perspective);
   } else {
     if (!node.translation.empty())
-      transform.pos = glm::vec3(node.translation[0], node.translation[1],
-                                node.translation[2]);
+      transform_comp.pos = glm::vec3(node.translation[0], node.translation[1],
+                                     node.translation[2]);
     if (!node.scale.empty())
-      transform.scale = glm::vec3(node.scale[0], node.scale[1], node.scale[2]);
+      transform_comp.scale =
+          glm::vec3(node.scale[0], node.scale[1], node.scale[2]);
     if (!node.rotation.empty())
-      transform.rot = glm::quat(node.rotation[3], node.rotation[0],
-                                node.rotation[1], node.rotation[2]);
+      transform_comp.rot = glm::quat(node.rotation[3], node.rotation[0],
+                                     node.rotation[1], node.rotation[2]);
   }
 
-  entity.set<TransformComp>(transform);
+  ent.set<TransformComp>(transform_comp);
 }
 
-void SceneLoader::AddMeshComp(Scene& scene, flecs::entity entity,
-                              const tinygltf::Model& model, int mesh_idx,
+void SceneLoader::AddMeshComp(Scene& scene, flecs::entity ent,
+                              const tinygltf::Model& model,
+                              const tinygltf::Node& node, const int prim_idx,
                               LoaderCache& cache) {
-  if (mesh_idx == -1) return;
-  if (cache.meshes.contains(mesh_idx)) {
-    entity.set<MeshComp>(cache.meshes.at(mesh_idx));
+  if (cache.meshes.contains({node.mesh, prim_idx})) {
+    ent.set<MeshComp>(cache.meshes.at({node.mesh, prim_idx}));
     return;
   }
 
-  const auto& gltf_mesh = model.meshes[mesh_idx];
-  const auto& prim = gltf_mesh.primitives[0];
+  const auto& mesh = model.meshes[node.mesh];
+  const auto& prim = mesh.primitives[prim_idx];
 
-  if (prim.mode != TINYGLTF_MODE_TRIANGLES)
-    throw std::runtime_error("primitive mode \"" + std::to_string(prim.mode) +
-                             "\" is not supported");
-
-  MeshComp mesh;
+  MeshComp mesh_comp;
 
   {  // load vertices
     int pos_acc_idx = GetAccessorIdx(prim, "POSITION", true);
@@ -176,13 +203,10 @@ void SceneLoader::AddMeshComp(Scene& scene, flecs::entity entity,
     int tan_acc_idx = GetAccessorIdx(prim, "TANGENT", false);
     int uv_acc_idx = -1;
 
-    if (prim.material) {
-      const auto& [uv_set_idx, _] =
-          GetTextureInfos(model.materials[prim.material]);
-      if (uv_set_idx != -1)
-        uv_acc_idx = GetAccessorIdx(
-            prim, "TEXCOORD_" + std::to_string(uv_set_idx), false);
-    }
+    int uv_set_idx = GetTexUvSetIdx(model.materials[prim.material]);
+    if (uv_set_idx != -1)
+      uv_acc_idx =
+          GetAccessorIdx(prim, "TEXCOORD_" + std::to_string(uv_set_idx), false);
 
     const auto* pos_data =
         GetVertexData<float[3]>(model, pos_acc_idx, TINYGLTF_TYPE_VEC3,
@@ -198,7 +222,7 @@ void SceneLoader::AddMeshComp(Scene& scene, flecs::entity entity,
                                 TINYGLTF_COMPONENT_TYPE_FLOAT, "UV");
 
     size_t vert_count = model.accessors[pos_acc_idx].count;
-    std::vector<npr_graphics::Vertex> vertices(vert_count);
+    std::vector<Vertex> vertices(vert_count);
 
     for (size_t i = 0; i < vert_count; ++i) {
       vertices[i].pos =
@@ -213,24 +237,24 @@ void SceneLoader::AddMeshComp(Scene& scene, flecs::entity entity,
 
     scene.gpu_resources_.vbos.emplace_back(
         cache.context, cache.cmd_buff, vertices,
-        "vbo_" + std::string(entity.name().c_str()));
-    mesh.vbo_idx = scene.gpu_resources_.vbos.size() - 1;
+        "vbo_" + std::string(ent.name().c_str()));
+    mesh_comp.vbo_idx = scene.gpu_resources_.vbos.size() - 1;
   }
 
   if (prim.indices != -1) {  // load indices
-    const auto& accessor = model.accessors[prim.indices];
-    std::vector<uint32_t> indices(accessor.count);
+    const auto& acc = model.accessors[prim.indices];
+    std::vector<uint32_t> indices(acc.count);
 
-    switch (accessor.componentType) {
+    switch (acc.componentType) {
       case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE: {
         const auto* idx_data = GetIndexData<uint8_t>(model, prim.indices);
-        for (size_t i = 0; i < accessor.count; ++i)
+        for (size_t i = 0; i < acc.count; ++i)
           indices[i] = static_cast<uint32_t>(idx_data[i]);
         break;
       }
       case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT: {
         const auto* idx_data = GetIndexData<uint16_t>(model, prim.indices);
-        for (size_t i = 0; i < accessor.count; ++i)
+        for (size_t i = 0; i < acc.count; ++i)
           indices[i] = static_cast<uint32_t>(idx_data[i]);
         break;
       }
@@ -241,22 +265,125 @@ void SceneLoader::AddMeshComp(Scene& scene, flecs::entity entity,
       }
       default:
         throw std::runtime_error("unsupported index buffer type: " +
-                                 std::to_string(accessor.componentType));
+                                 std::to_string(acc.componentType));
     }
 
     scene.gpu_resources_.ibos.emplace_back(
         cache.context, cache.cmd_buff, indices,
-        "ibo_" + std::string(entity.name().c_str()));
-    mesh.ibo_idx = scene.gpu_resources_.ibos.size() - 1;
+        "ibo_" + std::string(ent.name().c_str()));
+    mesh_comp.ibo_idx = scene.gpu_resources_.ibos.size() - 1;
   }
 
-  entity.set<MeshComp>(mesh);
-  cache.meshes.emplace(mesh_idx, mesh);
+  ent.set<MeshComp>(mesh_comp);
+  cache.meshes[{node.mesh, prim_idx}] = mesh_comp;
+}
+
+void SceneLoader::AddMaterialComp(Scene& scene, flecs::entity ent,
+                                  const tinygltf::Model& model,
+                                  const tinygltf::Node& node,
+                                  const int prim_idx, LoaderCache& cache) {
+  const auto& mesh = model.meshes[node.mesh];
+  const auto& prim = mesh.primitives[prim_idx];
+
+  if (cache.materials.contains(prim.material)) {
+    ent.set<MaterialComp>(cache.materials.at(prim.material));
+    return;
+  }
+
+  const auto& material = model.materials[prim.material];
+
+  MaterialComp material_comp;
+
+  // attributes
+  material_comp.double_sided = material.doubleSided;
+  material_comp.is_opaque = (material.alphaMode == "OPAQUE");
+  material_comp.is_mask = (material.alphaMode == "MASK");
+  material_comp.alpha_cutoff = material.alphaCutoff;
+
+  // factors
+  if (const auto& bcf = material.pbrMetallicRoughness.baseColorFactor;
+      !bcf.empty())
+    material_comp.color_factor = glm::vec4(bcf[0], bcf[1], bcf[2], bcf[3]);
+  if (const auto& ef = material.emissiveFactor; !ef.empty())
+    material_comp.emissive_factor = glm::vec3(ef[0], ef[1], ef[2]);
+  material_comp.metallic_factor = material.pbrMetallicRoughness.metallicFactor;
+  material_comp.roughness_factor =
+      material.pbrMetallicRoughness.roughnessFactor;
+
+  //  textures
+  material_comp.color_map_idx =
+      LoadTexture(scene, model, material, TextureType::kColor, cache);
+  material_comp.normal_map_idx =
+      LoadTexture(scene, model, material, TextureType::kNormal, cache);
+  material_comp.metallic_roughness_map_idx = LoadTexture(
+      scene, model, material, TextureType::kMetallicRoughness, cache);
+  material_comp.emissive_map_idx =
+      LoadTexture(scene, model, material, TextureType::kEmissive, cache);
+
+  ent.set<MaterialComp>(material_comp);
+  cache.materials[prim.material] = material_comp;
+}
+
+int SceneLoader::LoadTexture(Scene& scene, const tinygltf::Model& model,
+                             const tinygltf::Material& material,
+                             const TextureType tex_type, LoaderCache& cache) {
+  int tex_idx = GetTexIdx(material, tex_type);
+  if (tex_idx == -1) return -1;
+
+  const auto& texture = model.textures[tex_idx];
+  const auto& image = model.images[texture.source];
+
+  INFO(Texture::GetTypeInfo(tex_type).name);
+  // INFO(image.component, " ", Texture::GetTypeInfo(tex_type).component);
+  // INFO(image.component != Texture::GetTypeInfo(tex_type).component);
+  // INFO(image.pixel_type != TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE &&
+  //      image.pixel_type != TINYGLTF_COMPONENT_TYPE_BYTE);
+
+  // if (image.component != Texture::GetTypeInfo(tex_type).component ||
+  //     (image.pixel_type != TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE &&
+  //      image.pixel_type != TINYGLTF_COMPONENT_TYPE_BYTE))
+  //   throw std::runtime_error("texture is in unexpected format");
+
+  TextureData tex_data;
+  tex_data.name = image.name;
+  tex_data.type = tex_type;
+  tex_data.height = image.height;
+  tex_data.width = image.width;
+
+  Texture tex{cache.context, tex_data, SamplerProps()};
+  tex.Write(cache.cmd_buff, image.image);
+
+  scene.gpu_resources_.textures.push_back(std::move(tex));
+  int idx = scene.gpu_resources_.textures.size() - 1;
+
+  return idx;
 }
 
 /*
  * Helpers
  */
+
+int SceneLoader::GetSceneIdx(const tinygltf::Model& model,
+                             const std::string& scene_name,
+                             const LoaderCache& cache) {
+  int scene_idx{-1};
+
+  if (scene_name.empty()) {
+    scene_idx = model.defaultScene;
+  } else {
+    for (int i = 0; i < static_cast<int>(model.scenes.size()); ++i) {
+      if (model.scenes[i].name != scene_name) continue;
+
+      scene_idx = i;
+      break;
+    }
+  }
+
+  if (scene_idx == -1)
+    throw std::runtime_error("scene with name '" + cache.scene_name +
+                             "' not found");
+  return scene_idx;
+}
 
 int SceneLoader::GetLightIdx(const tinygltf::Node& node,
                              const LoaderCache& cache) {
@@ -272,8 +399,8 @@ int SceneLoader::GetAccessorIdx(const tinygltf::Primitive& primitive,
     acc_idx = primitive.attributes.at(attr_name);
 
   if (acc_idx == -1 && req)
-    throw std::runtime_error("mesh is missing required attribute \"" +
-                             attr_name + "\"");
+    throw std::runtime_error("mesh is missing required attribute: " +
+                             attr_name);
   return acc_idx;
 }
 
@@ -285,8 +412,8 @@ const T* SceneLoader::GetVertexData(const tinygltf::Model& model, int acc_idx,
 
   const auto& acc = model.accessors[acc_idx];
   if (acc.type != expected_type || acc.componentType != expected_comp_type)
-    throw std::runtime_error("mesh attribute \"" + attr_name +
-                             "\" is in incorrect format");
+    throw std::runtime_error("mesh attribute '" + attr_name +
+                             "' is in incorrect format");
 
   const auto& view = model.bufferViews[acc.bufferView];
   const auto& buffer = model.buffers[view.buffer];
@@ -305,14 +432,7 @@ const T* SceneLoader::GetIndexData(const tinygltf::Model& model, int acc_idx) {
                                     acc.byteOffset);
 }
 
-std::pair<int /*uv_set_idx*/, std::vector<int> /*tex_indices*/>
-SceneLoader::GetTextureInfos(const tinygltf::Material& material) {
-  std::vector<int> tex_indices{
-      material.pbrMetallicRoughness.baseColorTexture.index,
-      material.normalTexture.index,
-      material.pbrMetallicRoughness.metallicRoughnessTexture.index,
-      material.emissiveTexture.index};
-
+int SceneLoader::GetTexUvSetIdx(const tinygltf::Material& material) {
   std::vector<int> tex_uv_indices{
       material.pbrMetallicRoughness.baseColorTexture.texCoord,
       material.normalTexture.texCoord,
@@ -320,18 +440,32 @@ SceneLoader::GetTextureInfos(const tinygltf::Material& material) {
       material.emissiveTexture.texCoord};
 
   std::set<int> unique_uv_set_indices;
-  for (size_t i = 0; i < tex_indices.size(); i++) {
-    if (tex_indices[i] == -1 || tex_uv_indices[i] == -1) continue;
-    unique_uv_set_indices.insert(tex_uv_indices[i]);
+  for (const auto& tex_uv_idx : tex_uv_indices) {
+    if (tex_uv_idx == -1) continue;
+    unique_uv_set_indices.emplace(tex_uv_idx);
   }
 
   if (unique_uv_set_indices.size() > 1)
     throw std::runtime_error(
         "materials with multiple uv sets are not supported");
 
-  int uv_set_idx =
-      unique_uv_set_indices.empty() ? -1 : *unique_uv_set_indices.begin();
-  return {uv_set_idx, tex_indices};
+  return unique_uv_set_indices.empty() ? -1 : *unique_uv_set_indices.begin();
+}
+
+int SceneLoader::GetTexIdx(const tinygltf::Material& material,
+                           TextureType tex_type) {
+  switch (tex_type) {
+    case TextureType::kColor:
+      return material.pbrMetallicRoughness.baseColorTexture.index;
+    case TextureType::kNormal:
+      return material.normalTexture.index;
+    case TextureType::kMetallicRoughness:
+      return material.pbrMetallicRoughness.metallicRoughnessTexture.index;
+    case TextureType::kEmissive:
+      return material.emissiveTexture.index;
+    default:
+      throw std::runtime_error("unsupported texture type");
+  }
 }
 
 }  // namespace npr_scene

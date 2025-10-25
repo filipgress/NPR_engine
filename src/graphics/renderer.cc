@@ -128,7 +128,7 @@ void Renderer::RecompileShaders() {
   for (auto& frag_shader : frag_shaders_) frag_shader.ReloadAsync();
 }
 
-void Renderer::UpdateShaders() {
+void Renderer::SwapShaders() {
   if (!kEnableShaderReload) return;
 
   bool is_dirty{false};

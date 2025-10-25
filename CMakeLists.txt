@@ -120,6 +120,7 @@ set(HEADER_FILES
     ./src/graphics/sync.h
     ./src/graphics/resources.h
     ./src/graphics/buffer.h
+    ./src/graphics/image.h
     ./src/graphics/command_pool.h
     ./src/graphics/descriptor_pool.h
     ./src/graphics/descriptor_sets.h
@@ -146,6 +147,7 @@ set(SOURCE_FILES
     ./src/graphics/sync.cc
     ./src/graphics/resources.cc
     ./src/graphics/buffer.cc
+    ./src/graphics/image.cc
     ./src/graphics/command_pool.cc
     ./src/graphics/descriptor_pool.cc
     ./src/graphics/descriptor_sets.cc

@@ -22,7 +22,7 @@ class Renderer : public npr_core::NonCopyable {
 
   void OnWindowResize() { swapchain_.GetProps().dirty = true; }
   void RecompileShaders();
-  void UpdateShaders();
+  void SwapShaders();
 
  private:
   vk::CommandBuffer Record(uint image_idx);
