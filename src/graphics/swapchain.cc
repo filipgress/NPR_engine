@@ -144,7 +144,8 @@ vk::Extent2D Swapchain::ChooseExtent(const SwapSupport& swap_supp,
 }
 
 const std::set<vk::SurfaceFormatKHR> Swapchain::kHDRFormats{
-    {vk::Format::eR16G16B16A16Sfloat, vk::ColorSpaceKHR::eHdr10HlgEXT},
+    // HDR is not implemented yet
+    // {vk::Format::eR16G16B16A16Sfloat, vk::ColorSpaceKHR::eHdr10HlgEXT},
 };
 const std::set<vk::SurfaceFormatKHR> Swapchain::kSDRFormats{
     {vk::Format::eB8G8R8A8Srgb, vk::ColorSpaceKHR::eSrgbNonlinear},

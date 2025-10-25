@@ -42,6 +42,9 @@ class VulkanContext : public npr_core::NonCopyable {
   vk::PhysicalDeviceProperties GetProperties() const {
     return phys_device_.getProperties();
   }
+  vk::FormatProperties GetFormatProperties(vk::Format format) const {
+    return phys_device_.getFormatProperties(format);
+  }
 
   uint32_t FindMemTypeIdx(uint32_t typ_bits,
                           vk::MemoryPropertyFlags properties) const;
