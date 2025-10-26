@@ -3,6 +3,7 @@
 
 #include "frame_timer.h"
 #include "input_handler.h"
+#include "task_manager.h"
 
 #include "window/window.h"
 #include "graphics/renderer.h"
@@ -21,6 +22,7 @@ class App : public NonCopyable {
 
   FrameTimer timer_{0, [this](npr_window::Event& e) { return OnEvent(e); }};
   InputHandler inputs_;
+  TaskManager tasks_;
   bool running_{true};
 };
 

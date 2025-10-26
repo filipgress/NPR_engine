@@ -103,6 +103,7 @@ set(HEADER_FILES
     ./src/core/app.h
     ./src/core/frame_timer.h
     ./src/core/input_handler.h
+    ./src/core/task_manager.h
     # scene
     ./src/scene/scene.h
     ./src/scene/scene_loader.h

@@ -14,7 +14,7 @@ namespace npr_graphics {
 class Renderer : public npr_core::NonCopyable {
  public:
   Renderer(const npr_window::Window& window) : window_{window} {}
-  ~Renderer() { c_.GetDevice().waitIdle(); }
+  ~Renderer() { Finish(); }
 
   void Render();
 
@@ -23,6 +23,8 @@ class Renderer : public npr_core::NonCopyable {
   void OnWindowResize() { swapchain_.GetProps().dirty = true; }
   void RecompileShaders();
   void SwapShaders();
+
+  void Finish() { c_.GetDevice().waitIdle(); }
 
  private:
   vk::CommandBuffer Record(uint image_idx);

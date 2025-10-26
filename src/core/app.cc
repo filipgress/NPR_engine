@@ -10,33 +10,51 @@ namespace npr_core {
 
 void App::Run() {
   npr_scene::Scene scene;
-  bool load = true;
   npr_scene::SceneLoader::LoadAsync(renderer_.GetContext(), scene,
                                     "../assets/market/scene.gltf");
+
+  tasks_.Add([&]() {
+    if (scene.IsLoading()) return false;
+    if (!scene.IsValid()) return true;
+
+    auto device = renderer_.GetContext().GetDevice();
+    auto cmd_buff = scene.GetGpuResources().cmd_pool->GetCmdBuff();
+
+    vk::SubmitInfo submit_info{};
+    submit_info.commandBufferCount = 1;
+    submit_info.pCommandBuffers = &cmd_buff;
+
+    vk::Fence fence = device.createFence({});
+    renderer_.GetContext().GetGraphicsQ().submit(submit_info, fence);
+
+    tasks_.Add([&scene, device, fence]() {
+      auto status = device.getFenceStatus(fence);
+
+      if (status == vk::Result::eNotReady) return false;
+      device.destroyFence(fence);
+
+      if (status == vk::Result::eErrorDeviceLost)
+        ERR("error during scene loading:", vk::to_string(status));
+      else
+        INFO("Scene loaded successfully:", scene.GetName());
+      return true;
+    });
+
+    return true;
+  });
 
   while (running_) {
     timer_.Update();
 
     window_.PollEvents();
     inputs_.Update(window_.GetSize());
-
-    if (scene.IsValid() && load) {
-      load = false;
-      auto cmd_buff = scene.GetGpuResources().cmd_pool->GetCmdBuff();
-
-      vk::SubmitInfo submit_info{};
-      submit_info.commandBufferCount = 1;
-      submit_info.pCommandBuffers = &cmd_buff;
-
-      INFO("SUBMIT");
-      renderer_.GetContext().GetGraphicsQ().submit(submit_info);
-    }
+    tasks_.Process();
 
     if (window_.IsMinimized()) continue;
     renderer_.Render();
   }
 
-  renderer_.GetContext().GetDevice().waitIdle();
+  renderer_.Finish();
 }
 
 void App::OnEvent(npr_window::Event& e) {
