@@ -330,33 +330,115 @@ int SceneLoader::LoadTexture(Scene& scene, const tinygltf::Model& model,
   int tex_idx = GetTexIdx(material, tex_type);
   if (tex_idx == -1) return -1;
 
+  const auto& tex_info = Texture::GetTypeInfo(tex_type);
   const auto& texture = model.textures[tex_idx];
   const auto& image = model.images[texture.source];
 
-  INFO(Texture::GetTypeInfo(tex_type).name);
-  // INFO(image.component, " ", Texture::GetTypeInfo(tex_type).component);
-  // INFO(image.component != Texture::GetTypeInfo(tex_type).component);
-  // INFO(image.pixel_type != TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE &&
-  //      image.pixel_type != TINYGLTF_COMPONENT_TYPE_BYTE);
+  int component = image.component;
+  const std::vector<unsigned char>* data = &image.image;
 
-  // if (image.component != Texture::GetTypeInfo(tex_type).component ||
-  //     (image.pixel_type != TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE &&
-  //      image.pixel_type != TINYGLTF_COMPONENT_TYPE_BYTE))
-  //   throw std::runtime_error("texture is in unexpected format");
+  std::vector<unsigned char> converted;
+  if (tex_type == TextureType::kMetallicRoughness && component > 2) {
+    // convert to use two components
+    converted.reserve(image.width * image.height * 2);
+
+    for (size_t i = 0; i < image.image.size(); i += component) {
+      converted.push_back(image.image[i + 2]);  // metallic from B
+      converted.push_back(image.image[i + 1]);  // roughness from G
+    }
+
+    data = &converted;
+    component = 2;
+
+  } else if (component == 3) {
+    // pad RGB to RGBA with 255 for alpha
+    converted.reserve(image.width * image.height * tex_info.component);
+
+    for (size_t i = 0; i < image.image.size(); i += component) {
+      converted.push_back(image.image[i]);
+      converted.push_back(image.image[i + 1]);
+      converted.push_back(image.image[i + 2]);
+      converted.push_back(255);
+    }
+
+    data = &converted;
+    component = 4;
+  }
+
+  if (component != tex_info.component ||
+      (image.pixel_type != TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE &&
+       image.pixel_type != TINYGLTF_COMPONENT_TYPE_BYTE))
+    throw std::runtime_error("texture type '" + tex_info.name +
+                             "' is in unexpected format");
 
   TextureData tex_data;
-  tex_data.name = image.name;
+  tex_data.name = tex_info.name + (image.name.empty() ? "" : "_" + image.name);
   tex_data.type = tex_type;
   tex_data.height = image.height;
   tex_data.width = image.width;
 
-  Texture tex{cache.context, tex_data, SamplerProps()};
-  tex.Write(cache.cmd_buff, image.image);
+  Texture tex{cache.context, tex_data, LoadSampler(model, texture)};
+  tex.Write(cache.cmd_buff, *data);
 
   scene.gpu_resources_.textures.push_back(std::move(tex));
   int idx = scene.gpu_resources_.textures.size() - 1;
 
   return idx;
+}
+
+SamplerProps SceneLoader::LoadSampler(const tinygltf::Model& model,
+                                      const tinygltf::Texture& texture) {
+  SamplerProps props;
+  if (texture.sampler == -1) return props;
+
+  const auto& sampler = model.samplers[texture.sampler];
+
+  props.mag_filter = sampler.magFilter == TINYGLTF_TEXTURE_FILTER_NEAREST
+                         ? vk::Filter::eNearest
+                         : vk::Filter::eLinear;
+
+  switch (sampler.minFilter) {
+    case TINYGLTF_TEXTURE_FILTER_NEAREST:
+      props.min_filter = vk::Filter::eNearest;
+      props.mipmap_mode = vk::SamplerMipmapMode::eNearest;
+      break;
+    case TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_NEAREST:
+      props.min_filter = vk::Filter::eNearest;
+      props.mipmap_mode = vk::SamplerMipmapMode::eNearest;
+      break;
+    case TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_LINEAR:
+      props.min_filter = vk::Filter::eNearest;
+      props.mipmap_mode = vk::SamplerMipmapMode::eLinear;
+      break;
+    case TINYGLTF_TEXTURE_FILTER_LINEAR:
+      props.min_filter = vk::Filter::eLinear;
+      props.mipmap_mode = vk::SamplerMipmapMode::eNearest;
+      break;
+    case TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_NEAREST:
+      props.min_filter = vk::Filter::eLinear;
+      props.mipmap_mode = vk::SamplerMipmapMode::eNearest;
+      break;
+    case TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_LINEAR:
+      props.min_filter = vk::Filter::eLinear;
+      props.mipmap_mode = vk::SamplerMipmapMode::eLinear;
+      break;
+    default:
+      props.min_filter = vk::Filter::eLinear;
+      props.mipmap_mode = vk::SamplerMipmapMode::eLinear;
+      break;
+  }
+
+  static const std::unordered_map<int, vk::SamplerAddressMode> wrapModeMap = {
+      {TINYGLTF_TEXTURE_WRAP_CLAMP_TO_EDGE,
+       vk::SamplerAddressMode::eClampToEdge},
+      {TINYGLTF_TEXTURE_WRAP_MIRRORED_REPEAT,
+       vk::SamplerAddressMode::eMirroredRepeat},
+      {TINYGLTF_TEXTURE_WRAP_REPEAT, vk::SamplerAddressMode::eRepeat}};
+
+  props.address_mode_U = wrapModeMap.at(sampler.wrapS);
+  props.address_mode_V = wrapModeMap.at(sampler.wrapT);
+
+  return props;
 }
 
 /*

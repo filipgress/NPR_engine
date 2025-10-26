@@ -66,6 +66,8 @@ class SceneLoader {
                          const tinygltf::Material& material,
                          const npr_graphics::TextureType tex_type,
                          LoaderCache& cache);
+  static npr_graphics::SamplerProps LoadSampler(
+      const tinygltf::Model& model, const tinygltf::Texture& texture);
 
   // helpers
   static int GetSceneIdx(const tinygltf::Model& model,

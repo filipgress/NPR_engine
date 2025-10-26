@@ -140,7 +140,7 @@ TextureInfo Texture::GetTypeInfo(TextureType type) {
     case TextureType::kMetallicRoughness:
       return {vk::Format::eR8G8Unorm, 2, "metallic_roughness"};
     case TextureType::kEmissive:
-      return {vk::Format::eR8G8B8A8Srgb, 3, "emissive"};
+      return {vk::Format::eR8G8B8A8Srgb, 4, "emissive"};
     default:
       throw std::runtime_error("unsupported texture type");
   }
