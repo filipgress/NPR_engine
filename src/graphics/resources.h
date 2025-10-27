@@ -75,17 +75,20 @@ struct FrameResources {
 };
 
 class Resources : public npr_core::NonCopyable {
+  friend class Renderer;
+
  public:
   Resources(const VulkanContext& context, vk::Extent2D extent,
             uint frame_count);
 
   uint GetFrameCount() const { return frame_count_; }
+  const FrameProps& GetProps() const { return frame_props_; }
   const std::vector<FrameResources>& GetResources() const {
     return frame_resources_;
   }
 
   // bind scenes that have finished loading for rendering
-  // void Bind(npr_scene::Scene&& scene) { scene_ = std::move(scene); }
+  void Bind(npr_scene::Scene&& scene) { scene_ = std::move(scene); }
 
  private:
   void CreateImages();

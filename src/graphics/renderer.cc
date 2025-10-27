@@ -85,14 +85,47 @@ vk::CommandBuffer Renderer::Record(uint image_idx) {
   vk::Viewport viewport(0, 0, swap_extent.width, swap_extent.height, 0.0f,
                         1.0f);
 
-  // auto window_size = window_.GetSize();
-  // if (swap_extent.width != static_cast<uint>(window_size.x) ||
-  //     swap_extent.height != static_cast<uint>(window_size.y)) {
-  //   INFO("FrameInFlight: ", frame_idx, " SwapchainImage: ", image_idx);
-  //   INFO("Window size: ", window_size.x, "x", window_size.y);
-  //   INFO("Swapchain extent: ", swap_extent.width, "x", swap_extent.height);
-  // }
-
+  {
+    // auto res_extent = res_.GetProps().extent;
+    // cmd_buff.beginRenderPass(gbuff_pass_.BeginInfo(frame_idx, res_extent),
+    //                          vk::SubpassContents::eInline);
+    //
+    // ModelPushConst data;
+    // cmd_buff.pushConstants(gbuff_pipe_.GetLayout(),
+    //                        vk::ShaderStageFlagBits::eVertex, 0, sizeof(data),
+    //                        &data);
+    //
+    // auto offset =
+    //     res_.GetResources()[frame_idx].material_unif->GetElemOffset(0);
+    //
+    // cmd_buff.setScissor(0, scissor);
+    // cmd_buff.setViewport(0, viewport);
+    // cmd_buff.setCullMode(vk::CullModeFlagBits::eNone);
+    //
+    // cmd_buff.bindPipeline(vk::PipelineBindPoint::eGraphics,
+    //                       gbuff_pipe_.GetPipeline());
+    // cmd_buff.bindDescriptorSets(
+    //     vk::PipelineBindPoint::eGraphics, gbuff_pipe_.GetLayout(), 0,
+    //     desc_pool_.GetCameraSets().GetSet(frame_idx), {});
+    // cmd_buff.bindDescriptorSets(
+    //     vk::PipelineBindPoint::eGraphics, gbuff_pipe_.GetLayout(), 1,
+    //     desc_pool_.GetMaterialSets().GetSet(frame_idx), offset);
+    // cmd_buff.bindDescriptorSets(
+    //     vk::PipelineBindPoint::eGraphics, gbuff_pipe_.GetLayout(), 2,
+    //     res_.scene_.GetGpuResources().desc_pool->GetTextureSet().GetSet(0),
+    //     {});
+    //
+    // auto& ibos = res_.scene_.GetGpuResources().ibos;
+    // vk::Buffer vbos[] = {res_.scene_.GetGpuResources().vbos[0].GetBuffer()};
+    // vk::DeviceSize offsets[] = {0};
+    //
+    // cmd_buff.bindVertexBuffers(0, 1, vbos, offsets);
+    // cmd_buff.bindIndexBuffer(ibos[0].GetBuffer(), 0, vk::IndexType::eUint32);
+    // cmd_buff.drawIndexed(ibos[0].GetCount(), 1, 0, 0, 0);
+    //
+    // cmd_buff.nextSubpass(vk::SubpassContents::eInline);
+    // cmd_buff.endRenderPass();
+  }
   {
     cmd_buff.beginRenderPass(swap_pass_.BeginInfo(image_idx, swap_extent),
                              vk::SubpassContents::eInline);
@@ -103,6 +136,10 @@ vk::CommandBuffer Renderer::Record(uint image_idx) {
 
     cmd_buff.bindPipeline(vk::PipelineBindPoint::eGraphics,
                           swap_pipe_.GetPipeline());
+    cmd_buff.bindDescriptorSets(
+        vk::PipelineBindPoint::eGraphics, swap_pipe_.GetLayout(), 0,
+        desc_pool_.GetGBuffSets().GetSet(frame_idx), {});
+
     cmd_buff.draw(3, 1, 0, 0);
 
     cmd_buff.endRenderPass();
@@ -116,7 +153,7 @@ void Renderer::RenderTargetResize() {
   c_.GetDevice().waitIdle();
 
   swapchain_.Recreate(window_.GetSize());
-  swap_pass_.Recreate();  // swapchain framebuffers
+  swap_pass_.CreateFramebuffers();
 }
 
 void Renderer::RecompileShaders() {
@@ -146,11 +183,10 @@ void Renderer::SwapShaders() {
   }
 
   if (!is_dirty) return;
+  c_.GetDevice().waitIdle();
 
-  if (!swap_pipe_.IsUpToDate()) {
-    c_.GetDevice().waitIdle();
-    swap_pipe_.Recreate();
-  }
+  if (!swap_pipe_.IsUpToDate()) swap_pipe_.Recreate();
+  if (!gbuff_pipe_.IsUpToDate()) gbuff_pipe_.Recreate();
 }
 
 }  // namespace npr_graphics

@@ -18,6 +18,7 @@ void App::Run() {
     if (!scene.IsValid()) return true;
 
     auto device = renderer_.GetContext().GetDevice();
+    auto& res = renderer_.GetResources();
     auto cmd_buff = scene.GetGpuResources().cmd_pool->GetCmdBuff();
 
     vk::SubmitInfo submit_info{};
@@ -27,7 +28,7 @@ void App::Run() {
     vk::Fence fence = device.createFence({});
     renderer_.GetContext().GetGraphicsQ().submit(submit_info, fence);
 
-    tasks_.Add([&scene, device, fence]() {
+    tasks_.Add([&scene, &res, device, fence]() {
       auto status = device.getFenceStatus(fence);
 
       if (status == vk::Result::eNotReady) return false;
@@ -36,7 +37,7 @@ void App::Run() {
       if (status == vk::Result::eErrorDeviceLost)
         ERR("error during scene loading:", vk::to_string(status));
       else
-        INFO("Scene loaded successfully:", scene.GetName());
+        res.Bind(std::move(scene));
       return true;
     });
 

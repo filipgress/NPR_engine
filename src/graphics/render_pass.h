@@ -3,6 +3,7 @@
 
 #include "vulkan_context.h"
 #include "swapchain.h"
+#include "resources.h"
 
 namespace npr_graphics {
 class BasePass : public npr_core::NonCopyable {
@@ -40,6 +41,43 @@ class BasePass : public npr_core::NonCopyable {
   std::vector<vk::ClearValue> clear_values_;
 };
 
+class RenderPass : public BasePass {
+ public:
+  RenderPass(const VulkanContext& context, const Resources& res)
+      : BasePass{context}, res_{res} {}
+  virtual ~RenderPass() = default;
+
+ protected:
+  void CreateFramebuffers() override;
+  virtual std::vector<vk::ImageView> GetAttachmentViews(
+      int frame_idx) const = 0;
+
+ protected:
+  const Resources& res_;
+};
+
+class GBuffPass : public RenderPass {
+ public:
+  GBuffPass(const VulkanContext& context, const Resources& res)
+      : RenderPass{context, res} {
+    Init();
+  }
+
+ private:
+  const std::string GetDbgName() const override { return "gbuffer_pass"; }
+  void SetClearValues() override;
+
+  std::vector<vk::AttachmentDescription> GetAttachments() const override;
+  std::vector<vk::SubpassDependency> GetDependencies() const override;
+  std::vector<vk::SubpassDescription> GetSubpasses() override;
+  std::vector<vk::ImageView> GetAttachmentViews(int frame_idx) const override;
+
+ private:
+  std::array<vk::AttachmentReference, 5> color_refs_{};
+  vk::AttachmentReference depth_ref_{};
+  vk::AttachmentReference resolve_ref_{};
+};
+
 class SwapPass : public BasePass {
  public:
   SwapPass(const VulkanContext& context, const Swapchain& swapchain)
@@ -47,10 +85,9 @@ class SwapPass : public BasePass {
     Init();
   }
 
-  void Recreate() { CreateFramebuffers(); }
+  void CreateFramebuffers() override;
 
  private:
-  void CreateFramebuffers() override;
   void SetClearValues() override;
 
   const std::string GetDbgName() const override { return "swap_pass"; }

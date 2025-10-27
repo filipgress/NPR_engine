@@ -99,22 +99,20 @@ std::array<vk::PipelineShaderStageCreateInfo, 2> Pipeline::GetShaderStages(
       frag_shader_.GetShaderStageInfo(frag_entry)};
 
   if (specialization_consts.empty()) return shader_stages;
+  if (data.specialization_data.empty()) {
+    data.specialization_entries.reserve(specialization_consts.size());
+    uint32_t offset = 0;
+    for (const auto& spec : specialization_consts) {
+      data.specialization_entries.emplace_back(
+          vk::SpecializationMapEntry{spec.constant_id, offset, spec.size});
 
-  data.specialization_data.clear();
-  data.specialization_entries.clear();
-  data.specialization_entries.reserve(specialization_consts.size());
+      // Copy data
+      const uint8_t* byte_data = static_cast<const uint8_t*>(spec.data);
+      data.specialization_data.insert(data.specialization_data.end(), byte_data,
+                                      byte_data + spec.size);
 
-  uint32_t offset = 0;
-  for (const auto& spec : specialization_consts) {
-    data.specialization_entries.emplace_back(
-        vk::SpecializationMapEntry{spec.constant_id, offset, spec.size});
-
-    // Copy data
-    const uint8_t* byte_data = static_cast<const uint8_t*>(spec.data);
-    data.specialization_data.insert(data.specialization_data.end(), byte_data,
-                                    byte_data + spec.size);
-
-    offset += spec.size;
+      offset += spec.size;
+    }
   }
 
   data.specialization_info.mapEntryCount = data.specialization_entries.size();
@@ -223,6 +221,57 @@ vk::PipelineDynamicStateCreateInfo Pipeline::GetDynamicState(
   dynamic_state.dynamicStateCount = data.dynamic_states.size();
   dynamic_state.pDynamicStates = data.dynamic_states.data();
   return dynamic_state;
+}
+
+/*
+ * GBuffPipe
+ */
+
+vk::PipelineMultisampleStateCreateInfo GBuffPipe::GetMultisampleState() const {
+  vk::PipelineMultisampleStateCreateInfo multisample{};
+  multisample.rasterizationSamples = props_.samples;
+  multisample.sampleShadingEnable = VK_FALSE;
+  return multisample;
+}
+
+vk::PipelineDepthStencilStateCreateInfo GBuffPipe::GetDepthStencilState()
+    const {
+  vk::PipelineDepthStencilStateCreateInfo depth_stencil{};
+  depth_stencil.depthTestEnable = VK_TRUE;
+  depth_stencil.depthWriteEnable = VK_TRUE;
+  depth_stencil.depthCompareOp = vk::CompareOp::eLess;
+  depth_stencil.stencilTestEnable = VK_TRUE;
+
+  // Configure front face stencil operations
+  depth_stencil.front.failOp = vk::StencilOp::eKeep;
+  depth_stencil.front.passOp = vk::StencilOp::eReplace;
+  depth_stencil.front.depthFailOp = vk::StencilOp::eKeep;
+  depth_stencil.front.compareOp = vk::CompareOp::eAlways;
+  depth_stencil.front.compareMask = BIT(1);
+  depth_stencil.front.writeMask = BIT(1);
+  depth_stencil.front.reference = BIT(1);
+
+  depth_stencil.back = depth_stencil.front;
+
+  return depth_stencil;
+}
+
+vk::PipelineColorBlendStateCreateInfo GBuffPipe::GetColorBlendState(
+    PipelineData& data) const {
+  data.color_attachments.resize(5);
+  for (auto& att : data.color_attachments) {
+    att.blendEnable = VK_FALSE;
+    att.colorWriteMask =
+        vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+        vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+  }
+  data.color_attachments[4].colorWriteMask = vk::ColorComponentFlagBits::eR;
+
+  vk::PipelineColorBlendStateCreateInfo color_blend{};
+  color_blend.logicOpEnable = VK_FALSE;
+  color_blend.attachmentCount = data.color_attachments.size();
+  color_blend.pAttachments = data.color_attachments.data();
+  return color_blend;
 }
 
 }  // namespace npr_graphics

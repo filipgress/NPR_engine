@@ -113,20 +113,54 @@ class Pipeline : public npr_core::NonCopyable {
   uint64_t frag_shader_ver_;
 };
 
+class GBuffPipe : public Pipeline {
+ public:
+  GBuffPipe(const VulkanContext& context, const PipelineCache& cache,
+            const GBuffPass& render_pass, VertexShader& vert_shader,
+            FragmentShader& frag_shader, const FrameProps& props,
+            const DescriptorPool& desc_pool)
+      : Pipeline(context, cache, render_pass, vert_shader, frag_shader),
+        props_{props} {
+    CreateLayout(
+        {desc_pool.GetCameraSets().GetLayout(),
+         desc_pool.GetMaterialSets().GetLayout(),
+         TextureArraySet(c_).GetLayout()},
+        {MakePushConst<ModelPushConst>(vk::ShaderStageFlagBits::eVertex)});
+    Recreate();
+  }
+
+  void Recreate() override {
+    CreatePipeline(0, true, "main", "main",
+                   {MakeSpecConst(0, static_cast<uint32_t>(props_.samples)),
+                    MakeSpecConst(1, static_cast<uint32_t>(MAX_TEXTURES))});
+  }
+
+ private:
+  const std::string GetDbgName() const override { return "gbuff_pipe"; }
+
+  vk::PipelineMultisampleStateCreateInfo GetMultisampleState() const override;
+  vk::PipelineDepthStencilStateCreateInfo GetDepthStencilState() const override;
+  vk::PipelineColorBlendStateCreateInfo GetColorBlendState(
+      PipelineData& data) const override;
+
+ private:
+  const FrameProps& props_;
+};
+
 class SwapPipe : public Pipeline {
  public:
   SwapPipe(const VulkanContext& context, const PipelineCache& cache,
            const SwapPass& render_pass, VertexShader& vert_shader,
-           FragmentShader& frag_shader)
+           FragmentShader& frag_shader, const DescriptorPool& desc_pool)
       : Pipeline(context, cache, render_pass, vert_shader, frag_shader) {
-    CreateLayout({}, {});
+    CreateLayout({desc_pool.GetGBuffSets().GetLayout()}, {});
     Recreate();
   }
 
-  void Recreate() { CreatePipeline(0, false, "main", "main", {}); }
+  void Recreate() override { CreatePipeline(0, false, "main", "main", {}); }
 
  private:
-  const std::string GetDbgName() const { return "swap_pipe"; }
+  const std::string GetDbgName() const override { return "swap_pipe"; }
 };
 
 }  // namespace npr_graphics

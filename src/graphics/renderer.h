@@ -20,6 +20,7 @@ class Renderer : public npr_core::NonCopyable {
   void Render();
 
   const VulkanContext& GetContext() const { return c_; }
+  Resources& GetResources() { return res_; }
 
   void OnWindowResize() { swapchain_.GetProps().dirty = true; }
   void RecompileShaders();
@@ -43,16 +44,30 @@ class Renderer : public npr_core::NonCopyable {
   GraphicsCommandPool cmd_pool_{c_, sync_.GetFrameCount()};
   DescriptorPool desc_pool_{c_, res_};
 
+  GBuffPass gbuff_pass_{c_, res_};
   SwapPass swap_pass_{c_, swapchain_};
 
-  std::array<VertexShader, 1> vert_shaders_{
-      {{c_, "shaders/main_vert.spv", "../shaders/main.vert"}}};
-  std::array<FragmentShader, 1> frag_shaders_{
-      {{c_, "shaders/main_frag.spv", "../shaders/main.frag"}}};
+  std::array<VertexShader, 2> vert_shaders_{
+      VertexShader{c_, "shaders/main_vert.spv", "../shaders/main.vert"},
+      VertexShader{c_, "shaders/quad_vert.spv", "../shaders/quad.vert"},
+  };
+
+  std::array<FragmentShader, 2> frag_shaders_{
+      FragmentShader{c_, "shaders/main_frag.spv", "../shaders/main.frag"},
+      FragmentShader{c_, "shaders/quad_frag.spv", "../shaders/quad.frag"},
+  };
 
   PipelineCache pipe_cache_{c_};
-  SwapPipe swap_pipe_{c_, pipe_cache_, swap_pass_, vert_shaders_[0],
-                      frag_shaders_[0]};
+  GBuffPipe gbuff_pipe_{c_,
+                        pipe_cache_,
+                        gbuff_pass_,
+                        vert_shaders_[0],
+                        frag_shaders_[0],
+                        res_.GetProps(),
+                        desc_pool_};
+  SwapPipe swap_pipe_{
+      c_,        pipe_cache_, swap_pass_, vert_shaders_[1], frag_shaders_[1],
+      desc_pool_};
 };
 }  // namespace npr_graphics
 
