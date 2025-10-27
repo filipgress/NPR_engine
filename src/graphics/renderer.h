@@ -5,6 +5,7 @@
 #include "swapchain.h"
 #include "command_pool.h"
 #include "sync.h"
+#include "resources.h"
 #include "shader.h"
 #include "render_pass.h"
 #include "pipeline.h"
@@ -37,9 +38,10 @@ class Renderer : public npr_core::NonCopyable {
   Swapchain swapchain_{c_, window_.GetSize()};
 
   Sync sync_{c_, swapchain_.GetProps().image_count};
+  Resources res_{c_, {1280, 720}, sync_.GetFrameCount()};
 
   GraphicsCommandPool cmd_pool_{c_, sync_.GetFrameCount()};
-  // DescriptorPool desc_pool_{c_, res_};
+  DescriptorPool desc_pool_{c_, res_};
 
   SwapPass swap_pass_{c_, swapchain_};
 

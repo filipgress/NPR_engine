@@ -40,7 +40,7 @@ inline std::string GetFilename(const std::string& filepath) {
   return filepath.substr(filepath.find_last_of("/\\") + 1);
 }
 
-uint32_t Align(uint32_t size, uint32_t alignment) {
+inline uint32_t Align(uint32_t size, uint32_t alignment) {
   return (size + alignment - 1) & ~(alignment - 1);
 }
 

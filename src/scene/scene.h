@@ -12,7 +12,7 @@ namespace npr_scene {
 
 struct GpuResources {
   std::unique_ptr<npr_graphics::CommandPool> cmd_pool;
-  std::unique_ptr<npr_graphics::DescriptorPool> desc_pool;
+  std::unique_ptr<npr_graphics::TexDescriptorPool> desc_pool;
 
   std::vector<npr_graphics::IndexBuffer> ibos;
   std::vector<npr_graphics::VertexBuffer> vbos;

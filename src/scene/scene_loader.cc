@@ -55,6 +55,7 @@ bool SceneLoader::LoadScene(const VulkanContext& context, Scene& scene,
       for (int node_idx : model.scenes[scene_idx].nodes)
         LoadEntity(scene, flecs::entity::null(), model, node_idx, cache);
 
+      scene.gpu_resources_.desc_pool->Update(scene.gpu_resources_.textures);
       cache.cmd_buff.end();
     }
 
@@ -87,10 +88,9 @@ void SceneLoader::PrepareScene(Scene& scene, LoaderCache& cache) {
   }
 
   // custom descriptor pool
-  // if (!scene.gpu_resources_.desc_pool) {
-  //   scene.gpu_resources_.desc_pool =
-  //       std::make_unique<DescriptorPool>();
-  // }
+  if (!scene.gpu_resources_.desc_pool)
+    scene.gpu_resources_.desc_pool =
+        std::make_unique<TexDescriptorPool>(cache.context);
 }
 
 void SceneLoader::LoadEntity(Scene& scene, flecs::entity parent_ent,

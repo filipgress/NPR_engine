@@ -15,6 +15,7 @@ A non-photorealistic real-time rendering engine written in C++ using Vulkan API.
 - [`glm`](https://github.com/g-truc/glm) (mathematics library)
 - [`Dear ImGui`](https://github.com/ocornut/imgui) (UI toolkit)
 - [`tinygltf`](https://github.com/syoyo/tinygltf) (GLTF model loader)
+- [`Flecs`](https://github.com/SanderMertens/flecs) (Entity Component System)
 
 Third-party libraries are managed automatically by CMake. Refer to the [CMakeLists.txt](./CMakeLists.txt) for details.
 

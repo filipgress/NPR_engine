@@ -104,6 +104,16 @@ void Image::AllocMem() {
 /*
  * Texture
  */
+
+Texture::Texture(const VulkanContext& context, vk::Format format,
+                 vk::Extent2D extent, vk::ImageUsageFlags usage,
+                 vk::ImageAspectFlags aspect, vk::SampleCountFlagBits samples,
+                 std::string dbg_name)
+    : Image(context, format, extent, usage, aspect, vk::SharingMode::eExclusive,
+            samples, 1, dbg_name) {
+  CreateSampler();
+}
+
 Texture::Texture(const VulkanContext& context, const TextureData& data,
                  const SamplerProps& sampler_props)
     : Image{context,

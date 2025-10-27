@@ -6,6 +6,9 @@
 
 namespace npr_graphics {
 
+#define MAX_TEXTURES 128
+#define MAX_MATERIALS 1024
+
 enum MaterialFlags : uint32_t {
   kNone = BIT(0),
   kDoubleSided = BIT(1),
@@ -13,7 +16,7 @@ enum MaterialFlags : uint32_t {
   kMask = BIT(3)
 };
 
-struct alignas(16) MaterialUniform {
+struct alignas(16) MaterialUnif {
   glm::ivec4 maps;
 
   glm::vec4 color_factor;
@@ -25,10 +28,15 @@ struct alignas(16) MaterialUniform {
   MaterialFlags flags;
 };
 
-struct alignas(16) CameraUniform {
+struct alignas(16) CameraUnif {
   glm::mat4 view;
   glm::mat4 proj;
   glm::mat4 view_proj;
+};
+
+struct alignas(16) ModelPushConst {
+  glm::mat4 model;
+  glm::mat4 normal;
 };
 
 struct FrameProps {
@@ -50,14 +58,26 @@ struct FrameProps {
 };
 
 struct FrameResources {
-  std::unique_ptr<UniformBuffer<CameraUniform>> camera_unif;
-  std::unique_ptr<DynamicUniformBuffer<MaterialUniform>> material_unif;
-  std::unique_ptr<Buffer> light_storage;
+  std::unique_ptr<UniformBuffer<CameraUnif>> camera_unif;
+  std::unique_ptr<DynamicUniformBuffer<MaterialUnif>> material_unif;
+  // std::unique_ptr<Buffer> light_storage;
+
+  // gpass
+  std::unique_ptr<Texture> albedo_metallic_ms;
+  std::unique_ptr<Texture> emissive_roughness_ms;
+  std::unique_ptr<Texture> position_ms;
+  std::unique_ptr<Texture> normal_ms;
+
+  std::unique_ptr<Image> coverage_ms;
+  std::unique_ptr<Texture> coverage_res;
+
+  std::unique_ptr<Texture> depth_stencil_ms;
 };
 
 class Resources : public npr_core::NonCopyable {
  public:
-  Resources(const VulkanContext& context);
+  Resources(const VulkanContext& context, vk::Extent2D extent,
+            uint frame_count);
 
   uint GetFrameCount() const { return frame_count_; }
   const std::vector<FrameResources>& GetResources() const {
@@ -68,6 +88,9 @@ class Resources : public npr_core::NonCopyable {
   // void Bind(npr_scene::Scene&& scene) { scene_ = std::move(scene); }
 
  private:
+  void CreateImages();
+  void CreateBuffers();
+
   vk::SampleCountFlagBits GetMaxSamples();
 
  private:

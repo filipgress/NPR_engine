@@ -70,6 +70,9 @@ struct SamplerProps {
 
 class Texture : public Image {
  public:
+  Texture(const VulkanContext& context, vk::Format format, vk::Extent2D extent,
+          vk::ImageUsageFlags usage, vk::ImageAspectFlags aspect,
+          vk::SampleCountFlagBits samples, std::string dbg_name);
   Texture(const VulkanContext& context, const TextureData& data,
           const SamplerProps& sampler_props);
   Texture(Texture&&) noexcept;
@@ -83,7 +86,7 @@ class Texture : public Image {
              vk::ImageLayout src_layout = vk::ImageLayout::eUndefined);
 
  private:
-  void CreateSampler(const SamplerProps& props);
+  void CreateSampler(const SamplerProps& props = SamplerProps());
 
   void Transition(vk::CommandBuffer cmd_buff, vk::ImageLayout old_layout,
                   vk::ImageLayout new_layout, uint32_t start_mip_level,
