@@ -48,6 +48,9 @@ class VulkanContext : public npr_core::NonCopyable {
 
   uint32_t FindMemTypeIdx(uint32_t typ_bits,
                           vk::MemoryPropertyFlags properties) const;
+  vk::Format FindFormat(const std::vector<vk::Format>& candidates,
+                        vk::ImageTiling tiling,
+                        vk::FormatFeatureFlags features) const;
 
   void SetDbgName(uint64_t object_handle, vk::ObjectType object_type,
                   const std::string& name) const;

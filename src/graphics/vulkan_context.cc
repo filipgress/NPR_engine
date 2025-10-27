@@ -340,6 +340,24 @@ uint32_t VulkanContext::FindMemTypeIdx(
   throw std::runtime_error("Failed to find suitable memory type!");
 }
 
+vk::Format VulkanContext::FindFormat(const std::vector<vk::Format>& candidates,
+                                     vk::ImageTiling tiling,
+                                     vk::FormatFeatureFlags features) const {
+  for (vk::Format format : candidates) {
+    vk::FormatProperties props = phys_device_.getFormatProperties(format);
+
+    if (tiling == vk::ImageTiling::eLinear &&
+        (props.linearTilingFeatures & features) == features) {
+      return format;
+    } else if (tiling == vk::ImageTiling::eOptimal &&
+               (props.optimalTilingFeatures & features) == features) {
+      return format;
+    }
+  }
+
+  throw std::runtime_error("failed to find supported format!");
+}
+
 void VulkanContext::SetDbgName(uint64_t object_handle,
                                vk::ObjectType object_type,
                                const std::string& name) const {

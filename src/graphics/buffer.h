@@ -17,24 +17,30 @@ class Buffer : public npr_core::NonCopyable {
   vk::Buffer GetBuffer() const { return buff_; }
 
   void Write(vk::CommandBuffer cmd_buff, const void* data);
+
   void DestroyStagingBuff() { staging_buff_.reset(); }
+  void UnmapMemory() {
+    if (mapped_mem_) c_.GetDevice().unmapMemory(buff_mem_);
+    mapped_mem_ = nullptr;
+  }
 
  private:
   void CreateBuffer(vk::SharingMode sharing_mode);
   void AllocMem();
 
- private:
+ protected:
   const VulkanContext& c_;
 
   vk::Buffer buff_;
   vk::DeviceMemory buff_mem_;
-  std::unique_ptr<StagingBuffer> staging_buff_;
 
   vk::MemoryPropertyFlags mem_props_;
   vk::BufferUsageFlags usage_;
 
-  uint32_t size_{0};
+  void* mapped_mem_{nullptr};
+  std::unique_ptr<StagingBuffer> staging_buff_;
 
+  uint32_t size_{0};
   std::string dbg_name_;
 };
 
@@ -92,5 +98,57 @@ class IndexBuffer : public Buffer {
   size_t count_;
 };
 
+template <typename T>
+class UniformBuffer : public Buffer {
+ public:
+  UniformBuffer(const VulkanContext& context, const std::string& dbg_name)
+      : Buffer(context, vk::BufferUsageFlagBits::eUniformBuffer,
+               vk::MemoryPropertyFlagBits::eHostVisible |
+                   vk::MemoryPropertyFlagBits::eHostCoherent,
+               vk::SharingMode::eExclusive, sizeof(T), dbg_name) {}
+  void Write(const T& ubo) { Write(nullptr, ubo); }
+};
+
+template <typename T>
+class DynamicUniformBuffer : public Buffer {
+ public:
+  DynamicUniformBuffer(const VulkanContext& context, uint32_t obj_count,
+                       const std::string& dbg_name)
+      : Buffer{context,
+               vk::BufferUsageFlagBits::eUniformBuffer,
+               vk::MemoryPropertyFlagBits::eHostVisible |
+                   vk::MemoryPropertyFlagBits::eHostCoherent,
+               vk::SharingMode::eExclusive,
+               CalcBufferSize(context, obj_count),
+               dbg_name} {}
+
+  uint32_t GetElemSize() const { return aligned_size_; }
+  uint32_t GetElemOffset(uint32_t idx) const {
+    assert(idx < elem_count_);
+    return idx * aligned_size_;
+  }
+
+  void Write(uint32_t idx, const T& ubo) {
+    assert(idx < elem_count_);
+    if (!mapped_mem_)
+      mapped_mem_ = c_.GetDevice().mapMemory(buff_mem_, 0, size_);
+    memcpy(static_cast<char*>(mapped_mem_) + idx * aligned_size_, &ubo,
+           sizeof(T));
+  }
+
+ private:
+  uint32_t CalcBufferSize(const VulkanContext& context, uint32_t elem_count) {
+    aligned_size_ = npr_core::Align(
+        sizeof(T),
+        context.GetProperties().limits.minUniformBufferOffsetAlignment);
+    elem_count_ = elem_count;
+
+    return aligned_size_ * elem_count_;
+  }
+
+ private:
+  uint32_t elem_count_;
+  uint32_t aligned_size_;
+};
 }  // namespace npr_graphics
 #endif  // BUFFER_H_

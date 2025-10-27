@@ -36,7 +36,7 @@ void Pipeline::CreateLayout(
     range.size = pc.size;
     push_constant_ranges.push_back(range);
 
-    offset += (pc.size + 3) & ~3;  // Align to 4 bytes
+    offset += npr_core::Align(pc.size, 4);
   }
 
   pipeline_layout_info.pushConstantRangeCount = push_constant_ranges.size();

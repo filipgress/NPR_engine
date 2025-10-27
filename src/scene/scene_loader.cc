@@ -108,16 +108,12 @@ void SceneLoader::LoadEntity(Scene& scene, flecs::entity parent_ent,
     flecs::entity child_ent = scene.entities_.entity(node.name.c_str());
     if (parent_ent.is_valid()) child_ent.child_of(parent_ent);
 
-    if (node.camera != -1) {
-      // child_ent.add<CameraTag>();
-
-    } else if (int light_idx = GetLightIdx(node, cache); light_idx == -1) {
-      child_ent.add<ObjectTag>();
+    if (node.camera != -1)
+      LoadCamera(child_ent, model, node);
+    else if (int light_idx = GetLightIdx(node, cache); light_idx == -1)
       LoadObject(scene, child_ent, model, node, cache);
-
-    } else {
-      // child_ent.add<LightTag>();
-    }
+    else {
+    }  // child_ent.add<LightTag>();
 
     for (int glfw_child_node_idx : node.children)
       s.push({child_ent, glfw_child_node_idx});
@@ -127,6 +123,7 @@ void SceneLoader::LoadEntity(Scene& scene, flecs::entity parent_ent,
 void SceneLoader::LoadObject(Scene& scene, flecs::entity node_ent,
                              const tinygltf::Model& model,
                              const tinygltf::Node& node, LoaderCache& cache) {
+  node_ent.add<ObjectTag>();
   AddTransformComp(node_ent, node);
 
   if (node.mesh == -1) return;
@@ -153,6 +150,35 @@ void SceneLoader::LoadObject(Scene& scene, flecs::entity node_ent,
     AddMaterialComp(scene, prim_ent, model, node, prim_idx, cache);
 
     prim_idx++;
+  }
+}
+
+void SceneLoader::LoadCamera(flecs::entity node_ent,
+                             const tinygltf::Model& model,
+                             const tinygltf::Node& node) {
+  node_ent.add<CameraTag>();
+  AddTransformComp(node_ent, node);
+
+  const auto& camera = model.cameras[node.camera];
+
+  if (camera.type == "perspective") {
+    PerspectiveComp comp;
+    comp.aspect = camera.perspective.aspectRatio;
+    comp.fov = camera.perspective.yfov;
+    comp.far = camera.perspective.zfar;
+    comp.near = camera.perspective.znear;
+    node_ent.set<PerspectiveComp>(comp);
+
+  } else if (camera.type == "orthographic") {
+    OrthographicComp comp;
+    comp.xmag = camera.orthographic.xmag;
+    comp.ymag = camera.orthographic.ymag;
+    comp.far = camera.orthographic.zfar;
+    comp.near = camera.orthographic.znear;
+    node_ent.set<OrthographicComp>(comp);
+
+  } else {
+    INFO("[warn]: skipping unsupported camera type: " + camera.type);
   }
 }
 

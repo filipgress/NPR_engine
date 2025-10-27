@@ -20,17 +20,21 @@ Buffer::Buffer(Buffer&& other) noexcept
     : c_(other.c_),
       buff_(std::move(other.buff_)),
       buff_mem_(std::move(other.buff_mem_)),
-      staging_buff_(std::move(other.staging_buff_)),
       mem_props_(other.mem_props_),
       usage_(other.usage_),
+      mapped_mem_(other.mapped_mem_),
+      staging_buff_(std::move(other.staging_buff_)),
       size_(other.size_),
       dbg_name_(std::move(other.dbg_name_)) {
   other.buff_ = nullptr;
   other.buff_mem_ = nullptr;
+  other.mapped_mem_ = nullptr;
   other.size_ = 0;
 }
 
 Buffer::~Buffer() {
+  UnmapMemory();
+
   auto device = c_.GetDevice();
   if (buff_mem_) device.freeMemory(buff_mem_);
   if (buff_) device.destroyBuffer(buff_);
@@ -76,9 +80,8 @@ void Buffer::Write(vk::CommandBuffer cmd_buff, const void* data) {
   auto device = c_.GetDevice();
 
   if (mem_props_ & vk::MemoryPropertyFlagBits::eHostVisible) {
-    void* mapped_mem = device.mapMemory(buff_mem_, 0, size_);
-    memcpy(mapped_mem, data, size_);
-    device.unmapMemory(buff_mem_);
+    if (!mapped_mem_) mapped_mem_ = device.mapMemory(buff_mem_, 0, size_);
+    memcpy(mapped_mem_, data, size_);
 
   } else {
     assert(cmd_buff);

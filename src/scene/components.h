@@ -14,6 +14,11 @@ struct ObjectTag {
   /* TransformComp */
 };
 
+struct CameraTag {
+  /* TransformComp */
+  /* PerspectiveCameraComp or OrthographicCameraComp */
+};
+
 struct TransformComp {
   glm::vec3 pos{0.0f};
   glm::quat rot{1.0f, 0.0f, 0.0f, 0.0f};
@@ -44,6 +49,32 @@ struct MaterialComp {
   bool double_sided{false};
   bool is_opaque{false};
   bool is_mask{false};
+};
+
+struct PerspectiveComp {
+  float aspect{-1.0f};
+  float fov{glm::pi<float>() / 4.0f};
+  float near{0.01f};
+  float far{100.0f};
+};
+
+struct OrthographicComp {
+  float xmag{1.0f};
+  float ymag{1.0f};
+  float near{0.01f};
+  float far{100.0f};
+};
+
+struct LightComp {
+  int idx{-1};
+  glm::vec3 color{1.0f};
+  float intensity{1.0f};
+  float range{0.0f};  // 0 = inf
+};
+
+struct SpotComp {
+  float inner_cone_angle{0.0f};
+  float outer_cone_angle{0.0f};
 };
 
 }  // namespace npr_scene
