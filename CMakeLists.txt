@@ -108,6 +108,8 @@ set(HEADER_FILES
     ./src/scene/scene.h
     ./src/scene/scene_loader.h
     ./src/scene/components.h
+    ./src/scene/camera.h
+    ./src/scene/frustrum.h
     # window
     ./src/window/window.h
     ./src/window/event.h
@@ -139,6 +141,8 @@ set(SOURCE_FILES
     # scene
     ./src/scene/scene.cc
     ./src/scene/scene_loader.cc
+    ./src/scene/camera.cc
+    ./src/scene/frustrum.cc
     # window
     ./src/window/window.cc
     # graphics
