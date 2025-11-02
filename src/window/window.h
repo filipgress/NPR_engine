@@ -22,6 +22,8 @@ class Window {
   static void ErrorCallback(int err_code, const char* desc);
 
   glm::ivec2 GetSize() const;
+  float GetAspect() const;
+
   bool IsMinimized() const {
     glm::ivec2 size = GetSize();
     return size.x == 0 || size.y == 0;

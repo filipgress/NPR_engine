@@ -124,4 +124,9 @@ glm::ivec2 Window::GetSize() const {
   return size;
 }
 
+float Window::GetAspect() const {
+  auto size = GetSize();
+  return static_cast<float>(size.x) / size.y;
+}
+
 }  // namespace npr_window

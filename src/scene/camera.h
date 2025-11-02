@@ -9,6 +9,13 @@
 
 namespace npr_scene {
 
+struct ProjProps {
+  float fov{60.0f};
+  float aspect{16.0f / 9.0f};
+  float near{0.1f};
+  float far{100.0f};
+};
+
 enum class CameraMode { kFree, kOrbit };
 struct CameraProps {
   float orbit_factor{4.5f};
@@ -27,24 +34,24 @@ struct CameraProps {
 
 struct CameraState {
   glm::vec3 pos{0.0f, 0.0f, 5.0f};
-
-  glm::vec3 target{0.0f};
-  float dist{5.0f};
-  float phi{0.0f};
-  float theta{0.0f};
+  glm::vec3 front{0.0f, 0.0f, -1.0f};
 };
 
 class Camera {
  public:
-  Camera(flecs::entity ent);
+  Camera(ProjProps proj_props = ProjProps(),
+         CameraProps cam_props = CameraProps());
+  Camera(float aspect) : Camera{{.aspect = aspect}} {}
 
   CameraMode GetMode() const { return props_.mode; }
-  void SetMode(CameraMode mode);
+  void SetMode(CameraMode mode) { props_.mode = mode; }
 
-  float GetAspectRatio() const;
+  float GetAspect() const;
+  void SetAspect(float aspect);
+
   const Frustrum& GetFrustrum() const { return frustrum_; }
   npr_graphics::CameraUnif GetCameraUnif() {
-    return npr_graphics::CameraUnif{view_, proj_, proj_ * view_};
+    return {view_, proj_, proj_ * view_};
   }
 
   void SetEntity(flecs::entity ent);
@@ -63,20 +70,19 @@ class Camera {
   void SetProjMat();
   void SetViewMat();
 
-  glm::vec3 CalcFpsFront(const CameraState& state) const;
-  glm::vec3 CalcOrbitPos(const CameraState& state) const;
-
  private:
   glm::mat4 proj_{1.0f};
   glm::mat4 view_{1.0f};
 
   CameraState curr_{};
   CameraState dest_{};
+  glm::vec3 target_{0.0f};
 
-  CameraProps props_;
-  flecs::entity ent_;
+  ProjProps proj_props_{};
+  CameraProps props_{};
 
-  Frustrum frustrum_;
+  flecs::entity ent_{};
+  Frustrum frustrum_{};
 };
 
 }  // namespace npr_scene
