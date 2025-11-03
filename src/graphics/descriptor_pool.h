@@ -17,6 +17,7 @@ class DescriptorPool : public npr_core::NonCopyable {
   const GBuffSets& GetGBuffSets() const { return gbuff_sets_; }
   const CameraUnifSets& GetCameraSets() const { return camera_sets_; }
   const MaterialUnifSets& GetMaterialSets() const { return material_sets_; }
+  const PresentSets& GetPresentSets() const { return present_sets_; }
 
  private:
   void CreateDescriptorPool();
@@ -29,6 +30,7 @@ class DescriptorPool : public npr_core::NonCopyable {
   GBuffSets gbuff_sets_;
   CameraUnifSets camera_sets_;
   MaterialUnifSets material_sets_;
+  PresentSets present_sets_;
 };
 
 class TexDescriptorPool : public npr_core::NonCopyable {

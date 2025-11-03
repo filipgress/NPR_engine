@@ -25,6 +25,8 @@ float Camera::GetAspect() const {
 void Camera::SetAspect(float aspect) {
   proj_props_.aspect = aspect;
 
+  if (ent_.is_valid()) return;
+
   SetProjMat();
   frustrum_.Update(proj_ * view_);
 }

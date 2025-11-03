@@ -17,10 +17,6 @@ void DescriptorSets::AllocSets(vk::DescriptorPool pool) {
 /*
  * GBuffSets
  */
-std::vector<vk::DescriptorPoolSize> GBuffSets::GetPoolSizes() const {
-  return {{vk::DescriptorType::eCombinedImageSampler, 5 * count_}};
-}
-
 void GBuffSets::CreateLayout() {
   std::array<vk::DescriptorSetLayoutBinding, 5> bindings;
 
@@ -59,6 +55,8 @@ void GBuffSets::CreateLayout() {
   layout_info.pBindings = bindings.data();
 
   layout_ = c_.GetDevice().createDescriptorSetLayout(layout_info);
+  c_.SetDbgName((uint64_t)(VkDescriptorSetLayout)layout_,
+                vk::ObjectType::eDescriptorSetLayout, "gbuff_set_layout");
 }
 
 void GBuffSets::Update(const Resources& res) const {
@@ -110,12 +108,49 @@ void GBuffSets::Update(const Resources& res) const {
 }
 
 /*
- * TextureArraySet
+ * TextureSets
  */
-std::vector<vk::DescriptorPoolSize> TextureArraySet::GetPoolSizes() const {
-  return {{vk::DescriptorType::eCombinedImageSampler, MAX_TEXTURES}};
+void TextureSets::CreateLayout() {
+  vk::DescriptorSetLayoutBinding binding{};
+  binding.binding = 0;
+  binding.descriptorType = vk::DescriptorType::eCombinedImageSampler;
+  binding.descriptorCount = 1;
+  binding.stageFlags = vk::ShaderStageFlagBits::eFragment;
+
+  vk::DescriptorSetLayoutCreateInfo layout_info{};
+  layout_info.bindingCount = 1;
+  layout_info.pBindings = &binding;
+
+  layout_ = c_.GetDevice().createDescriptorSetLayout(layout_info);
+  c_.SetDbgName((uint64_t)(VkDescriptorSetLayout)layout_,
+                vk::ObjectType::eDescriptorSetLayout, "texture_set_layout");
 }
 
+void TextureSets::Update(const Resources& res) const {
+  for (size_t i = 0; i < res.GetResources().size(); i++) {
+    auto* tex = GetAttach(res, i);
+
+    vk::DescriptorImageInfo image_info{};
+    image_info.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+    image_info.imageView = tex->GetImageView();
+    image_info.sampler = tex->GetSampler();
+
+    vk::WriteDescriptorSet desc_write{};
+
+    desc_write.dstSet = sets_[i];
+    desc_write.dstBinding = 0;
+    desc_write.dstArrayElement = 0;
+    desc_write.descriptorType = vk::DescriptorType::eCombinedImageSampler;
+    desc_write.descriptorCount = 1;
+    desc_write.pImageInfo = &image_info;
+
+    c_.GetDevice().updateDescriptorSets(1, &desc_write, 0, nullptr);
+  }
+}
+
+/*
+ * TextureArraySet
+ */
 void TextureArraySet::CreateLayout() {
   vk::DescriptorSetLayoutBinding binding{};
   binding.binding = 0;
@@ -128,6 +163,9 @@ void TextureArraySet::CreateLayout() {
   layout_info.pBindings = &binding;
 
   layout_ = c_.GetDevice().createDescriptorSetLayout(layout_info);
+  c_.SetDbgName((uint64_t)(VkDescriptorSetLayout)layout_,
+                vk::ObjectType::eDescriptorSetLayout,
+                "texture_array_set_layout");
 }
 
 void TextureArraySet::Update(
@@ -178,10 +216,6 @@ void TextureArraySet::Update(uint idx,
 /*
  * UniformSets
  */
-std::vector<vk::DescriptorPoolSize> BufferSets::GetPoolSizes() const {
-  return {{desc_type_, count_}};
-}
-
 void BufferSets::CreateLayout() {
   vk::DescriptorSetLayoutBinding binding{};
   binding.binding = 0;
@@ -194,6 +228,8 @@ void BufferSets::CreateLayout() {
   layout_info.pBindings = &binding;
 
   layout_ = c_.GetDevice().createDescriptorSetLayout(layout_info);
+  c_.SetDbgName((uint64_t)(VkDescriptorSetLayout)layout_,
+                vk::ObjectType::eDescriptorSetLayout, "buffer_set_layout");
 }
 
 void BufferSets::Update(vk::Buffer buffer, vk::DeviceSize range,

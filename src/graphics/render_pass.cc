@@ -243,11 +243,74 @@ std::vector<vk::ImageView> GBuffPass::GetAttachmentViews(int frame_idx) const {
 }
 
 /*
+ * LoadPass
+ */
+void LoadPass::SetClearValues() {
+  clear_values_.resize(1);
+  clear_values_[0].color = std::array<float, 4>{0.0f, 0.0f, 0.0f, 0.0f};
+}
+
+std::vector<vk::AttachmentDescription> LoadPass::GetAttachments() const {
+  auto& props = res_.GetProps();
+  std::vector<vk::AttachmentDescription> attachments(1);
+
+  attachments[0].format = props.albedo_format;
+  attachments[0].samples = vk::SampleCountFlagBits::e1;
+  attachments[0].loadOp = vk::AttachmentLoadOp::eClear;
+  attachments[0].storeOp = vk::AttachmentStoreOp::eStore;
+  attachments[0].stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
+  attachments[0].stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
+  attachments[0].initialLayout = vk::ImageLayout::eUndefined;
+  attachments[0].finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+
+  return attachments;
+}
+
+std::vector<vk::SubpassDependency> LoadPass::GetDependencies() const {
+  std::vector<vk::SubpassDependency> deps(2);
+
+  deps[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+  deps[0].dstSubpass = 0;
+  deps[0].srcStageMask = vk::PipelineStageFlagBits::eFragmentShader;
+  deps[0].dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+  deps[0].srcAccessMask = vk::AccessFlagBits::eShaderRead;
+  deps[0].dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
+
+  deps[1].srcSubpass = 0;
+  deps[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+  deps[1].srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+  deps[1].dstStageMask = vk::PipelineStageFlagBits::eFragmentShader;
+  deps[1].srcAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
+  deps[1].dstAccessMask = vk::AccessFlagBits::eShaderRead;
+
+  return deps;
+}
+
+std::vector<vk::SubpassDescription> LoadPass::GetSubpasses() {
+  color_ref_ = {0, vk::ImageLayout::eColorAttachmentOptimal};
+
+  vk::SubpassDescription subpass{};
+  subpass.pipelineBindPoint = vk::PipelineBindPoint::eGraphics;
+  subpass.colorAttachmentCount = 1;
+  subpass.pColorAttachments = &color_ref_;
+
+  return {subpass};
+}
+
+std::vector<vk::ImageView> LoadPass::GetAttachmentViews(int frame_idx) const {
+  auto& res = res_.GetResources()[frame_idx];
+  if (!res.present_color)
+    throw std::runtime_error("missing required resources for: " + GetDbgName());
+
+  return {res.present_color->GetImageView()};
+}
+
+/*
  * SwapPass
  */
 void SwapPass::SetClearValues() {
   clear_values_.resize(1);
-  clear_values_[0].color = std::array<float, 4>{1.0f, 0.0f, 0.0f, 1.0f};
+  clear_values_[0].color = std::array<float, 4>{0.0f, 0.0f, 0.0f, 1.0f};
 }
 
 std::vector<vk::AttachmentDescription> SwapPass::GetAttachments() const {

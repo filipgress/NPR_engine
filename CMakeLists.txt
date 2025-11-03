@@ -138,6 +138,7 @@ set(SOURCE_FILES
     ./src/core/utils.cc
     ./src/core/app.cc
     ./src/core/frame_timer.cc
+    ./src/core/input_handler.cc
     # scene
     ./src/scene/scene.cc
     ./src/scene/scene_loader.cc
@@ -205,42 +206,52 @@ endif()
 # Compile shaders during build
 # ---------------------------------------
 
-find_program(GLSLC_EXECUTABLE "glslc")
-if(NOT GLSLC_EXECUTABLE)
-    message(FATAL_ERROR "glslc not found. Please make sure it's in your PATH.")
-endif()
+option(BUILD_SHADERS "Compile shaders during build" ON)
+set(BUILD_SHADERS OFF CACHE BOOL "" FORCE)
 
-set(SHADER_DIR "shaders")
-set(SHADER_BIN_DIR "${CMAKE_BINARY_DIR}/${SHADER_DIR}")
+if(BUILD_SHADERS)
+    find_program(GLSLC_EXECUTABLE "glslc")
+    if(NOT GLSLC_EXECUTABLE)
+        message(
+            FATAL_ERROR
+            "glslc not found. Please make sure it's in your PATH."
+        )
+    endif()
 
-# ensure output dir is created
-file(MAKE_DIRECTORY ${SHADER_BIN_DIR})
-file(
-    GLOB SHADERS
-    "${SHADER_DIR}/*.vert"
-    "${SHADER_DIR}/*.frag"
-    "${SHADER_DIR}/*.comp"
-)
+    set(SHADER_DIR "shaders")
+    set(SHADER_BIN_DIR "${CMAKE_BINARY_DIR}/${SHADER_DIR}")
 
-foreach(SHADER IN LISTS SHADERS)
-    get_filename_component(SHADER_NAME ${SHADER} NAME_WE)
-    get_filename_component(SHADER_EXT ${SHADER} EXT)
-    string(SUBSTRING ${SHADER_EXT} 1 -1 SHADER_EXT_DOT)
-    set(OUTPUT_FILE "${SHADER_BIN_DIR}/${SHADER_NAME}_${SHADER_EXT_DOT}.spv")
-
-    add_custom_command(
-        OUTPUT ${OUTPUT_FILE}
-        DEPENDS ${SHADER}
-        COMMAND ${GLSLC_EXECUTABLE} ${SHADER} -o ${OUTPUT_FILE}
-        COMMENT "Compiling shader: ${SHADER_NAME}"
-        VERBATIM
+    # ensure output dir is created
+    file(MAKE_DIRECTORY ${SHADER_BIN_DIR})
+    file(
+        GLOB SHADERS
+        "${SHADER_DIR}/*.vert"
+        "${SHADER_DIR}/*.frag"
+        "${SHADER_DIR}/*.comp"
     )
 
-    list(APPEND SPV_SHADERS ${OUTPUT_FILE})
-endforeach()
+    foreach(SHADER IN LISTS SHADERS)
+        get_filename_component(SHADER_NAME ${SHADER} NAME_WE)
+        get_filename_component(SHADER_EXT ${SHADER} EXT)
+        string(SUBSTRING ${SHADER_EXT} 1 -1 SHADER_EXT_DOT)
+        set(OUTPUT_FILE
+            "${SHADER_BIN_DIR}/${SHADER_NAME}_${SHADER_EXT_DOT}.spv"
+        )
 
-add_custom_target(compile_shaders ALL DEPENDS ${SPV_SHADERS})
-add_dependencies(${PROJECT_NAME} compile_shaders)
+        add_custom_command(
+            OUTPUT ${OUTPUT_FILE}
+            DEPENDS ${SHADER}
+            COMMAND ${GLSLC_EXECUTABLE} ${SHADER} -o ${OUTPUT_FILE}
+            COMMENT "Compiling shader: ${SHADER_NAME}"
+            VERBATIM
+        )
+
+        list(APPEND SPV_SHADERS ${OUTPUT_FILE})
+    endforeach()
+
+    add_custom_target(compile_shaders ALL DEPENDS ${SPV_SHADERS})
+    add_dependencies(${PROJECT_NAME} compile_shaders)
+endif()
 
 # ---------------------------------------
 # Get compile_commands.json into root

@@ -2,7 +2,7 @@
 #define RESOURCES_H_
 
 #include "vulkan_context.h"
-#include "scene/scene.h"
+#include "image.h"
 
 namespace npr_graphics {
 
@@ -39,6 +39,12 @@ struct alignas(16) ModelPushConst {
   glm::mat4 normal;
 };
 
+struct LoadPushConst {
+  alignas(16) glm::uvec2 res{0};
+  alignas(16) glm::vec3 t{0.0f};
+  bool is_loading{false};
+};
+
 struct FrameProps {
   vk::SampleCountFlagBits samples;
   vk::Extent2D extent;
@@ -72,6 +78,9 @@ struct FrameResources {
   std::unique_ptr<Texture> coverage_res;
 
   std::unique_ptr<Texture> depth_stencil_ms;
+
+  // swap pass
+  std::unique_ptr<Texture> present_color;
 };
 
 class Resources : public npr_core::NonCopyable {
@@ -87,9 +96,6 @@ class Resources : public npr_core::NonCopyable {
     return frame_resources_;
   }
 
-  // bind scenes that have finished loading for rendering
-  void Bind(npr_scene::Scene&& scene) { scene_ = std::move(scene); }
-
  private:
   void CreateImages();
   void CreateBuffers();
@@ -102,8 +108,6 @@ class Resources : public npr_core::NonCopyable {
   FrameProps frame_props_;
   std::vector<FrameResources> frame_resources_;
   uint frame_count_;
-
-  npr_scene::Scene scene_;
 };
 
 }  // namespace npr_graphics

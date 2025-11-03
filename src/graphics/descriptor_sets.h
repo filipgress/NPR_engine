@@ -2,6 +2,7 @@
 #define DESCRIPTOR_SETS_H_
 
 #include "vulkan_context.h"
+#include "resources.h"
 #include "image.h"
 
 namespace npr_graphics {
@@ -40,10 +41,41 @@ class GBuffSets : public DescriptorSets {
   }
 
   void Update(const Resources& res) const;
-  std::vector<vk::DescriptorPoolSize> GetPoolSizes() const override;
+  std::vector<vk::DescriptorPoolSize> GetPoolSizes() const override {
+    return {{vk::DescriptorType::eCombinedImageSampler, 5 * count_}};
+  }
 
  private:
   void CreateLayout() override;
+};
+
+class TextureSets : public DescriptorSets {
+ public:
+  TextureSets(const VulkanContext& context, uint count)
+      : DescriptorSets{context, count} {
+    CreateLayout();
+  }
+  virtual ~TextureSets() = default;
+
+  void Update(const Resources& res) const;
+  std::vector<vk::DescriptorPoolSize> GetPoolSizes() const override {
+    return {{vk::DescriptorType::eCombinedImageSampler, count_}};
+  }
+
+ protected:
+  void CreateLayout() override;
+  virtual const Texture* GetAttach(const Resources& res,
+                                   int frame_idx) const = 0;
+};
+
+class PresentSets : public TextureSets {
+ public:
+  PresentSets(const VulkanContext& context, uint count)
+      : TextureSets{context, count} {}
+
+  const Texture* GetAttach(const Resources& res, int frame_idx) const override {
+    return res.GetResources()[frame_idx].present_color.get();
+  }
 };
 
 class TextureArraySet : public DescriptorSets {
@@ -54,7 +86,9 @@ class TextureArraySet : public DescriptorSets {
 
   void Update(const std::vector<npr_graphics::Texture>& textures) const;
   void Update(uint idx, const npr_graphics::Texture& texture) const;
-  std::vector<vk::DescriptorPoolSize> GetPoolSizes() const override;
+  std::vector<vk::DescriptorPoolSize> GetPoolSizes() const override {
+    return {{vk::DescriptorType::eCombinedImageSampler, MAX_TEXTURES}};
+  }
 
  private:
   void CreateLayout() override;
@@ -72,7 +106,9 @@ class BufferSets : public DescriptorSets {
   virtual ~BufferSets() = default;
 
   void Update(vk::Buffer buffer, vk::DeviceSize range, uint idx) const;
-  std::vector<vk::DescriptorPoolSize> GetPoolSizes() const override;
+  std::vector<vk::DescriptorPoolSize> GetPoolSizes() const override {
+    return {{desc_type_, count_}};
+  }
 
  protected:
   void CreateLayout() override;

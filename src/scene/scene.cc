@@ -1,13 +1,83 @@
 #include "scene.h"
 
 namespace npr_scene {
+
+Scene& Scene::operator=(Scene&& scene) noexcept {
+  if (this == &scene) return *this;
+
+  assert(!IsLoading());
+
+  entities_ = std::move(scene.entities_);
+  gpu_res_ = std::move(scene.gpu_res_);
+  valid_ = std::exchange(scene.valid_, false);
+  handle_ = std::move(scene.handle_);
+
+  return *this;
+}
+
 bool Scene::IsLoading() {
   if (!handle_.valid()) return false;
   if (handle_.wait_for(std::chrono::seconds(0)) != std::future_status::ready)
     return true;
 
   valid_ = handle_.get();
+  gpu_init_ = false;
+
   return false;
+}
+
+void Scene::Prepare(const npr_graphics::VulkanContext& context,
+                    const std::string& filepath,
+                    const std::string& scene_name) {
+  filename_ = npr_core::GetFilename(filepath);
+  scene_name_ = scene_name.empty() ? "default" : scene_name;
+
+  entities_.reset();
+
+  if (gpu_res_ && gpu_res_->context.GetDevice() == context.GetDevice())
+    gpu_res_->Reset();
+  else
+    gpu_res_ = std::make_unique<GpuResources>(context, "scene_" + scene_name_);
+}
+
+void Scene::InitGPU(npr_core::TaskManager& tasks,
+                    std::function<void()> on_complete) {
+  if (!IsValid() || gpu_init_) return;
+
+  auto device = gpu_res_->context.GetDevice();
+  auto cmd_buff = gpu_res_->cmd_pool.GetCmdBuff();
+
+  vk::SubmitInfo submit_info{};
+  submit_info.commandBufferCount = 1;
+  submit_info.pCommandBuffers = &cmd_buff;
+
+  vk::Fence fence = device.createFence({});
+  gpu_res_->context.GetGraphicsQ().submit(submit_info, fence);
+
+  tasks.Add([this, on_complete, device, fence]() {
+    auto status = device.getFenceStatus(fence);
+
+    if (status == vk::Result::eNotReady) return false;
+    device.destroyFence(fence);
+
+    if (status == vk::Result::eErrorDeviceLost) {
+      ERR("error during scene loading:", vk::to_string(status));
+      return true;
+    }
+
+    INFO("scene initialized: ", filename_, "(", scene_name_, ")");
+    gpu_init_ = true;
+
+    on_complete();
+    return true;
+  });
+}
+
+void Scene::WaitForAsync() {
+  if (!handle_.valid()) return;
+
+  valid_ = handle_.get();
+  gpu_init_ = false;
 }
 
 }  // namespace npr_scene

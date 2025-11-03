@@ -1,6 +1,8 @@
 #ifndef INPUT_HANDLER_H_
 #define INPUT_HANDLER_H_
 
+#include "window/event.h"
+
 namespace npr_core {
 struct InputHandler {
   std::unordered_map<uint16_t, bool> key_tokens;
@@ -14,17 +16,8 @@ struct InputHandler {
   glm::vec2 mouse_move{};
   glm::vec2 mouse_scroll{};
 
-  void Update(glm::ivec2 window_size) {
-    // scroll delta
-    mouse_scroll = acc_mouse_scroll;
-    acc_mouse_scroll = {0, 0};  // reset
-
-    // normalize move delta
-    glm::vec2 delta = curr_mouse_pos - last_mouse_pos;
-    last_mouse_pos = curr_mouse_pos;
-
-    mouse_move = {delta.x / window_size.x, delta.y / window_size.y};
-  }
+  void OnEvent(npr_window::Event& e);
+  void Update(glm::ivec2 window_size);
 };
 }  // namespace npr_core
 

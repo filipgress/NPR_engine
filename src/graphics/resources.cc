@@ -75,6 +75,14 @@ void Resources::CreateImages() {
         vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil,
         frame_props_.samples, "depth_stencil_ms" + std::to_string(idx));
 
+    // swap pass
+    res.present_color = std::make_unique<Texture>(
+        c_, frame_props_.albedo_format, frame_props_.extent,
+        vk::ImageUsageFlagBits::eColorAttachment |
+            vk::ImageUsageFlagBits::eSampled,
+        vk::ImageAspectFlagBits::eColor, vk::SampleCountFlagBits::e1,
+        "present_color_" + std::to_string(idx));
+
     idx++;
   }
 }

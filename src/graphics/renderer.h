@@ -4,6 +4,7 @@
 #include "vulkan_context.h"
 #include "swapchain.h"
 #include "command_pool.h"
+#include "descriptor_pool.h"
 #include "sync.h"
 #include "resources.h"
 #include "shader.h"
@@ -11,18 +12,23 @@
 #include "pipeline.h"
 #include "pipeline_cache.h"
 
+#include "window/window.h"
+#include "scene/scene.h"
+#include "scene/camera.h"
+
 namespace npr_graphics {
 class Renderer : public npr_core::NonCopyable {
  public:
   Renderer(const npr_window::Window& window) : window_{window} {}
   ~Renderer() { Finish(); }
 
-  void Render();
+  void Render(const npr_scene::Camera& camera, npr_scene::Scene& scene,
+              bool is_loading, float dt);
 
   const VulkanContext& GetContext() const { return c_; }
   Resources& GetResources() { return res_; }
 
-  void OnWindowResize() { swapchain_.GetProps().dirty = true; }
+  void Resize() { swapchain_.GetProps().dirty = true; }
   void RecompileShaders();
   void SwapShaders();
 
@@ -30,7 +36,12 @@ class Renderer : public npr_core::NonCopyable {
 
  private:
   vk::CommandBuffer Record(uint image_idx);
+  vk::CommandBuffer RecordFallback(uint image_idx, float camera_aspect,
+                                   bool is_loading, float dt);
+
   void RenderTargetResize();
+  std::pair<vk::Viewport, vk::Rect2D> CalcViewportScissor(
+      vk::Extent2D swap_extent, float camera_aspect) const;
 
  private:
   const npr_window::Window& window_;
@@ -45,16 +56,17 @@ class Renderer : public npr_core::NonCopyable {
   DescriptorPool desc_pool_{c_, res_};
 
   GBuffPass gbuff_pass_{c_, res_};
+  LoadPass load_pass_{c_, res_};
   SwapPass swap_pass_{c_, swapchain_};
 
   std::array<VertexShader, 2> vert_shaders_{
-      VertexShader{c_, "shaders/main_vert.spv", "../shaders/main.vert"},
-      VertexShader{c_, "shaders/quad_vert.spv", "../shaders/quad.vert"},
-  };
+      VertexShader{c_, "shaders/gbuff_vert.spv", "../shaders/gbuff.vert"},
+      VertexShader{c_, "shaders/quad_vert.spv", "../shaders/quad.vert"}};
 
-  std::array<FragmentShader, 2> frag_shaders_{
+  std::array<FragmentShader, 3> frag_shaders_{
+      FragmentShader{c_, "shaders/gbuff_frag.spv", "../shaders/gbuff.frag"},
+      FragmentShader{c_, "shaders/swap_frag.spv", "../shaders/swap.frag"},
       FragmentShader{c_, "shaders/main_frag.spv", "../shaders/main.frag"},
-      FragmentShader{c_, "shaders/quad_frag.spv", "../shaders/quad.frag"},
   };
 
   PipelineCache pipe_cache_{c_};
@@ -65,6 +77,8 @@ class Renderer : public npr_core::NonCopyable {
                         frag_shaders_[0],
                         res_.GetProps(),
                         desc_pool_};
+  LoadPipe load_pipe_{c_, pipe_cache_, load_pass_, vert_shaders_[1],
+                      frag_shaders_[2]};
   SwapPipe swap_pipe_{
       c_,        pipe_cache_, swap_pass_, vert_shaders_[1], frag_shaders_[1],
       desc_pool_};

@@ -1,7 +1,8 @@
 #include "renderer.h"
 
 namespace npr_graphics {
-void Renderer::Render() {
+void Renderer::Render(const npr_scene::Camera& camera, npr_scene::Scene& scene,
+                      bool is_loading, float dt) {
   auto device = c_.GetDevice();
 
   // wait for in flight fence
@@ -24,7 +25,7 @@ void Renderer::Render() {
       break;
     case vk::Result::eTimeout:
     case vk::Result::eNotReady:
-      return;  // Skip frame gracefully
+      return;  // skip frame
     case vk::Result::eErrorOutOfDateKHR:
       RenderTargetResize();
       return;
@@ -32,11 +33,19 @@ void Renderer::Render() {
       throw std::runtime_error("failed to acquire swapchain image: " +
                                vk::to_string(res_acquire));
   }
-
   device.resetFences(in_flight);
 
   // record & submit commands
-  auto cmd_buff = Record(image_idx);
+  // vk::CommandBuffer cmd_buff;
+  // if (!scene.IsValid() || !scene.IsInit()) {
+  //   cmd_buff = RecordFallback(image_idx, camera.GetAspect(), is_loading, dt);
+  // } else {
+  //   return;
+  //   cmd_buff = Record(image_idx);
+  // }
+  (void)scene;
+  auto cmd_buff = RecordFallback(image_idx, camera.GetAspect(), is_loading, dt);
+
   auto render_finished = sync_.GetRenderFinished(image_idx);
 
   vk::SubmitInfo submit_info{};
@@ -73,6 +82,83 @@ void Renderer::Render() {
   sync_.Increment();
 }
 
+vk::CommandBuffer Renderer::RecordFallback(uint image_idx, float aspect,
+                                           bool is_loading, float dt) {
+  auto frame_idx = sync_.GetFrameIdx();
+  auto cmd_buff = cmd_pool_.GetCmdBuff(frame_idx);
+
+  cmd_buff.begin({vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
+
+  {  // load_pass
+    auto res_extent = res_.GetProps().extent;
+    cmd_buff.beginRenderPass(load_pass_.BeginInfo(frame_idx, res_extent),
+                             vk::SubpassContents::eInline);
+    cmd_buff.endRenderPass();
+  }
+  {  // swap_pass
+    auto swap_extent = swapchain_.GetProps().extent;
+    auto [viewport, scissor] = CalcViewportScissor(swap_extent, aspect);
+    LoadPushConst load_data{};
+    if (is_loading) {
+      glm::ivec2 size = window_.GetSize();
+      load_data.res = {size.x, size.y};
+      load_data.t = {
+          std::sin(dt * 2.4f) * 0.5f + 0.5f,
+          std::sin(dt * 3.5f) * 0.5f + 0.5f,
+          std::sin(dt * 2.8f) * 0.5f + 0.5f,
+      };
+      load_data.is_loading = true;
+    }
+
+    cmd_buff.beginRenderPass(swap_pass_.BeginInfo(image_idx, swap_extent),
+                             vk::SubpassContents::eInline);
+
+    cmd_buff.setScissor(0, scissor);
+    cmd_buff.setViewport(0, viewport);
+    cmd_buff.setCullMode(vk::CullModeFlagBits::eNone);
+
+    cmd_buff.pushConstants(swap_pipe_.GetLayout(),
+                           vk::ShaderStageFlagBits::eFragment, 0,
+                           sizeof(load_data), &load_data);
+    cmd_buff.bindPipeline(vk::PipelineBindPoint::eGraphics,
+                          swap_pipe_.GetPipeline());
+    cmd_buff.bindDescriptorSets(
+        vk::PipelineBindPoint::eGraphics, swap_pipe_.GetLayout(), 0,
+        desc_pool_.GetPresentSets().GetSet(frame_idx), {});
+
+    cmd_buff.draw(3, 1, 0, 0);
+    cmd_buff.endRenderPass();
+  }
+
+  cmd_buff.end();
+  return cmd_buff;
+}
+
+std::pair<vk::Viewport, vk::Rect2D> Renderer::CalcViewportScissor(
+    vk::Extent2D swap_extent, float camera_aspect) const {
+  float win_aspect = static_cast<float>(swap_extent.width) / swap_extent.height;
+
+  if (win_aspect > camera_aspect) {
+    // window is wider than camera aspect
+    uint32_t width = swap_extent.height * camera_aspect;
+    int32_t offset = (swap_extent.width - width) / 2.0f;
+
+    vk::Viewport viewport(offset, 0.0f, width, swap_extent.height, 0.0f, 1.0f);
+    vk::Rect2D scissor{{offset, 0}, {width, swap_extent.height}};
+
+    return {viewport, scissor};
+  } else {
+    // window is taller than camera aspect
+    uint32_t height = swap_extent.width / camera_aspect;
+    int32_t offset = (swap_extent.height - height) / 2.0f;
+
+    vk::Viewport viewport(0.0f, offset, swap_extent.width, height, 0.0f, 1.0f);
+    vk::Rect2D scissor{{0, offset}, {swap_extent.width, height}};
+
+    return {viewport, scissor};
+  }
+}
+
 vk::CommandBuffer Renderer::Record(uint image_idx) {
   auto frame_idx = sync_.GetFrameIdx();
 
@@ -92,8 +178,8 @@ vk::CommandBuffer Renderer::Record(uint image_idx) {
     //
     // ModelPushConst data;
     // cmd_buff.pushConstants(gbuff_pipe_.GetLayout(),
-    //                        vk::ShaderStageFlagBits::eVertex, 0, sizeof(data),
-    //                        &data);
+    //                        vk::ShaderStageFlagBits::eVertex, 0,
+    //                        sizeof(data), &data);
     //
     // auto offset =
     //     res_.GetResources()[frame_idx].material_unif->GetElemOffset(0);
@@ -116,12 +202,14 @@ vk::CommandBuffer Renderer::Record(uint image_idx) {
     //     {});
     //
     // auto& ibos = res_.scene_.GetGpuResources().ibos;
-    // vk::Buffer vbos[] = {res_.scene_.GetGpuResources().vbos[0].GetBuffer()};
-    // vk::DeviceSize offsets[] = {0};
+    // vk::Buffer vbos[] =
+    // {res_.scene_.GetGpuResources().vbos[0].GetBuffer()}; vk::DeviceSize
+    // offsets[] = {0};
     //
     // cmd_buff.bindVertexBuffers(0, 1, vbos, offsets);
-    // cmd_buff.bindIndexBuffer(ibos[0].GetBuffer(), 0, vk::IndexType::eUint32);
-    // cmd_buff.drawIndexed(ibos[0].GetCount(), 1, 0, 0, 0);
+    // cmd_buff.bindIndexBuffer(ibos[0].GetBuffer(), 0,
+    // vk::IndexType::eUint32); cmd_buff.drawIndexed(ibos[0].GetCount(), 1, 0,
+    // 0, 0);
     //
     // cmd_buff.nextSubpass(vk::SubpassContents::eInline);
     // cmd_buff.endRenderPass();

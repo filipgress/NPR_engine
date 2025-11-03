@@ -2,6 +2,7 @@
 #define PIPELINE_H_
 
 #include "vulkan_context.h"
+#include "descriptor_pool.h"
 #include "pipeline_cache.h"
 #include "render_pass.h"
 #include "shader.h"
@@ -147,17 +148,35 @@ class GBuffPipe : public Pipeline {
   const FrameProps& props_;
 };
 
+class LoadPipe : public Pipeline {
+ public:
+  LoadPipe(const VulkanContext& context, const PipelineCache& cache,
+           const LoadPass& render_pass, VertexShader& vert_shader,
+           FragmentShader& frag_shader)
+      : Pipeline(context, cache, render_pass, vert_shader, frag_shader) {
+    CreateLayout();
+    Recreate();
+  }
+
+  void Recreate() override { CreatePipeline(); }
+
+ private:
+  const std::string GetDbgName() const override { return "load_pipe"; }
+};
+
 class SwapPipe : public Pipeline {
  public:
   SwapPipe(const VulkanContext& context, const PipelineCache& cache,
            const SwapPass& render_pass, VertexShader& vert_shader,
            FragmentShader& frag_shader, const DescriptorPool& desc_pool)
       : Pipeline(context, cache, render_pass, vert_shader, frag_shader) {
-    CreateLayout({desc_pool.GetGBuffSets().GetLayout()}, {});
+    CreateLayout(
+        {desc_pool.GetPresentSets().GetLayout()},
+        {MakePushConst<LoadPushConst>(vk::ShaderStageFlagBits::eFragment)});
     Recreate();
   }
 
-  void Recreate() override { CreatePipeline(0, false, "main", "main", {}); }
+  void Recreate() override { CreatePipeline(); }
 
  private:
   const std::string GetDbgName() const override { return "swap_pipe"; }

@@ -11,28 +11,36 @@
 namespace npr_scene {
 using namespace npr_graphics;
 
-void SceneLoader::LoadAsync(const VulkanContext& context, Scene& scene,
+void SceneLoader::LoadAsync(const npr_graphics::VulkanContext& context,
+                            Scene& scene, npr_core::TaskManager& tasks,
+                            std::function<void()> on_loaded,
                             const std::string& filepath,
                             const std::string& scene_name) {
   if (scene.handle_.valid()) return;
   scene.handle_ =
       std::async(std::launch::async, &SceneLoader::LoadScene,
                  std::cref(context), std::ref(scene), filepath, scene_name);
+
+  tasks.Add([&scene, &tasks, on_loaded]() {
+    if (scene.IsLoading()) return false;
+    if (!scene.IsValid()) return true;
+    scene.InitGPU(tasks, on_loaded);
+    return true;
+  });
 }
 
 void SceneLoader::Load(const VulkanContext& context, Scene& scene,
                        const std::string& filepath,
                        const std::string& scene_name) {
   scene.WaitForAsync();
+
   scene.valid_ = LoadScene(context, scene, filepath, scene_name);
+  scene.gpu_init_ = false;
 }
 
 bool SceneLoader::LoadScene(const VulkanContext& context, Scene& scene,
                             const std::string& filepath,
                             const std::string& scene_name) {
-  LoaderCache cache{context, filepath, scene_name};
-  INFO("loading scene: ", cache.filename, "(", cache.scene_name, ")");
-
   try {
     tinygltf::Model model;
     tinygltf::TinyGLTF loader;
@@ -44,19 +52,23 @@ bool SceneLoader::LoadScene(const VulkanContext& context, Scene& scene,
     if (!err.empty()) throw std::runtime_error("gltf err: " + err);
     if (!ret) throw std::runtime_error("gltf failed to parse file: " + err);
 
+    scene.Prepare(context, filepath, scene_name);
+    INFO("loading scene: ", scene.filename_, "(", scene.scene_name_, ")");
+
+    LoaderCache cache;
     cache.light_supp = model.extensions.contains("KHR_lights_punctual");
     if (!cache.light_supp) INFO("scene doesn't support lights");
 
-    PrepareScene(scene, cache);
     {
-      cache.cmd_buff.begin({vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
+      scene.gpu_res_->cmd_buff.begin(
+          {vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
 
-      int scene_idx = GetSceneIdx(model, scene_name, cache);
+      int scene_idx = GetSceneIdx(model, scene_name);
       for (int node_idx : model.scenes[scene_idx].nodes)
         LoadEntity(scene, flecs::entity::null(), model, node_idx, cache);
 
-      scene.gpu_resources_.desc_pool->Update(scene.gpu_resources_.textures);
-      cache.cmd_buff.end();
+      scene.gpu_res_->UpdateTextureDescriptors();
+      scene.gpu_res_->cmd_buff.end();
     }
 
   } catch (const std::runtime_error& e) {
@@ -64,33 +76,8 @@ bool SceneLoader::LoadScene(const VulkanContext& context, Scene& scene,
     return false;
   }
 
-  INFO("scene loaded: ", cache.filename, "(", cache.scene_name, ")");
+  INFO("scene loaded: ", scene.filename_, "(", scene.scene_name_, ")");
   return true;
-}
-
-void SceneLoader::PrepareScene(Scene& scene, LoaderCache& cache) {
-  scene.Clear();
-  scene.name_ = cache.scene_name;
-
-  // custom command pool
-  if (scene.gpu_resources_.cmd_pool) {
-    cache.cmd_buff = scene.gpu_resources_.cmd_pool->GetCmdBuff();
-    cache.cmd_buff.reset(vk::CommandBufferResetFlagBits::eReleaseResources);
-  } else {
-    uint32_t q_idx = cache.context.GetQFamilies().graphics_i.value();
-    scene.gpu_resources_.cmd_pool = std::make_unique<CommandPool>(
-        cache.context, 1,
-        vk::CommandPoolCreateFlagBits::eTransient |
-            vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-        q_idx, "cmd_pool_" + scene.name_);
-
-    cache.cmd_buff = scene.gpu_resources_.cmd_pool->GetCmdBuff();
-  }
-
-  // custom descriptor pool
-  if (!scene.gpu_resources_.desc_pool)
-    scene.gpu_resources_.desc_pool =
-        std::make_unique<TexDescriptorPool>(cache.context);
 }
 
 void SceneLoader::LoadEntity(Scene& scene, flecs::entity parent_ent,
@@ -261,10 +248,10 @@ void SceneLoader::AddMeshComp(Scene& scene, flecs::entity ent,
                                         tangent_data[i][2], tangent_data[i][3]);
     }
 
-    scene.gpu_resources_.vbos.emplace_back(
-        cache.context, cache.cmd_buff, vertices,
-        "vbo_" + std::string(ent.name().c_str()));
-    mesh_comp.vbo_idx = scene.gpu_resources_.vbos.size() - 1;
+    scene.gpu_res_->vbos.emplace_back(scene.gpu_res_->context,
+                                      scene.gpu_res_->cmd_buff, vertices,
+                                      "vbo_" + std::string(ent.name().c_str()));
+    mesh_comp.vbo_idx = scene.gpu_res_->vbos.size() - 1;
   }
 
   if (prim.indices != -1) {  // load indices
@@ -294,10 +281,10 @@ void SceneLoader::AddMeshComp(Scene& scene, flecs::entity ent,
                                  std::to_string(acc.componentType));
     }
 
-    scene.gpu_resources_.ibos.emplace_back(
-        cache.context, cache.cmd_buff, indices,
-        "ibo_" + std::string(ent.name().c_str()));
-    mesh_comp.ibo_idx = scene.gpu_resources_.ibos.size() - 1;
+    scene.gpu_res_->ibos.emplace_back(scene.gpu_res_->context,
+                                      scene.gpu_res_->cmd_buff, indices,
+                                      "ibo_" + std::string(ent.name().c_str()));
+    mesh_comp.ibo_idx = scene.gpu_res_->ibos.size() - 1;
   }
 
   ent.set<MeshComp>(mesh_comp);
@@ -338,13 +325,13 @@ void SceneLoader::AddMaterialComp(Scene& scene, flecs::entity ent,
 
   //  textures
   material_comp.color_map_idx =
-      LoadTexture(scene, model, material, TextureType::kColor, cache);
+      LoadTexture(scene, model, material, TextureType::kColor);
   material_comp.normal_map_idx =
-      LoadTexture(scene, model, material, TextureType::kNormal, cache);
-  material_comp.metallic_roughness_map_idx = LoadTexture(
-      scene, model, material, TextureType::kMetallicRoughness, cache);
+      LoadTexture(scene, model, material, TextureType::kNormal);
+  material_comp.metallic_roughness_map_idx =
+      LoadTexture(scene, model, material, TextureType::kMetallicRoughness);
   material_comp.emissive_map_idx =
-      LoadTexture(scene, model, material, TextureType::kEmissive, cache);
+      LoadTexture(scene, model, material, TextureType::kEmissive);
 
   ent.set<MaterialComp>(material_comp);
   cache.materials[prim.material] = material_comp;
@@ -352,7 +339,7 @@ void SceneLoader::AddMaterialComp(Scene& scene, flecs::entity ent,
 
 int SceneLoader::LoadTexture(Scene& scene, const tinygltf::Model& model,
                              const tinygltf::Material& material,
-                             const TextureType tex_type, LoaderCache& cache) {
+                             const TextureType tex_type) {
   int tex_idx = GetTexIdx(material, tex_type);
   if (tex_idx == -1) return -1;
 
@@ -403,11 +390,11 @@ int SceneLoader::LoadTexture(Scene& scene, const tinygltf::Model& model,
   tex_data.height = image.height;
   tex_data.width = image.width;
 
-  Texture tex{cache.context, tex_data, LoadSampler(model, texture)};
-  tex.Write(cache.cmd_buff, *data);
+  Texture tex{scene.gpu_res_->context, tex_data, LoadSampler(model, texture)};
+  tex.Write(scene.gpu_res_->cmd_buff, *data);
 
-  scene.gpu_resources_.textures.push_back(std::move(tex));
-  int idx = scene.gpu_resources_.textures.size() - 1;
+  scene.gpu_res_->textures.push_back(std::move(tex));
+  int idx = scene.gpu_res_->textures.size() - 1;
 
   return idx;
 }
@@ -472,8 +459,7 @@ SamplerProps SceneLoader::LoadSampler(const tinygltf::Model& model,
  */
 
 int SceneLoader::GetSceneIdx(const tinygltf::Model& model,
-                             const std::string& scene_name,
-                             const LoaderCache& cache) {
+                             const std::string& scene_name) {
   int scene_idx{-1};
 
   if (scene_name.empty()) {
@@ -488,7 +474,8 @@ int SceneLoader::GetSceneIdx(const tinygltf::Model& model,
   }
 
   if (scene_idx == -1)
-    throw std::runtime_error("scene with name '" + cache.scene_name +
+    throw std::runtime_error("scene with name '" +
+                             (scene_name.empty() ? "default" : scene_name) +
                              "' not found");
   return scene_idx;
 }
