@@ -19,6 +19,13 @@ struct CameraTag {
   /* PerspectiveCameraComp or OrthographicCameraComp */
 };
 
+struct LightTag {
+  /* TransformComp */
+  /* LightComp */
+  /* RangeComp (optional) */
+  /* SpotComp (optional) */
+};
+
 struct TransformComp {
   glm::vec3 pos{0.0f};
   glm::quat rot{1.0f, 0.0f, 0.0f, 0.0f};
@@ -26,6 +33,8 @@ struct TransformComp {
 
   glm::mat4 local_mat;
   glm::mat4 global_mat;
+
+  bool dirty{true};
 };
 
 struct MeshComp {
@@ -69,6 +78,9 @@ struct LightComp {
   int idx{-1};
   glm::vec3 color{1.0f};
   float intensity{1.0f};
+};
+
+struct RangeComp {
   float range{0.0f};  // 0 = inf
 };
 

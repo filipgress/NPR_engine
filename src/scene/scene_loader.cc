@@ -90,9 +90,15 @@ void SceneLoader::LoadEntity(Scene& scene, flecs::entity parent_ent,
     auto [parent_ent, node_idx] = s.top();
     s.pop();
 
+    if (cache.nodes.contains(node_idx)) continue;
+    cache.nodes.insert(node_idx);
+
     const auto& node = model.nodes[node_idx];
 
-    flecs::entity child_ent = scene.entities_.entity(node.name.c_str());
+    std::string entity_name =
+        scene.GetSceneName() + "_node_" + std::to_string(node_idx) + node.name;
+
+    flecs::entity child_ent = scene.entities_.entity(entity_name.c_str());
     if (parent_ent.is_valid()) child_ent.child_of(parent_ent);
 
     if (node.camera != -1)
@@ -179,8 +185,8 @@ void SceneLoader::AddTransformComp(flecs::entity ent,
 
     glm::vec3 skew;
     glm::vec4 perspective;
-    glm::decompose(transform_comp.local_mat, transform_comp.scale,
-                   transform_comp.rot, transform_comp.pos, skew, perspective);
+    glm::decompose(mat, transform_comp.scale, transform_comp.rot,
+                   transform_comp.pos, skew, perspective);
   } else {
     if (!node.translation.empty())
       transform_comp.pos = glm::vec3(node.translation[0], node.translation[1],

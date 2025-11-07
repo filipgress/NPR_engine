@@ -10,7 +10,7 @@
 namespace npr_scene {
 
 struct ProjProps {
-  float fov{60.0f};
+  float fov{45.0f};
   float aspect{16.0f / 9.0f};
   float near{0.1f};
   float far{100.0f};
@@ -50,7 +50,7 @@ class Camera {
   void SetAspect(float aspect);
 
   const Frustrum& GetFrustrum() const { return frustrum_; }
-  npr_graphics::CameraUnif GetCameraUnif() {
+  npr_graphics::CameraUnif GetCameraUnif() const {
     return {view_, proj_, proj_ * view_};
   }
 

@@ -24,6 +24,14 @@ class Window {
   glm::ivec2 GetSize() const;
   float GetAspect() const;
 
+  glm::vec2 GetMousePos() const;
+  void DisableMouse() const {
+    glfwSetInputMode(window_, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+  }
+  void EnableMouse() const {
+    glfwSetInputMode(window_, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+  }
+
   bool IsMinimized() const {
     glm::ivec2 size = GetSize();
     return size.x == 0 || size.y == 0;

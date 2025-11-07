@@ -129,4 +129,10 @@ float Window::GetAspect() const {
   return static_cast<float>(size.x) / size.y;
 }
 
+glm::vec2 Window::GetMousePos() const {
+  glm::dvec2 pos;
+  glfwGetCursorPos(window_, &pos.x, &pos.y);
+  return pos;
+}
+
 }  // namespace npr_window

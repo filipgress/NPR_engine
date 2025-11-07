@@ -21,6 +21,49 @@ App::App()
     if (inputs_.key_tokens.contains(GLFW_KEY_I))
       INFO(timer_.GetAvgFPS(), "fps");
 
+    if (camera_.GetMode() == npr_scene::CameraMode::kFree) {
+      camera_.Rotate(inputs_.mouse_move);
+
+      if (inputs_.key_tokens.contains(GLFW_KEY_W))
+        camera_.Move({0.0f, 0.0f, 1.0f});
+      if (inputs_.key_tokens.contains(GLFW_KEY_A))
+        camera_.Move({-1.0f, 0.0f, 0.0f});
+      if (inputs_.key_tokens.contains(GLFW_KEY_S))
+        camera_.Move({0.0f, 0.0f, -1.0f});
+      if (inputs_.key_tokens.contains(GLFW_KEY_D))
+        camera_.Move({1.0f, 0.0f, 0.0f});
+
+      if (inputs_.key_tokens.contains(GLFW_KEY_LEFT_SHIFT)) {
+        if (inputs_.key_tokens.contains(GLFW_KEY_SPACE))
+          camera_.Move({0.0f, -1.0f, 0.0f});
+      } else {
+        if (inputs_.key_tokens.contains(GLFW_KEY_SPACE))
+          camera_.Move({0.0f, 1.0f, 0.0f});
+      }
+
+      if (inputs_.key_tokens.contains(GLFW_KEY_ESCAPE)) {
+        window_.EnableMouse();
+        camera_.SetMode(npr_scene::CameraMode::kOrbit);
+
+        inputs_.curr_mouse_pos = inputs_.last_mouse_pos = window_.GetMousePos();
+      }
+
+    } else {
+      camera_.Zoom(inputs_.mouse_scroll.y);
+      if (inputs_.mouse_buttons.contains(GLFW_MOUSE_BUTTON_LEFT)) {
+        camera_.Orbit(inputs_.mouse_move);
+      }
+      if (inputs_.mouse_buttons.contains(GLFW_MOUSE_BUTTON_RIGHT))
+        camera_.Pan(inputs_.mouse_move);
+
+      if (inputs_.key_tokens.contains(GLFW_KEY_F)) {
+        window_.DisableMouse();
+        camera_.SetMode(npr_scene::CameraMode::kFree);
+
+        inputs_.curr_mouse_pos = inputs_.last_mouse_pos = window_.GetMousePos();
+      }
+    }
+
     return false;
   });
 }
@@ -32,6 +75,7 @@ void App::Run() {
     window_.PollEvents();
     inputs_.Update(window_.GetSize());
     tasks_.Process();
+    camera_.Update(timer_.GetDelta());
 
     if (window_.IsMinimized()) continue;
     renderer_.Render(camera_, *active_scene_, scene_swap_->IsLoading(),

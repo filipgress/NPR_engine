@@ -207,8 +207,6 @@ endif()
 # ---------------------------------------
 
 option(BUILD_SHADERS "Compile shaders during build" ON)
-set(BUILD_SHADERS OFF CACHE BOOL "" FORCE)
-
 if(BUILD_SHADERS)
     find_program(GLSLC_EXECUTABLE "glslc")
     if(NOT GLSLC_EXECUTABLE)

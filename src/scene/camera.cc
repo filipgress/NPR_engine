@@ -61,6 +61,7 @@ void Camera::SetProjMat() {
     proj_ = glm::ortho(-ortho.xmag, ortho.xmag, -ortho.ymag, ortho.ymag,
                        ortho.near, ortho.far);
   }
+  proj_[1][1] *= -1;  // flip y for vulkan
 }
 
 void Camera::SetViewMat() {
