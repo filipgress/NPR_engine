@@ -21,9 +21,11 @@ struct CameraProps {
   float orbit_factor{4.5f};
   float pan_factor{1.3f};
   float zoom_factor{0.02f};
-  float move_factor{0.1f};
-  float rotate_factor{1.5f};
-  float anim_factor{11.0f};
+  float move_factor{10.0f};
+  float rotate_factor{750.0f};
+
+  float orbit_anim_factor{11.0f};
+  float free_anim_factor{17.0f};
 
   float min_dist{0.5f};
   float max_dist{100.0f};
@@ -63,8 +65,8 @@ class Camera {
   void Pan(glm::vec2 delta);
   void Zoom(float delta);
 
-  void Move(glm::vec3 delta);
-  void Rotate(glm::vec2 delta);
+  void Move(glm::vec3 delta, float dt);
+  void Rotate(glm::vec2 delta, float dt);
 
  private:
   void SetProjMat();

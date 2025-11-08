@@ -70,9 +70,16 @@ void Camera::SetViewMat() {
 }
 
 void Camera::Update(float dt) {
-  float t = glm::clamp(props_.anim_factor * dt, 0.0f, 1.0f);
+  float t{0.0f};
+  if (props_.mode == CameraMode::kOrbit) {
+    t = glm::clamp(props_.orbit_anim_factor * dt, 0.0f, 1.0f);
+    curr_.pos = glm::mix(curr_.pos, dest_.pos, t);
 
-  curr_.pos = glm::mix(curr_.pos, dest_.pos, t);
+  } else if (props_.mode == CameraMode::kFree) {
+    t = glm::clamp(props_.free_anim_factor * dt, 0.0f, 1.0f);
+    curr_.pos = dest_.pos;
+  }
+
   curr_.front = glm::normalize(glm::mix(curr_.front, dest_.front, t));
 
   SetViewMat();
@@ -122,24 +129,24 @@ void Camera::Zoom(float delta) {
   dest_.pos = target_ - dist * dest_.front;
 }
 
-void Camera::Move(glm::vec3 delta) {
+void Camera::Move(glm::vec3 delta, float dt) {
   if (!delta.x && !delta.y && !delta.z) return;
 
   glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
   glm::vec3 right = glm::normalize(glm::cross(dest_.front, up));
-  dest_.pos += props_.move_factor *
+  dest_.pos += dt * props_.move_factor *
                (right * delta.x + up * delta.y + dest_.front * delta.z);
 }
 
-void Camera::Rotate(glm::vec2 delta) {
+void Camera::Rotate(glm::vec2 delta, float dt) {
   if (!delta.x && !delta.y) return;
 
   glm::vec3 dir = -dest_.front;
   float theta = glm::asin(dir.y);
   float phi = std::atan2(dir.z, dir.x);
 
-  theta += delta.y * props_.rotate_factor;
-  phi += delta.x * props_.rotate_factor;
+  theta += delta.y * dt * props_.rotate_factor;
+  phi += delta.x * dt * props_.rotate_factor;
 
   theta = glm::clamp(theta, -props_.max_theta, props_.max_theta);
   phi = glm::mod(phi, glm::two_pi<float>());

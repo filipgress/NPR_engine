@@ -11,7 +11,7 @@ App::App()
   npr_scene::SceneLoader::LoadAsync(
       renderer_.GetContext(), *scene_swap_, tasks_,
       [this]() { scene_swap_.swap(active_scene_); },
-      "../assets/market/scene.gltf");
+      "../assets/market_inst/scene.gltf");
 
   tasks_.Add([&]() {
     if (inputs_.key_tokens.contains(GLFW_KEY_LEFT_CONTROL) &&
@@ -22,23 +22,24 @@ App::App()
       INFO(timer_.GetAvgFPS(), "fps");
 
     if (camera_.GetMode() == npr_scene::CameraMode::kFree) {
-      camera_.Rotate(inputs_.mouse_move);
+      float dt = timer_.GetDelta();
+      camera_.Rotate(inputs_.mouse_move, dt);
 
       if (inputs_.key_tokens.contains(GLFW_KEY_W))
-        camera_.Move({0.0f, 0.0f, 1.0f});
+        camera_.Move({0.0f, 0.0f, 1.0f}, dt);
       if (inputs_.key_tokens.contains(GLFW_KEY_A))
-        camera_.Move({-1.0f, 0.0f, 0.0f});
+        camera_.Move({-1.0f, 0.0f, 0.0f}, dt);
       if (inputs_.key_tokens.contains(GLFW_KEY_S))
-        camera_.Move({0.0f, 0.0f, -1.0f});
+        camera_.Move({0.0f, 0.0f, -1.0f}, dt);
       if (inputs_.key_tokens.contains(GLFW_KEY_D))
-        camera_.Move({1.0f, 0.0f, 0.0f});
+        camera_.Move({1.0f, 0.0f, 0.0f}, dt);
 
       if (inputs_.key_tokens.contains(GLFW_KEY_LEFT_SHIFT)) {
         if (inputs_.key_tokens.contains(GLFW_KEY_SPACE))
-          camera_.Move({0.0f, -1.0f, 0.0f});
+          camera_.Move({0.0f, -1.0f, 0.0f}, dt);
       } else {
         if (inputs_.key_tokens.contains(GLFW_KEY_SPACE))
-          camera_.Move({0.0f, 1.0f, 0.0f});
+          camera_.Move({0.0f, 1.0f, 0.0f}, dt);
       }
 
       if (inputs_.key_tokens.contains(GLFW_KEY_ESCAPE)) {
