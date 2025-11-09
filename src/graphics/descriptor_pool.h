@@ -41,9 +41,6 @@ class TexDescriptorPool : public npr_core::NonCopyable {
   }
 
   const TextureArraySet& GetTextureSet() const { return tex_set_; }
-  void Update(const std::vector<npr_graphics::Texture>& textures) {
-    tex_set_.Update(textures);
-  }
 
  private:
   void CreateDescriptorPool();

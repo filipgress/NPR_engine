@@ -129,13 +129,63 @@ vk::PipelineVertexInputStateCreateInfo Pipeline::GetVertexInputState(
   vk::PipelineVertexInputStateCreateInfo vertex_input{};
 
   if (use_vbo) {
-    data.binding_desc = Vertex::GetBindingDesc();
-    data.attribute_descs = Vertex::GetAttributeDescs();
+    // Vertex binding
+    data.binding_descs[0].binding = 0;
+    data.binding_descs[0].stride = sizeof(Vertex);
+    data.binding_descs[0].inputRate = vk::VertexInputRate::eVertex;
 
-    vertex_input.vertexBindingDescriptionCount = 1;
-    vertex_input.pVertexBindingDescriptions = &data.binding_desc;
-    vertex_input.vertexAttributeDescriptionCount = data.attribute_descs.size();
-    vertex_input.pVertexAttributeDescriptions = data.attribute_descs.data();
+    // Instance binding
+    data.binding_descs[1].binding = 1;
+    data.binding_descs[1].stride = sizeof(Instance);
+    data.binding_descs[1].inputRate = vk::VertexInputRate::eInstance;
+
+    data.attr_descs.resize(11);
+
+    // position
+    data.attr_descs[0].binding = 0;
+    data.attr_descs[0].location = 0;
+    data.attr_descs[0].format = vk::Format::eR32G32B32Sfloat;
+    data.attr_descs[0].offset = offsetof(Vertex, pos);
+
+    // uv
+    data.attr_descs[1].binding = 0;
+    data.attr_descs[1].location = 1;
+    data.attr_descs[1].format = vk::Format::eR32G32Sfloat;
+    data.attr_descs[1].offset = offsetof(Vertex, uv);
+
+    // normal
+    data.attr_descs[2].binding = 0;
+    data.attr_descs[2].location = 2;
+    data.attr_descs[2].format = vk::Format::eR32G32B32Sfloat;
+    data.attr_descs[2].offset = offsetof(Vertex, normal);
+
+    // tan
+    data.attr_descs[3].binding = 0;
+    data.attr_descs[3].location = 3;
+    data.attr_descs[3].format = vk::Format::eR32G32B32A32Sfloat;
+    data.attr_descs[3].offset = offsetof(Vertex, tangent);
+
+    // model matrix (4 vec4s)
+    for (int i = 0; i < 4; i++) {
+      data.attr_descs[4 + i].binding = 1;
+      data.attr_descs[4 + i].location = 4 + i;
+      data.attr_descs[4 + i].format = vk::Format::eR32G32B32A32Sfloat;
+      data.attr_descs[4 + i].offset = sizeof(glm::vec4) * i;
+    }
+
+    // normal matrix (3 vec3s)
+    for (int i = 0; i < 3; i++) {
+      data.attr_descs[8 + i].binding = 1;
+      data.attr_descs[8 + i].location = 8 + i;
+      data.attr_descs[8 + i].format = vk::Format::eR32G32B32Sfloat;
+      data.attr_descs[8 + i].offset =
+          offsetof(Instance, normal) + sizeof(glm::vec3) * i;
+    }
+
+    vertex_input.vertexBindingDescriptionCount = data.binding_descs.size();
+    vertex_input.pVertexBindingDescriptions = data.binding_descs.data();
+    vertex_input.vertexAttributeDescriptionCount = data.attr_descs.size();
+    vertex_input.pVertexAttributeDescriptions = data.attr_descs.data();
   } else {
     vertex_input.vertexBindingDescriptionCount = 0;
     vertex_input.vertexAttributeDescriptionCount = 0;

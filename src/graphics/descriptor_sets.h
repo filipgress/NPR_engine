@@ -84,7 +84,8 @@ class TextureArraySet : public DescriptorSets {
     CreateLayout();
   }
 
-  void Update(const std::vector<npr_graphics::Texture>& textures) const;
+  void Update(const std::vector<npr_graphics::Texture>& textures,
+              const npr_graphics::Texture& default_tex) const;
   void Update(uint idx, const npr_graphics::Texture& texture) const;
   std::vector<vk::DescriptorPoolSize> GetPoolSizes() const override {
     return {{vk::DescriptorType::eCombinedImageSampler, MAX_TEXTURES}};

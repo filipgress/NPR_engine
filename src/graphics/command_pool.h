@@ -13,6 +13,9 @@ class CommandPool : public npr_core::NonCopyable {
 
   vk::CommandBuffer GetCmdBuff(uint idx = 0) const { return cmd_buffs_[idx]; }
 
+  vk::CommandBuffer BeginSingleTimeCmds() const;
+  void EndSingleTimeCmds(vk::CommandBuffer cmd_buff) const;
+
  private:
   void CreateCommandPool(vk::CommandPoolCreateFlags usage, uint32_t queue_idx);
   void CreateCommandBuffers(uint count);

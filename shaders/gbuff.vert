@@ -5,20 +5,18 @@ layout(location = 1) in vec2 in_uv;
 layout(location = 2) in vec3 in_normal;
 layout(location = 3) in vec4 in_tangent;
 
-layout(push_constant) uniform ModelPushConstant {
-  mat4 model;
-  mat3 normal;
-};
+layout(location = 4) in mat4 model;
+layout(location = 8) in mat3 normal;
+
+layout(location = 0) out vec2 frag_uv;
+layout(location = 1) out vec3 frag_pos;
+layout(location = 2) out mat3 TBN;
 
 layout(set = 0, binding = 0) uniform CameraUniform {
   mat4 view;
   mat4 proj;
   mat4 view_proj;
 };
-
-layout(location = 0) out vec2 frag_uv;
-layout(location = 1) out vec3 frag_pos;
-layout(location = 2) out mat3 TBN;
 
 void main() {
   vec4 view_pos = view * model * vec4(in_pos, 1.0);

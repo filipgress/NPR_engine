@@ -2,8 +2,8 @@
 
 namespace npr_graphics {
 
-Resources::Resources(const VulkanContext& context, vk::Extent2D extent,
-                     uint frame_count)
+Resources::Resources(const VulkanContext& context, const CommandPool& cmd_pool,
+                     vk::Extent2D extent, uint frame_count)
     : c_{context}, frame_count_{frame_count} {
   frame_props_.extent = extent;
   frame_props_.samples = std::min(vk::SampleCountFlagBits::e4, GetMaxSamples());
@@ -19,6 +19,12 @@ Resources::Resources(const VulkanContext& context, vk::Extent2D extent,
 
   CreateImages();
   CreateBuffers();
+
+  auto cmd_buff = cmd_pool.BeginSingleTimeCmds();
+  {
+    CreateDefaultTexture(cmd_buff);
+  }
+  cmd_pool.EndSingleTimeCmds(cmd_buff);
 }
 
 void Resources::CreateImages() {
@@ -88,12 +94,27 @@ void Resources::CreateImages() {
 }
 
 void Resources::CreateBuffers() {
+  int idx{0};
   for (auto& res : frame_resources_) {
-    res.camera_unif =
-        std::make_unique<UniformBuffer<CameraUnif>>(c_, "camera_unif_buff");
-    res.material_unif = std::make_unique<DynamicUniformBuffer<MaterialUnif>>(
-        c_, MAX_MATERIALS, "material_dynamic_unif_buff");
+    res.camera_ubo = std::make_unique<UniformBuffer<CameraUnif>>(
+        c_, "camera_unif_buff" + std::to_string(idx));
+    res.material_ubo = std::make_unique<DynamicUniformBuffer<MaterialUnif>>(
+        c_, MAX_MATERIALS, "material_dynamic_unif_buff" + std::to_string(idx));
+    res.instance_buff = std::make_unique<InstanceBuffer>(
+        c_, MAX_INSTANCES, "instance_buff" + std::to_string(idx));
+    idx++;
   }
+}
+
+void Resources::CreateDefaultTexture(vk::CommandBuffer cmd_buff) {
+  TextureProps tex_data;
+  tex_data.name = "default_texture";
+  tex_data.width = 1;
+  tex_data.height = 1;
+  tex_data.type = TextureType::kColor;
+
+  default_tex_ = std::make_unique<Texture>(c_, tex_data);
+  default_tex_->Write(cmd_buff, {255, 255, 255, 255});
 }
 
 vk::SampleCountFlagBits Resources::GetMaxSamples() {

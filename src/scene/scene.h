@@ -1,13 +1,13 @@
 #ifndef SCENE_H_
 #define SCENE_H_
 
+#include "world.h"
+
 #include "core/task_manager.h"
 #include "graphics/command_pool.h"
 #include "graphics/descriptor_pool.h"
 #include "graphics/buffer.h"
 #include "graphics/image.h"
-
-#include <flecs.h>
 
 namespace npr_scene {
 struct GpuResources {
@@ -33,7 +33,9 @@ struct GpuResources {
         cmd_buff{cmd_pool.GetCmdBuff()},
         desc_pool{context} {}
 
-  void UpdateTextureDescriptors() { desc_pool.Update(textures); }
+  void UpdateTextureDescriptors(const npr_graphics::Texture& default_tex) {
+    desc_pool.GetTextureSet().Update(textures, default_tex);
+  }
   void Reset() {
     ibos.clear();
     vbos.clear();
@@ -53,11 +55,15 @@ class Scene : npr_core::NonCopyable {
 
   Scene& operator=(Scene&& scene) noexcept;
 
-  const std::string& GetSceneName() { return scene_name_; }
-  const std::string& GetFilename() { return filename_; }
-  GpuResources& GetGpuResources() {
-    assert(gpu_res_);
-    return *gpu_res_;
+  const std::string& GetSceneName() const { return scene_name_; }
+  const std::string& GetFilename() const { return filename_; }
+  const GpuResources& GetGpuResources() const { return *gpu_res_; }
+  auto& GetCameraQuery() const { return world_.camera_query_; }
+
+  void RecordOpaque(vk::CommandBuffer cmd_buff, vk::PipelineLayout layout,
+                    uint frame_idx, const npr_graphics::Resources& res,
+                    const npr_graphics::DescriptorPool& desc_pool) const {
+    world_.RecordOpaque(cmd_buff, layout, frame_idx, res, *gpu_res_, desc_pool);
   }
 
   void InitGPU(npr_core::TaskManager& tasks, std::function<void()> on_complete);
@@ -73,7 +79,7 @@ class Scene : npr_core::NonCopyable {
   void WaitForAsync();
 
  private:
-  flecs::world entities_;
+  World world_;
   std::unique_ptr<GpuResources> gpu_res_;
 
   std::string filename_;

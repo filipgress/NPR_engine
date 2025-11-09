@@ -45,13 +45,13 @@ class Image : public npr_core::NonCopyable {
 };
 
 enum class TextureType { kColor, kNormal, kMetallicRoughness, kEmissive };
-struct TextureInfo {
+struct TextureTypeInfo {
   vk::Format format;
   int component;
   std::string name;
 };
 
-struct TextureData {
+struct TextureProps {
   std::string name;
   TextureType type;
   uint32_t width, height;
@@ -73,13 +73,13 @@ class Texture : public Image {
   Texture(const VulkanContext& context, vk::Format format, vk::Extent2D extent,
           vk::ImageUsageFlags usage, vk::ImageAspectFlags aspect,
           vk::SampleCountFlagBits samples, std::string dbg_name);
-  Texture(const VulkanContext& context, const TextureData& data,
-          const SamplerProps& sampler_props);
+  Texture(const VulkanContext& context, const TextureProps& data,
+          const SamplerProps& sampler_props = SamplerProps());
   Texture(Texture&&) noexcept;
   ~Texture();
 
   vk::Sampler GetSampler() const { return sampler_; }
-  static TextureInfo GetTypeInfo(TextureType type);
+  static TextureTypeInfo GetTypeInfo(TextureType type);
 
   void DestroyStagingBuff() { staging_buff_.reset(); }
   void Write(vk::CommandBuffer cmd_buff, const std::vector<unsigned char>& data,

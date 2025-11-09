@@ -114,7 +114,7 @@ Texture::Texture(const VulkanContext& context, vk::Format format,
   CreateSampler();
 }
 
-Texture::Texture(const VulkanContext& context, const TextureData& data,
+Texture::Texture(const VulkanContext& context, const TextureProps& data,
                  const SamplerProps& sampler_props)
     : Image{context,
             GetTypeInfo(data.type).format,
@@ -141,7 +141,7 @@ Texture::~Texture() {
   if (sampler_) c_.GetDevice().destroySampler(sampler_);
 }
 
-TextureInfo Texture::GetTypeInfo(TextureType type) {
+TextureTypeInfo Texture::GetTypeInfo(TextureType type) {
   switch (type) {
     case TextureType::kColor:
       return {vk::Format::eR8G8B8A8Srgb, 4, "color"};

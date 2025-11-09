@@ -4,7 +4,7 @@
 #include "scene.h"
 #include "components.h"
 
-#include "graphics/vulkan_context.h"
+#include "graphics/renderer.h"
 
 #include <tiny_gltf.h>
 
@@ -20,19 +20,19 @@ class SceneLoader {
   };
 
  public:
-  static void LoadAsync(const npr_graphics::VulkanContext& context,
-                        Scene& scene, npr_core::TaskManager& tasks,
+  static void LoadAsync(const npr_graphics::Renderer& renderer, Scene& scene,
+                        npr_core::TaskManager& tasks,
                         std::function<void()> on_loaded,
                         const std::string& filepath,
                         const std::string& scene_name = "");
 
-  static void Load(const npr_graphics::VulkanContext& context, Scene& scene,
+  static void Load(const npr_graphics::Renderer& renderer, Scene& scene,
                    const std::string& filepath,
                    const std::string& scene_name = "");
 
  private:
-  static bool LoadScene(const npr_graphics::VulkanContext& context,
-                        Scene& scene, const std::string& filepath,
+  static bool LoadScene(const npr_graphics::Renderer& renderer, Scene& scene,
+                        const std::string& filepath,
                         const std::string& scene_name);
 
   static void LoadEntity(Scene& scene, flecs::entity parent_ent,

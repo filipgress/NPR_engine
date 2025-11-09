@@ -2,12 +2,14 @@
 #define RESOURCES_H_
 
 #include "vulkan_context.h"
+#include "command_pool.h"
 #include "image.h"
 
 namespace npr_graphics {
 
 #define MAX_TEXTURES 128
 #define MAX_MATERIALS 1024
+#define MAX_INSTANCES 16384
 
 enum MaterialFlags : uint32_t {
   kNone = BIT(0),
@@ -21,11 +23,11 @@ struct alignas(16) MaterialUnif {
 
   glm::vec4 color_factor;
   glm::vec3 emissive_factor;
-  float mettalic_factor;
+  float metallic_factor;
   float roughness_factor;
 
   float alpha_cutoff;
-  MaterialFlags flags;
+  uint32_t flags;
 };
 
 struct alignas(16) CameraUnif {
@@ -34,13 +36,8 @@ struct alignas(16) CameraUnif {
   glm::mat4 view_proj;
 };
 
-struct alignas(16) ModelPushConst {
-  glm::mat4 model;
-  glm::mat4 normal;
-};
-
 struct LoadPushConst {
-  alignas(16) glm::uvec2 res{0};
+  glm::uvec2 res{0};
   alignas(16) glm::vec3 t{0.0f};
   bool is_loading{false};
 };
@@ -64,8 +61,9 @@ struct FrameProps {
 };
 
 struct FrameResources {
-  std::unique_ptr<UniformBuffer<CameraUnif>> camera_unif;
-  std::unique_ptr<DynamicUniformBuffer<MaterialUnif>> material_unif;
+  std::unique_ptr<InstanceBuffer> instance_buff;
+  std::unique_ptr<UniformBuffer<CameraUnif>> camera_ubo;
+  std::unique_ptr<DynamicUniformBuffer<MaterialUnif>> material_ubo;
   // std::unique_ptr<Buffer> light_storage;
 
   // gpass
@@ -87,11 +85,12 @@ class Resources : public npr_core::NonCopyable {
   friend class Renderer;
 
  public:
-  Resources(const VulkanContext& context, vk::Extent2D extent,
-            uint frame_count);
+  Resources(const VulkanContext& context, const CommandPool& cmd_pool,
+            vk::Extent2D extent, uint frame_count);
 
   uint GetFrameCount() const { return frame_count_; }
   const FrameProps& GetProps() const { return frame_props_; }
+  const Texture& GetDefaultTexture() const { return *default_tex_; }
   const std::vector<FrameResources>& GetResources() const {
     return frame_resources_;
   }
@@ -99,6 +98,7 @@ class Resources : public npr_core::NonCopyable {
  private:
   void CreateImages();
   void CreateBuffers();
+  void CreateDefaultTexture(vk::CommandBuffer cmd_buff);
 
   vk::SampleCountFlagBits GetMaxSamples();
 
@@ -108,6 +108,8 @@ class Resources : public npr_core::NonCopyable {
   FrameProps frame_props_;
   std::vector<FrameResources> frame_resources_;
   uint frame_count_;
+
+  std::unique_ptr<Texture> default_tex_;
 };
 
 }  // namespace npr_graphics

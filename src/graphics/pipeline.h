@@ -26,8 +26,8 @@ struct PipelineData {
   std::vector<uint8_t> specialization_data;
   vk::SpecializationInfo specialization_info;
 
-  vk::VertexInputBindingDescription binding_desc;
-  std::vector<vk::VertexInputAttributeDescription> attribute_descs;
+  std::array<vk::VertexInputBindingDescription, 2> binding_descs;
+  std::vector<vk::VertexInputAttributeDescription> attr_descs;
 
   std::vector<vk::PipelineColorBlendAttachmentState> color_attachments;
   std::vector<vk::DynamicState> dynamic_states;
@@ -123,10 +123,9 @@ class GBuffPipe : public Pipeline {
       : Pipeline(context, cache, render_pass, vert_shader, frag_shader),
         props_{props} {
     CreateLayout(
-        {desc_pool.GetCameraSets().GetLayout(),
-         desc_pool.GetMaterialSets().GetLayout(),
-         TextureArraySet(c_).GetLayout()},
-        {MakePushConst<ModelPushConst>(vk::ShaderStageFlagBits::eVertex)});
+        {desc_pool.GetCameraSets().GetLayout(), TextureArraySet(c_).GetLayout(),
+         desc_pool.GetMaterialSets().GetLayout()},
+        {});
     Recreate();
   }
 
@@ -171,7 +170,8 @@ class SwapPipe : public Pipeline {
            FragmentShader& frag_shader, const DescriptorPool& desc_pool)
       : Pipeline(context, cache, render_pass, vert_shader, frag_shader) {
     CreateLayout(
-        {desc_pool.GetPresentSets().GetLayout()},
+        // {desc_pool.GetPresentSets().GetLayout()},
+        {desc_pool.GetGBuffSets().GetLayout()},
         {MakePushConst<LoadPushConst>(vk::ShaderStageFlagBits::eFragment)});
     Recreate();
   }

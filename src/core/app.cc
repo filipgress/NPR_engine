@@ -9,9 +9,9 @@ App::App()
     : active_scene_{std::make_unique<npr_scene::Scene>()},
       scene_swap_{std::make_unique<npr_scene::Scene>()} {
   npr_scene::SceneLoader::LoadAsync(
-      renderer_.GetContext(), *scene_swap_, tasks_,
+      renderer_, *scene_swap_, tasks_,
       [this]() { scene_swap_.swap(active_scene_); },
-      "../assets/market_inst/scene.gltf");
+      "../assets/scene_graph/scene.gltf");
 
   tasks_.Add([&]() {
     if (inputs_.key_tokens.contains(GLFW_KEY_LEFT_CONTROL) &&
@@ -20,6 +20,16 @@ App::App()
 
     if (inputs_.key_tokens.contains(GLFW_KEY_I))
       INFO(timer_.GetAvgFPS(), "fps");
+
+    if (inputs_.key_tokens.contains(GLFW_KEY_O)) {
+      if (active_scene_->IsValid()) {
+        flecs::entity first_camera = active_scene_->GetCameraQuery().first();
+        // active_scene_->GetCameraQuery().run([&](flecs::iter it) {
+        //   while (it.next()) first_camera = it.entity(0);
+        // });
+        camera_.SetEntity(first_camera);
+      }
+    }
 
     if (camera_.GetMode() == npr_scene::CameraMode::kFree) {
       float dt = timer_.GetDelta();

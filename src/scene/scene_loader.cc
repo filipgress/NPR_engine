@@ -11,7 +11,7 @@
 namespace npr_scene {
 using namespace npr_graphics;
 
-void SceneLoader::LoadAsync(const npr_graphics::VulkanContext& context,
+void SceneLoader::LoadAsync(const npr_graphics::Renderer& renderer,
                             Scene& scene, npr_core::TaskManager& tasks,
                             std::function<void()> on_loaded,
                             const std::string& filepath,
@@ -19,7 +19,7 @@ void SceneLoader::LoadAsync(const npr_graphics::VulkanContext& context,
   if (scene.handle_.valid()) return;
   scene.handle_ =
       std::async(std::launch::async, &SceneLoader::LoadScene,
-                 std::cref(context), std::ref(scene), filepath, scene_name);
+                 std::cref(renderer), std::ref(scene), filepath, scene_name);
 
   tasks.Add([&scene, &tasks, on_loaded]() {
     if (scene.IsLoading()) return false;
@@ -29,16 +29,16 @@ void SceneLoader::LoadAsync(const npr_graphics::VulkanContext& context,
   });
 }
 
-void SceneLoader::Load(const VulkanContext& context, Scene& scene,
+void SceneLoader::Load(const Renderer& renderer, Scene& scene,
                        const std::string& filepath,
                        const std::string& scene_name) {
   scene.WaitForAsync();
 
-  scene.valid_ = LoadScene(context, scene, filepath, scene_name);
+  scene.valid_ = LoadScene(renderer, scene, filepath, scene_name);
   scene.gpu_init_ = false;
 }
 
-bool SceneLoader::LoadScene(const VulkanContext& context, Scene& scene,
+bool SceneLoader::LoadScene(const Renderer& renderer, Scene& scene,
                             const std::string& filepath,
                             const std::string& scene_name) {
   try {
@@ -52,7 +52,7 @@ bool SceneLoader::LoadScene(const VulkanContext& context, Scene& scene,
     if (!err.empty()) throw std::runtime_error("gltf err: " + err);
     if (!ret) throw std::runtime_error("gltf failed to parse file: " + err);
 
-    scene.Prepare(context, filepath, scene_name);
+    scene.Prepare(renderer.GetContext(), filepath, scene_name);
     INFO("loading scene: ", scene.filename_, "(", scene.scene_name_, ")");
 
     LoaderCache cache;
@@ -67,7 +67,8 @@ bool SceneLoader::LoadScene(const VulkanContext& context, Scene& scene,
       for (int node_idx : model.scenes[scene_idx].nodes)
         LoadEntity(scene, flecs::entity::null(), model, node_idx, cache);
 
-      scene.gpu_res_->UpdateTextureDescriptors();
+      scene.gpu_res_->UpdateTextureDescriptors(
+          renderer.GetResources().GetDefaultTexture());
       scene.gpu_res_->cmd_buff.end();
     }
 
@@ -98,7 +99,8 @@ void SceneLoader::LoadEntity(Scene& scene, flecs::entity parent_ent,
     std::string entity_name =
         scene.GetSceneName() + "_node_" + std::to_string(node_idx) + node.name;
 
-    flecs::entity child_ent = scene.entities_.entity(entity_name.c_str());
+    flecs::entity child_ent =
+        scene.world_.entities_.entity(entity_name.c_str());
     if (parent_ent.is_valid()) child_ent.child_of(parent_ent);
 
     if (node.camera != -1)
@@ -134,7 +136,7 @@ void SceneLoader::LoadObject(Scene& scene, flecs::entity node_ent,
     }
 
     std::string prim_name = node.name + "_prim_" + std::to_string(prim_idx);
-    flecs::entity prim_ent = scene.entities_.entity(prim_name.c_str());
+    flecs::entity prim_ent = scene.world_.entities_.entity(prim_name.c_str());
 
     prim_ent.child_of(node_ent);
     prim_ent.add<PrimitiveTag>();
@@ -390,7 +392,7 @@ int SceneLoader::LoadTexture(Scene& scene, const tinygltf::Model& model,
     throw std::runtime_error("texture type '" + tex_info.name +
                              "' is in unexpected format");
 
-  TextureData tex_data;
+  TextureProps tex_data;
   tex_data.name = tex_info.name + (image.name.empty() ? "" : "_" + image.name);
   tex_data.type = tex_type;
   tex_data.height = image.height;

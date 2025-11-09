@@ -168,9 +168,9 @@ void TextureArraySet::CreateLayout() {
                 "texture_array_set_layout");
 }
 
-void TextureArraySet::Update(
-    const std::vector<npr_graphics::Texture>& textures) const {
-  assert(!textures.empty() && textures.size() <= MAX_TEXTURES && count_);
+void TextureArraySet::Update(const std::vector<npr_graphics::Texture>& textures,
+                             const npr_graphics::Texture& default_tex) const {
+  assert(textures.size() <= MAX_TEXTURES && count_);
 
   std::vector<vk::DescriptorImageInfo> image_infos(MAX_TEXTURES);
   for (size_t i = 0; i < textures.size(); ++i) {
@@ -179,8 +179,13 @@ void TextureArraySet::Update(
     image_infos[i].sampler = textures[i].GetSampler();
   }
 
+  vk::DescriptorImageInfo default_info{};
+  default_info.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+  default_info.imageView = default_tex.GetImageView();
+  default_info.sampler = default_tex.GetSampler();
+
   for (size_t i = textures.size(); i < MAX_TEXTURES; ++i)
-    image_infos[i] = image_infos[0];
+    image_infos[i] = default_info[0];
 
   vk::WriteDescriptorSet desc_write{};
   desc_write.dstSet = sets_[0];
@@ -255,7 +260,7 @@ void CameraUnifSets::Update(const Resources& res) const {
   assert(count_ == per_frame_res.size());
 
   for (size_t i = 0; i < per_frame_res.size(); i++)
-    BufferSets::Update(per_frame_res[i].camera_unif->GetBuffer(), VK_WHOLE_SIZE,
+    BufferSets::Update(per_frame_res[i].camera_ubo->GetBuffer(), VK_WHOLE_SIZE,
                        i);
 }
 
@@ -264,8 +269,8 @@ void MaterialUnifSets::Update(const Resources& res) const {
   assert(count_ == per_frame_res.size());
 
   for (size_t i = 0; i < per_frame_res.size(); i++)
-    BufferSets::Update(per_frame_res[i].material_unif->GetBuffer(),
-                       per_frame_res[i].material_unif->GetElemSize(), i);
+    BufferSets::Update(per_frame_res[i].material_ubo->GetBuffer(),
+                       per_frame_res[i].material_ubo->GetElemSize(), i);
 }
 
 }  // namespace npr_graphics

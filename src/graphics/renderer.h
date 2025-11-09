@@ -26,7 +26,7 @@ class Renderer : public npr_core::NonCopyable {
               bool is_loading, float dt);
 
   const VulkanContext& GetContext() const { return c_; }
-  Resources& GetResources() { return res_; }
+  const Resources& GetResources() const { return res_; }
 
   void Resize() { swapchain_.GetProps().dirty = true; }
   void RecompileShaders();
@@ -35,9 +35,9 @@ class Renderer : public npr_core::NonCopyable {
   void Finish() { c_.GetDevice().waitIdle(); }
 
  private:
-  vk::CommandBuffer Record(uint image_idx);
-  vk::CommandBuffer RecordFallback(uint image_idx, float camera_aspect,
-                                   bool is_loading, float dt);
+  vk::CommandBuffer Record(uint image_idx, const npr_scene::Camera& camera,
+                           npr_scene::Scene& scene, bool is_loading, float dt);
+  vk::CommandBuffer RecordFallback(uint image_idx, bool is_loading, float dt);
 
   void RenderTargetResize();
   std::pair<vk::Viewport, vk::Rect2D> CalcViewportScissor(
@@ -50,9 +50,9 @@ class Renderer : public npr_core::NonCopyable {
   Swapchain swapchain_{c_, window_.GetSize()};
 
   Sync sync_{c_, swapchain_.GetProps().image_count};
-  Resources res_{c_, {1280, 720}, sync_.GetFrameCount()};
-
   GraphicsCommandPool cmd_pool_{c_, sync_.GetFrameCount()};
+
+  Resources res_{c_, cmd_pool_, {1280, 720}, sync_.GetFrameCount()};
   DescriptorPool desc_pool_{c_, res_};
 
   GBuffPass gbuff_pass_{c_, res_};

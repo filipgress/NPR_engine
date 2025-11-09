@@ -39,4 +39,34 @@ void CommandPool::CreateCommandBuffers(uint count) {
                   dbg_name_ + "_cmd_buff_" + std::to_string(i));
 }
 
+vk::CommandBuffer CommandPool::BeginSingleTimeCmds() const {
+  vk::CommandBufferAllocateInfo allocInfo{};
+  allocInfo.commandPool = cmd_pool_;
+  allocInfo.level = vk::CommandBufferLevel::ePrimary;
+  allocInfo.commandBufferCount = 1;
+
+  vk::CommandBuffer cmd_buff;
+  cmd_buff = c_.GetDevice().allocateCommandBuffers(allocInfo)[0];
+
+  vk::CommandBufferBeginInfo begin_info{};
+  begin_info.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit;
+  cmd_buff.begin(begin_info);
+
+  return cmd_buff;
+}
+
+void CommandPool::EndSingleTimeCmds(vk::CommandBuffer cmd_buff) const {
+  cmd_buff.end();
+
+  vk::SubmitInfo submit_info{};
+  submit_info.commandBufferCount = 1;
+  submit_info.pCommandBuffers = &cmd_buff;
+
+  auto graphics_q = c_.GetGraphicsQ();
+  graphics_q.submit(submit_info, nullptr);
+  graphics_q.waitIdle();
+
+  c_.GetDevice().freeCommandBuffers(cmd_pool_, cmd_buff);
+}
+
 }  // namespace npr_graphics

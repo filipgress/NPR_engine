@@ -59,9 +59,6 @@ struct Vertex {
 
   glm::vec3 normal{0.0f};
   glm::vec4 tangent{1.0f};
-
-  static vk::VertexInputBindingDescription GetBindingDesc();
-  static std::vector<vk::VertexInputAttributeDescription> GetAttributeDescs();
 };
 
 class VertexBuffer : public Buffer {
@@ -73,9 +70,48 @@ class VertexBuffer : public Buffer {
                    vk::BufferUsageFlagBits::eTransferDst,
                vk::MemoryPropertyFlagBits::eDeviceLocal,
                vk::SharingMode::eExclusive, vertices.size() * sizeof(Vertex),
-               dbg_name) {
+               dbg_name),
+        count_{vertices.size()} {
     Write(cmd_buff, vertices.data());
   }
+
+  size_t GetCount() const { return count_; }
+
+ private:
+  size_t count_;
+};
+
+struct Instance {
+  glm::mat4 model;
+  glm::mat3 normal;
+};
+
+class InstanceBuffer : public Buffer {
+ public:
+  InstanceBuffer(const VulkanContext& context, uint32_t max_instances,
+                 const std::string& dbg_name)
+      : Buffer(context, vk::BufferUsageFlagBits::eVertexBuffer,
+               vk::MemoryPropertyFlagBits::eHostVisible |
+                   vk::MemoryPropertyFlagBits::eHostCoherent,
+               vk::SharingMode::eExclusive, max_instances * sizeof(Instance),
+               dbg_name),
+        max_instances_{max_instances} {}
+
+  void Write(const std::vector<Instance>& instances, uint32_t offset = 0) {
+    assert(instances.size() <= GetMaxInstances());
+
+    if (offset + instances.size() > GetMaxInstances()) offset = 0;
+    if (!mapped_mem_)
+      mapped_mem_ = c_.GetDevice().mapMemory(buff_mem_, 0, size_);
+
+    memcpy(static_cast<char*>(mapped_mem_) + offset * sizeof(Instance),
+           instances.data(), instances.size() * sizeof(Instance));
+  }
+
+  uint32_t GetMaxInstances() const { return max_instances_; }
+
+ private:
+  uint32_t max_instances_;
 };
 
 class IndexBuffer : public Buffer {
@@ -106,7 +142,7 @@ class UniformBuffer : public Buffer {
                vk::MemoryPropertyFlagBits::eHostVisible |
                    vk::MemoryPropertyFlagBits::eHostCoherent,
                vk::SharingMode::eExclusive, sizeof(T), dbg_name) {}
-  void Write(const T& ubo) { Write(nullptr, ubo); }
+  void Write(const T& ubo) { Buffer::Write(nullptr, &ubo); }
 };
 
 template <typename T>
@@ -151,4 +187,5 @@ class DynamicUniformBuffer : public Buffer {
   uint32_t aligned_size_;
 };
 }  // namespace npr_graphics
+
 #endif  // BUFFER_H_

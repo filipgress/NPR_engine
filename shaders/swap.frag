@@ -3,7 +3,7 @@
 layout(location = 0) in vec2 frag_uv;
 layout(location = 0) out vec4 out_color;
 
-layout(set = 0, binding = 0) uniform sampler2D image_tex;
+layout(set = 0, binding = 4) uniform sampler2D image_tex;
 
 layout(push_constant) uniform PushConst {
   uvec2 res;

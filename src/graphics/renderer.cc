@@ -3,6 +3,7 @@
 namespace npr_graphics {
 void Renderer::Render(const npr_scene::Camera& camera, npr_scene::Scene& scene,
                       bool is_loading, float dt) {
+  if (!scene.IsValid() || !scene.IsInit()) return;
   auto device = c_.GetDevice();
 
   // wait for in flight fence
@@ -36,15 +37,13 @@ void Renderer::Render(const npr_scene::Camera& camera, npr_scene::Scene& scene,
   device.resetFences(in_flight);
 
   // record & submit commands
-  // vk::CommandBuffer cmd_buff;
-  // if (!scene.IsValid() || !scene.IsInit()) {
-  //   cmd_buff = RecordFallback(image_idx, camera.GetAspect(), is_loading, dt);
-  // } else {
-  //   return;
-  //   cmd_buff = Record(image_idx);
-  // }
-  (void)scene;
-  auto cmd_buff = RecordFallback(image_idx, camera.GetAspect(), is_loading, dt);
+  // auto cmd_buff = (scene.IsValid() && scene.IsInit())
+  //                     ? Record(image_idx, camera, scene, is_loading, dt)
+  //                     : RecordFallback(image_idx, is_loading, dt);
+  vk::CommandBuffer cmd_buff;
+  if (scene.IsValid() && scene.IsInit()) {
+    cmd_buff = Record(image_idx, camera, scene, is_loading, dt);
+  }
 
   auto render_finished = sync_.GetRenderFinished(image_idx);
 
@@ -82,8 +81,8 @@ void Renderer::Render(const npr_scene::Camera& camera, npr_scene::Scene& scene,
   sync_.Increment();
 }
 
-vk::CommandBuffer Renderer::RecordFallback(uint image_idx, float aspect,
-                                           bool is_loading, float dt) {
+vk::CommandBuffer Renderer::RecordFallback(uint image_idx, bool is_loading,
+                                           float dt) {
   auto frame_idx = sync_.GetFrameIdx();
   auto cmd_buff = cmd_pool_.GetCmdBuff(frame_idx);
 
@@ -97,7 +96,94 @@ vk::CommandBuffer Renderer::RecordFallback(uint image_idx, float aspect,
   }
   {  // swap_pass
     auto swap_extent = swapchain_.GetProps().extent;
-    auto [viewport, scissor] = CalcViewportScissor(swap_extent, aspect);
+    LoadPushConst load_data{};
+    if (is_loading) {
+      glm::ivec2 size = window_.GetSize();
+      load_data.res = {size.x, size.y};
+      load_data.t = {
+          std::sin(dt * 2.4f) * 0.5f + 0.5f,
+          std::sin(dt * 3.5f) * 0.5f + 0.5f,
+          std::sin(dt * 2.8f) * 0.5f + 0.5f,
+      };
+      load_data.is_loading = true;
+    }
+
+    cmd_buff.beginRenderPass(swap_pass_.BeginInfo(image_idx, swap_extent),
+                             vk::SubpassContents::eInline);
+
+    vk::Rect2D scissor{{0, 0}, swap_extent};
+    vk::Viewport viewport{0.0f,
+                          0.0f,
+                          static_cast<float>(swap_extent.width),
+                          static_cast<float>(swap_extent.height),
+                          0.0f,
+                          1.0f};
+
+    cmd_buff.setScissor(0, scissor);
+    cmd_buff.setViewport(0, viewport);
+    cmd_buff.setCullMode(vk::CullModeFlagBits::eNone);
+
+    cmd_buff.pushConstants(swap_pipe_.GetLayout(),
+                           vk::ShaderStageFlagBits::eFragment, 0,
+                           sizeof(load_data), &load_data);
+    cmd_buff.bindPipeline(vk::PipelineBindPoint::eGraphics,
+                          swap_pipe_.GetPipeline());
+    cmd_buff.bindDescriptorSets(
+        vk::PipelineBindPoint::eGraphics, swap_pipe_.GetLayout(), 0,
+        desc_pool_.GetPresentSets().GetSet(frame_idx), {});
+
+    cmd_buff.draw(3, 1, 0, 0);
+    cmd_buff.endRenderPass();
+  }
+
+  cmd_buff.end();
+  return cmd_buff;
+}
+
+vk::CommandBuffer Renderer::Record(uint image_idx,
+                                   const npr_scene::Camera& camera,
+                                   npr_scene::Scene& scene, bool is_loading,
+                                   float dt) {
+  auto frame_idx = sync_.GetFrameIdx();
+  auto cmd_buff = cmd_pool_.GetCmdBuff(frame_idx);
+
+  cmd_buff.begin({vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
+
+  {  // gbuff_pass
+    auto res_extent = res_.GetProps().extent;
+    cmd_buff.beginRenderPass(gbuff_pass_.BeginInfo(frame_idx, res_extent),
+                             vk::SubpassContents::eInline);
+
+    vk::Rect2D scissor{{0, 0}, res_extent};
+    vk::Viewport viewport(0, 0, res_extent.width, res_extent.height, 0.0f,
+                          1.0f);
+
+    cmd_buff.setScissor(0, scissor);
+    cmd_buff.setViewport(0, viewport);
+
+    cmd_buff.bindPipeline(vk::PipelineBindPoint::eGraphics,
+                          gbuff_pipe_.GetPipeline());
+
+    res_.frame_resources_[frame_idx].camera_ubo->Write(camera.GetCameraUnif());
+    cmd_buff.bindDescriptorSets(  // camera
+        vk::PipelineBindPoint::eGraphics, gbuff_pipe_.GetLayout(), 0,
+        desc_pool_.GetCameraSets().GetSet(frame_idx), {});
+
+    cmd_buff.bindDescriptorSets(  // textures
+        vk::PipelineBindPoint::eGraphics, gbuff_pipe_.GetLayout(), 1,
+        scene.GetGpuResources().desc_pool.GetTextureSet().GetSet(0), {});
+
+    scene.RecordOpaque(cmd_buff, gbuff_pipe_.GetLayout(), frame_idx, res_,
+                       desc_pool_);
+
+    cmd_buff.nextSubpass(vk::SubpassContents::eInline);
+    cmd_buff.endRenderPass();
+  }
+  {  // swap_pass
+    auto swap_extent = swapchain_.GetProps().extent;
+    auto [viewport, scissor] =
+        CalcViewportScissor(swap_extent, camera.GetAspect());
+
     LoadPushConst load_data{};
     if (is_loading) {
       glm::ivec2 size = window_.GetSize();
@@ -122,9 +208,12 @@ vk::CommandBuffer Renderer::RecordFallback(uint image_idx, float aspect,
                            sizeof(load_data), &load_data);
     cmd_buff.bindPipeline(vk::PipelineBindPoint::eGraphics,
                           swap_pipe_.GetPipeline());
+    // cmd_buff.bindDescriptorSets(
+    //     vk::PipelineBindPoint::eGraphics, swap_pipe_.GetLayout(), 0,
+    //     desc_pool_.GetPresentSets().GetSet(frame_idx), {});
     cmd_buff.bindDescriptorSets(
         vk::PipelineBindPoint::eGraphics, swap_pipe_.GetLayout(), 0,
-        desc_pool_.GetPresentSets().GetSet(frame_idx), {});
+        desc_pool_.GetGBuffSets().GetSet(frame_idx), {});
 
     cmd_buff.draw(3, 1, 0, 0);
     cmd_buff.endRenderPass();
@@ -136,105 +225,28 @@ vk::CommandBuffer Renderer::RecordFallback(uint image_idx, float aspect,
 
 std::pair<vk::Viewport, vk::Rect2D> Renderer::CalcViewportScissor(
     vk::Extent2D swap_extent, float camera_aspect) const {
+  (void)camera_aspect;
   float win_aspect = static_cast<float>(swap_extent.width) / swap_extent.height;
 
   if (win_aspect > camera_aspect) {
-    // window is wider than camera aspect
+    // Window is wider: letterbox (black bars on left/right)
     uint32_t width = swap_extent.height * camera_aspect;
-    int32_t offset = (swap_extent.width - width) / 2.0f;
+    int32_t offset = (swap_extent.width - width) / 2;
 
-    vk::Viewport viewport(offset, 0.0f, width, swap_extent.height, 0.0f, 1.0f);
+    vk::Viewport viewport(offset, 0, width, swap_extent.height, 0.0f, 1.0f);
     vk::Rect2D scissor{{offset, 0}, {width, swap_extent.height}};
 
     return {viewport, scissor};
   } else {
-    // window is taller than camera aspect
+    // Window is taller: pillarbox (black bars on top/bottom)
     uint32_t height = swap_extent.width / camera_aspect;
-    int32_t offset = (swap_extent.height - height) / 2.0f;
+    int32_t offset = (swap_extent.height - height) / 2;
 
-    vk::Viewport viewport(0.0f, offset, swap_extent.width, height, 0.0f, 1.0f);
+    vk::Viewport viewport(0, offset, swap_extent.width, height, 0.0f, 1.0f);
     vk::Rect2D scissor{{0, offset}, {swap_extent.width, height}};
 
     return {viewport, scissor};
   }
-}
-
-vk::CommandBuffer Renderer::Record(uint image_idx) {
-  auto frame_idx = sync_.GetFrameIdx();
-
-  auto cmd_buff = cmd_pool_.GetCmdBuff(frame_idx);
-  cmd_buff.begin({vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
-
-  auto swap_extent = swapchain_.GetProps().extent;
-
-  vk::Rect2D scissor{{0, 0}, swap_extent};
-  vk::Viewport viewport(0, 0, swap_extent.width, swap_extent.height, 0.0f,
-                        1.0f);
-
-  {
-    // auto res_extent = res_.GetProps().extent;
-    // cmd_buff.beginRenderPass(gbuff_pass_.BeginInfo(frame_idx, res_extent),
-    //                          vk::SubpassContents::eInline);
-    //
-    // ModelPushConst data;
-    // cmd_buff.pushConstants(gbuff_pipe_.GetLayout(),
-    //                        vk::ShaderStageFlagBits::eVertex, 0,
-    //                        sizeof(data), &data);
-    //
-    // auto offset =
-    //     res_.GetResources()[frame_idx].material_unif->GetElemOffset(0);
-    //
-    // cmd_buff.setScissor(0, scissor);
-    // cmd_buff.setViewport(0, viewport);
-    // cmd_buff.setCullMode(vk::CullModeFlagBits::eNone);
-    //
-    // cmd_buff.bindPipeline(vk::PipelineBindPoint::eGraphics,
-    //                       gbuff_pipe_.GetPipeline());
-    // cmd_buff.bindDescriptorSets(
-    //     vk::PipelineBindPoint::eGraphics, gbuff_pipe_.GetLayout(), 0,
-    //     desc_pool_.GetCameraSets().GetSet(frame_idx), {});
-    // cmd_buff.bindDescriptorSets(
-    //     vk::PipelineBindPoint::eGraphics, gbuff_pipe_.GetLayout(), 1,
-    //     desc_pool_.GetMaterialSets().GetSet(frame_idx), offset);
-    // cmd_buff.bindDescriptorSets(
-    //     vk::PipelineBindPoint::eGraphics, gbuff_pipe_.GetLayout(), 2,
-    //     res_.scene_.GetGpuResources().desc_pool->GetTextureSet().GetSet(0),
-    //     {});
-    //
-    // auto& ibos = res_.scene_.GetGpuResources().ibos;
-    // vk::Buffer vbos[] =
-    // {res_.scene_.GetGpuResources().vbos[0].GetBuffer()}; vk::DeviceSize
-    // offsets[] = {0};
-    //
-    // cmd_buff.bindVertexBuffers(0, 1, vbos, offsets);
-    // cmd_buff.bindIndexBuffer(ibos[0].GetBuffer(), 0,
-    // vk::IndexType::eUint32); cmd_buff.drawIndexed(ibos[0].GetCount(), 1, 0,
-    // 0, 0);
-    //
-    // cmd_buff.nextSubpass(vk::SubpassContents::eInline);
-    // cmd_buff.endRenderPass();
-  }
-  {
-    cmd_buff.beginRenderPass(swap_pass_.BeginInfo(image_idx, swap_extent),
-                             vk::SubpassContents::eInline);
-
-    cmd_buff.setScissor(0, scissor);
-    cmd_buff.setViewport(0, viewport);
-    cmd_buff.setCullMode(vk::CullModeFlagBits::eNone);
-
-    cmd_buff.bindPipeline(vk::PipelineBindPoint::eGraphics,
-                          swap_pipe_.GetPipeline());
-    cmd_buff.bindDescriptorSets(
-        vk::PipelineBindPoint::eGraphics, swap_pipe_.GetLayout(), 0,
-        desc_pool_.GetGBuffSets().GetSet(frame_idx), {});
-
-    cmd_buff.draw(3, 1, 0, 0);
-
-    cmd_buff.endRenderPass();
-  }
-
-  cmd_buff.end();
-  return cmd_buff;
 }
 
 void Renderer::RenderTargetResize() {

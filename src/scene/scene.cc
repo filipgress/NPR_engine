@@ -7,7 +7,7 @@ Scene& Scene::operator=(Scene&& scene) noexcept {
 
   assert(!IsLoading());
 
-  entities_ = std::move(scene.entities_);
+  world_ = std::move(scene.world_);
   gpu_res_ = std::move(scene.gpu_res_);
   valid_ = std::exchange(scene.valid_, false);
   handle_ = std::move(scene.handle_);
@@ -32,8 +32,7 @@ void Scene::Prepare(const npr_graphics::VulkanContext& context,
   filename_ = npr_core::GetFilename(filepath);
   scene_name_ = scene_name.empty() ? "default" : scene_name;
 
-  entities_.reset();
-
+  world_.Reset();
   if (gpu_res_ && gpu_res_->context.GetDevice() == context.GetDevice())
     gpu_res_->Reset();
   else
@@ -66,6 +65,10 @@ void Scene::InitGPU(npr_core::TaskManager& tasks,
     }
 
     INFO("scene initialized: ", filename_, "(", scene_name_, ")");
+
+    world_.BuildQueries();
+    world_.Update();
+
     gpu_init_ = true;
 
     on_complete();
