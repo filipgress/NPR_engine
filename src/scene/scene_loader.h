@@ -44,6 +44,8 @@ class SceneLoader {
                          const tinygltf::Node& node, LoaderCache& cache);
   static void LoadCamera(flecs::entity node_ent, const tinygltf::Model& model,
                          const tinygltf::Node& node);
+  static void LoadLight(flecs::entity node_ent, const tinygltf::Model& model,
+                        const tinygltf::Node& node, int light_idx);
 
   static void AddTransformComp(flecs::entity ent, const tinygltf::Node& node);
   static void AddMeshComp(Scene& scene, flecs::entity ent,

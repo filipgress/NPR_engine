@@ -19,11 +19,22 @@ struct CameraTag {
   /* PerspectiveCameraComp or OrthographicCameraComp */
 };
 
-struct LightTag {
+struct DirLightTag {
   /* TransformComp */
   /* LightComp */
-  /* RangeComp (optional) */
-  /* SpotComp (optional) */
+};
+
+struct SpotLightTag {
+  /* TransformComp */
+  /* LightComp */
+  /* SpotComp */
+  /* RangeComp */
+};
+
+struct PointLightTag {
+  /* TransformComp */
+  /* LightComp */
+  /* RangeComp */
 };
 
 struct TransformComp {
@@ -75,7 +86,6 @@ struct OrthographicComp {
 };
 
 struct LightComp {
-  int idx{-1};
   glm::vec3 color{1.0f};
   float intensity{1.0f};
 };

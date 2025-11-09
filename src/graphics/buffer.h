@@ -81,6 +81,34 @@ class VertexBuffer : public Buffer {
   size_t count_;
 };
 
+class IndexBuffer : public Buffer {
+ public:
+  IndexBuffer(const VulkanContext& context, vk::CommandBuffer cmd_buff,
+              const std::vector<uint32_t>& indices, const std::string& dbg_name)
+      : Buffer(context,
+               vk::BufferUsageFlagBits::eIndexBuffer |
+                   vk::BufferUsageFlagBits::eTransferDst,
+               vk::MemoryPropertyFlagBits::eDeviceLocal,
+               vk::SharingMode::eExclusive, indices.size() * sizeof(indices[0]),
+               dbg_name),
+        count_{indices.size()} {
+    Write(cmd_buff, indices.data());
+  }
+
+  size_t GetCount() const { return count_; }
+
+ private:
+  size_t count_;
+};
+
+struct Mesh {
+  VertexBuffer vbo;
+  IndexBuffer ibo;
+
+  Mesh(VertexBuffer&& v, IndexBuffer&& i)
+      : vbo(std::move(v)), ibo(std::move(i)) {}
+};
+
 struct Instance {
   glm::mat4 model;
   glm::mat3 normal;
@@ -112,26 +140,6 @@ class InstanceBuffer : public Buffer {
 
  private:
   uint32_t max_instances_;
-};
-
-class IndexBuffer : public Buffer {
- public:
-  IndexBuffer(const VulkanContext& context, vk::CommandBuffer cmd_buff,
-              const std::vector<uint32_t>& indices, const std::string& dbg_name)
-      : Buffer(context,
-               vk::BufferUsageFlagBits::eIndexBuffer |
-                   vk::BufferUsageFlagBits::eTransferDst,
-               vk::MemoryPropertyFlagBits::eDeviceLocal,
-               vk::SharingMode::eExclusive, indices.size() * sizeof(indices[0]),
-               dbg_name),
-        count_{indices.size()} {
-    Write(cmd_buff, indices.data());
-  }
-
-  size_t GetCount() const { return count_; }
-
- private:
-  size_t count_;
 };
 
 template <typename T>
@@ -186,6 +194,21 @@ class DynamicUniformBuffer : public Buffer {
   uint32_t elem_count_;
   uint32_t aligned_size_;
 };
+
+template <typename T>
+class StorageBuffer : public Buffer {
+ public:
+  StorageBuffer(const VulkanContext& context, const std::string& dbg_name)
+      : Buffer(context,
+               vk::BufferUsageFlagBits::eStorageBuffer |
+                   vk::BufferUsageFlagBits::eTransferDst,
+               vk::MemoryPropertyFlagBits::eDeviceLocal,
+               vk::SharingMode::eExclusive, sizeof(T), dbg_name) {}
+  void Write(vk::CommandBuffer cmd_buff, const T& data) {
+    Buffer::Write(cmd_buff, &data);
+  }
+};
+
 }  // namespace npr_graphics
 
 #endif  // BUFFER_H_

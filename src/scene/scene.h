@@ -44,6 +44,12 @@ struct GpuResources {
     cmd_pool.GetCmdBuff().reset(
         vk::CommandBufferResetFlagBits::eReleaseResources);
   }
+
+  void DestroyStagingBuffers() {
+    for (auto& ibo : ibos) ibo.DestroyStagingBuff();
+    for (auto& vbo : vbos) vbo.DestroyStagingBuff();
+    for (auto& texture : textures) texture.DestroyStagingBuff();
+  }
 };
 
 class Scene : npr_core::NonCopyable {

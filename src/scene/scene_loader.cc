@@ -68,7 +68,7 @@ bool SceneLoader::LoadScene(const Renderer& renderer, Scene& scene,
         LoadEntity(scene, flecs::entity::null(), model, node_idx, cache);
 
       scene.gpu_res_->UpdateTextureDescriptors(
-          renderer.GetResources().GetDefaultTexture());
+          renderer.GetResources().GetDefaultColorTex());
       scene.gpu_res_->cmd_buff.end();
     }
 
@@ -174,6 +174,46 @@ void SceneLoader::LoadCamera(flecs::entity node_ent,
 
   } else {
     INFO("[warn]: skipping unsupported camera type: " + camera.type);
+  }
+}
+
+void SceneLoader::LoadLight(flecs::entity node_ent,
+                            const tinygltf::Model& model,
+                            const tinygltf::Node& node, int light_idx) {
+  AddTransformComp(node_ent, node);
+
+  const auto& gltf_light = model.lights[light_idx];
+
+  LightComp light;
+  light.color = {gltf_light.color[0], gltf_light.color[1], gltf_light.color[2]};
+  light.intensity = gltf_light.intensity;
+  node_ent.set<LightComp>(light);
+
+  if (gltf_light.type == "directional") {
+    node_ent.add<DirLightTag>();
+
+  } else if (gltf_light.type == "point") {
+    node_ent.add<PointLightTag>();
+
+    RangeComp range_comp;
+    range_comp.range = gltf_light.range;
+    node_ent.set<RangeComp>(range_comp);
+
+  } else if (gltf_light.type == "spot") {
+    node_ent.add<SpotLightTag>();
+
+    RangeComp range_comp;
+    range_comp.range = gltf_light.range;
+    node_ent.set<RangeComp>(range_comp);
+
+    SpotComp spot_comp;
+    spot_comp.inner_cone_angle = gltf_light.spot.innerConeAngle;
+    spot_comp.outer_cone_angle = gltf_light.spot.outerConeAngle;
+    node_ent.set<SpotComp>(spot_comp);
+
+  } else {
+    INFO("[warn]: skipping unsupported light type: " + gltf_light.type);
+    return;
   }
 }
 

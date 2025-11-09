@@ -70,6 +70,7 @@ void Scene::InitGPU(npr_core::TaskManager& tasks,
     world_.Update();
 
     gpu_init_ = true;
+    gpu_res_->DestroyStagingBuffers();
 
     on_complete();
     return true;
