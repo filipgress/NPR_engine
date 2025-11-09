@@ -86,8 +86,16 @@ void Camera::Update(float dt) {
   frustrum_.Update(proj_ * view_);
 }
 
+void Camera::InvalidateEntity() {
+  if (!ent_.is_valid()) return;
+
+  ent_ = flecs::entity();
+  SetProjMat();
+}
+
 void Camera::Orbit(glm::vec2 delta) {
   if (!delta.x && !delta.y) return;
+  InvalidateEntity();
 
   glm::vec3 offset = glm::normalize(dest_.pos - target_);
   float theta = glm::asin(offset.y);
@@ -109,6 +117,7 @@ void Camera::Orbit(glm::vec2 delta) {
 
 void Camera::Pan(glm::vec2 delta) {
   if (!delta.x && !delta.y) return;
+  InvalidateEntity();
 
   glm::vec3 right =
       glm::normalize(glm::cross(dest_.front, glm::vec3(0.0f, 1.0f, 0.0f)));
@@ -122,6 +131,7 @@ void Camera::Pan(glm::vec2 delta) {
 
 void Camera::Zoom(float delta) {
   if (!delta) return;
+  InvalidateEntity();
 
   float dist = glm::clamp(
       glm::distance(dest_.pos, target_) * std::exp(-delta * props_.zoom_factor),
@@ -131,6 +141,7 @@ void Camera::Zoom(float delta) {
 
 void Camera::Move(glm::vec3 delta, float dt) {
   if (!delta.x && !delta.y && !delta.z) return;
+  InvalidateEntity();
 
   glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
   glm::vec3 right = glm::normalize(glm::cross(dest_.front, up));
@@ -140,6 +151,7 @@ void Camera::Move(glm::vec3 delta, float dt) {
 
 void Camera::Rotate(glm::vec2 delta, float dt) {
   if (!delta.x && !delta.y) return;
+  InvalidateEntity();
 
   glm::vec3 dir = -dest_.front;
   float theta = glm::asin(dir.y);
@@ -152,8 +164,8 @@ void Camera::Rotate(glm::vec2 delta, float dt) {
   phi = glm::mod(phi, glm::two_pi<float>());
 
   float cos_theta = std::cos(theta);
-  dest_.front = -glm::normalize(glm::vec3(
-      std::cos(phi) * cos_theta, std::sin(theta), std::sin(phi) * cos_theta));
+  dest_.front = -glm::normalize(
+      glm::vec3(cos(phi) * cos_theta, sin(theta), sin(phi) * cos_theta));
 }
 
 }  // namespace npr_scene
