@@ -11,7 +11,7 @@ void World::Reset() {
 
   camera_query_ = {};
   transform_query_ = {};
-  render_opaque_query_ = {};
+  renderable_query_ = {};
 }
 
 void World::BuildQueries() {
@@ -19,7 +19,6 @@ void World::BuildQueries() {
       entities_.query_builder<const CameraTag, const TransformComp>()
           .cached()
           .build();
-
   transform_query_ =
       entities_.query_builder<TransformComp, const TransformComp*>()
           .cached()
@@ -27,11 +26,10 @@ void World::BuildQueries() {
           .term_at(1)
           .parent()
           .build();
-
-  render_opaque_query_ =
+  renderable_query_ =
       entities_
           .query_builder<const TransformComp, const PrimitiveTag,
-                         const MeshComp, const MaterialComp>()
+                         const MeshComp, const MaterialComp, BoundingBoxComp>()
           .cached()
           .detect_changes()
           .term_at(0)
@@ -40,8 +38,12 @@ void World::BuildQueries() {
 }
 
 void World::Update() {
-  if (transform_query_.changed()) UpdateTransforms();
-  if (render_opaque_query_.changed()) UpdateInstances();
+  if (transform_query_.changed()) {
+    UpdateTransforms();
+    UpdateBoundingBoxes();
+  }
+
+  if (renderable_query_.changed()) UpdateInstances();
 }
 
 void World::UpdateTransforms() {
@@ -65,12 +67,36 @@ void World::UpdateTransforms() {
       });
 }
 
+void World::UpdateBoundingBoxes() {
+  renderable_query_.each([](const TransformComp& tf, const PrimitiveTag&,
+                            const MeshComp&, const MaterialComp&,
+                            BoundingBoxComp& bb) {
+    glm::vec3 local_center = (bb.min_pos + bb.max_pos) * 0.5f;
+    glm::vec3 local_extent = (bb.max_pos - bb.min_pos) * 0.5f;
+
+    glm::mat3 model3 = glm::mat3(tf.global_mat);
+    glm::vec3 scale;
+
+    scale.x = glm::length(model3[0]);
+    scale.y = glm::length(model3[1]);
+    scale.z = glm::length(model3[2]);
+
+    model3[0] = glm::normalize(model3[0]);
+    model3[1] = glm::normalize(model3[1]);
+    model3[2] = glm::normalize(model3[2]);
+
+    bb.center = tf.global_mat * glm::vec4(local_center, 1.0f);
+    bb.extent = local_extent * scale;
+    bb.inv_rot = glm::transpose(model3);
+  });
+}
+
 void World::UpdateInstances() {
   instances_.clear();
 
-  render_opaque_query_.each([this](const TransformComp& tf, const PrimitiveTag&,
-                                   const MeshComp& mesh,
-                                   const MaterialComp& mat) {
+  renderable_query_.each([this](const TransformComp& tf, const PrimitiveTag&,
+                                const MeshComp& mesh, const MaterialComp& mat,
+                                const BoundingBoxComp& bb) {
     if (mesh.vbo_idx == -1) return;
 
     uint32_t flags = MaterialFlags::kNone;
@@ -90,24 +116,35 @@ void World::UpdateInstances() {
             .alpha_cutoff = mat.alpha_cutoff,
             .flags = flags}};
 
-    instances_[key].push_back(
-        {.model = tf.global_mat,
-         .normal = glm::transpose(glm::inverse(tf.global_mat))});
+    instances_[key].push_back({tf, bb});
   });
 }
 
 uint World::material_at{0};
 uint World::instance_at{0};
 void World::RecordOpaque(vk::CommandBuffer cmd_buff, vk::PipelineLayout layout,
-                         uint frame_idx, const Resources& res,
-                         const GpuResources& gpu_res,
-                         const DescriptorPool& desc_pool) const {
+                         uint frame_idx, const npr_graphics::Resources& res,
+                         const npr_graphics::DescriptorPool& desc_pool,
+                         const Frustum& frustum,
+                         const GpuResources& gpu_res) const {
   for (const auto& [key, instances] : instances_) {
     const auto& mat = key.material;
     if ((!(mat.flags & MaterialFlags::kOpaque) &&
          !(mat.flags & MaterialFlags::kMask)) ||
         instances.empty())
       continue;
+
+    std::vector<InstanceData> visible_instances;
+    visible_instances.reserve(instances.size());
+
+    for (const auto& [tf, bb] : instances) {
+      if (!frustum.IsVisible(bb)) continue;
+      visible_instances.push_back(
+          {.model = tf.global_mat,
+           .normal = glm::transpose(glm::inverse(tf.global_mat))});
+    }
+
+    if (visible_instances.empty()) continue;
 
     cmd_buff.setCullMode((mat.flags & MaterialFlags::kDoubleSided)
                              ? vk::CullModeFlagBits::eNone
@@ -119,9 +156,11 @@ void World::RecordOpaque(vk::CommandBuffer cmd_buff, vk::PipelineLayout layout,
                                 desc_pool.GetMaterialSets().GetSet(frame_idx),
                                 material_ubo.GetElemOffset(material_at));
 
-    res.GetResources()[frame_idx].instance_buff->Write(instances, instance_at);
+    res.GetResources()[frame_idx].instance_buff->Write(visible_instances,
+                                                       instance_at);
 
-    std::array<vk::DeviceSize, 2> offsets = {0, instance_at * sizeof(Instance)};
+    std::array<vk::DeviceSize, 2> offsets = {
+        0, instance_at * sizeof(InstanceData)};
     std::array<vk::Buffer, 2> buffers = {
         gpu_res.vbos[key.mesh.vbo_idx].GetBuffer(),
         res.GetResources()[frame_idx].instance_buff->GetBuffer()};
@@ -133,15 +172,15 @@ void World::RecordOpaque(vk::CommandBuffer cmd_buff, vk::PipelineLayout layout,
       vk::Buffer ibo = gpu_res.ibos[key.mesh.ibo_idx].GetBuffer();
       cmd_buff.bindIndexBuffer(ibo, 0, vk::IndexType::eUint32);
       uint32_t index_count = gpu_res.ibos[key.mesh.ibo_idx].GetCount();
-      cmd_buff.drawIndexed(index_count, instances.size(), 0, 0, 0);
+      cmd_buff.drawIndexed(index_count, visible_instances.size(), 0, 0, 0);
     } else {
       uint32_t vertex_count = gpu_res.vbos[key.mesh.vbo_idx].GetCount();
-      cmd_buff.draw(vertex_count, instances.size(), 0, 0);
+      cmd_buff.draw(vertex_count, visible_instances.size(), 0, 0);
     }
 
     material_at = (material_at + 1) % MAX_MATERIALS;
     instance_at =
-        (instance_at + instances.size()) %
+        (instance_at + visible_instances.size()) %
         res.GetResources()[frame_idx].instance_buff->GetMaxInstances();
   }
 }

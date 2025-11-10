@@ -136,7 +136,7 @@ vk::PipelineVertexInputStateCreateInfo Pipeline::GetVertexInputState(
 
     // Instance binding
     data.binding_descs[1].binding = 1;
-    data.binding_descs[1].stride = sizeof(Instance);
+    data.binding_descs[1].stride = sizeof(InstanceData);
     data.binding_descs[1].inputRate = vk::VertexInputRate::eInstance;
 
     data.attr_descs.resize(11);
@@ -179,7 +179,7 @@ vk::PipelineVertexInputStateCreateInfo Pipeline::GetVertexInputState(
       data.attr_descs[8 + i].location = 8 + i;
       data.attr_descs[8 + i].format = vk::Format::eR32G32B32Sfloat;
       data.attr_descs[8 + i].offset =
-          offsetof(Instance, normal) + sizeof(glm::vec3) * i;
+          offsetof(InstanceData, normal) + sizeof(glm::vec3) * i;
     }
 
     vertex_input.vertexBindingDescriptionCount = data.binding_descs.size();

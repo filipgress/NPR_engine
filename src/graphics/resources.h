@@ -5,6 +5,8 @@
 #include "command_pool.h"
 #include "image.h"
 
+#include "scene/components.h"
+
 namespace npr_graphics {
 
 #define MAX_TEXTURES 128
@@ -37,7 +39,7 @@ struct alignas(16) MaterialUnif {
 struct alignas(16) CameraUnif {
   glm::mat4 view;
   glm::mat4 proj;
-  glm::mat4 view_proj;
+  glm::mat4 proj_view;
 };
 
 struct DirLightStorage {
@@ -109,6 +111,15 @@ struct FrameResources {
 
   // swap pass
   std::unique_ptr<Texture> present_color;
+};
+
+struct Mesh {
+  VertexBuffer vbo;
+  IndexBuffer ibo;
+  npr_scene::BoundingBoxComp bb;
+
+  Mesh(VertexBuffer&& v, IndexBuffer&& i, const npr_scene::BoundingBoxComp& b)
+      : vbo(std::move(v)), ibo(std::move(i)), bb{b} {}
 };
 
 class Resources : public npr_core::NonCopyable {

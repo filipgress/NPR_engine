@@ -68,8 +68,10 @@ class Scene : npr_core::NonCopyable {
 
   void RecordOpaque(vk::CommandBuffer cmd_buff, vk::PipelineLayout layout,
                     uint frame_idx, const npr_graphics::Resources& res,
-                    const npr_graphics::DescriptorPool& desc_pool) const {
-    world_.RecordOpaque(cmd_buff, layout, frame_idx, res, *gpu_res_, desc_pool);
+                    const npr_graphics::DescriptorPool& desc_pool,
+                    const Frustum& frustum) const {
+    world_.RecordOpaque(cmd_buff, layout, frame_idx, res, desc_pool, frustum,
+                        *gpu_res_);
   }
 
   void InitGPU(npr_core::TaskManager& tasks, std::function<void()> on_complete);

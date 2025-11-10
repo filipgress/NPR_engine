@@ -15,7 +15,9 @@ class SceneLoader {
     bool light_supp{false};
 
     std::unordered_set<int> nodes;
-    std::map<std::pair<int /*mesh_idx*/, int /*prim_idx*/>, MeshComp> meshes;
+    std::map<std::pair<int /*mesh_idx*/, int /*prim_idx*/>,
+             std::pair<MeshComp, BoundingBoxComp>>
+        meshes;
     std::unordered_map<int /*material_idx*/, MaterialComp> materials;
   };
 

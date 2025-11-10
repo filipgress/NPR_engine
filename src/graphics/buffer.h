@@ -101,15 +101,7 @@ class IndexBuffer : public Buffer {
   size_t count_;
 };
 
-struct Mesh {
-  VertexBuffer vbo;
-  IndexBuffer ibo;
-
-  Mesh(VertexBuffer&& v, IndexBuffer&& i)
-      : vbo(std::move(v)), ibo(std::move(i)) {}
-};
-
-struct Instance {
+struct InstanceData {
   glm::mat4 model;
   glm::mat3 normal;
 };
@@ -121,19 +113,19 @@ class InstanceBuffer : public Buffer {
       : Buffer(context, vk::BufferUsageFlagBits::eVertexBuffer,
                vk::MemoryPropertyFlagBits::eHostVisible |
                    vk::MemoryPropertyFlagBits::eHostCoherent,
-               vk::SharingMode::eExclusive, max_instances * sizeof(Instance),
-               dbg_name),
+               vk::SharingMode::eExclusive,
+               max_instances * sizeof(InstanceData), dbg_name),
         max_instances_{max_instances} {}
 
-  void Write(const std::vector<Instance>& instances, uint32_t offset = 0) {
+  void Write(const std::vector<InstanceData>& instances, uint32_t offset = 0) {
     assert(instances.size() <= GetMaxInstances());
 
     if (offset + instances.size() > GetMaxInstances()) offset = 0;
     if (!mapped_mem_)
       mapped_mem_ = c_.GetDevice().mapMemory(buff_mem_, 0, size_);
 
-    memcpy(static_cast<char*>(mapped_mem_) + offset * sizeof(Instance),
-           instances.data(), instances.size() * sizeof(Instance));
+    memcpy(static_cast<char*>(mapped_mem_) + offset * sizeof(InstanceData),
+           instances.data(), instances.size() * sizeof(InstanceData));
   }
 
   uint32_t GetMaxInstances() const { return max_instances_; }

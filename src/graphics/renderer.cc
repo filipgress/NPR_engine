@@ -174,7 +174,7 @@ vk::CommandBuffer Renderer::Record(uint image_idx,
         scene.GetGpuResources().desc_pool.GetTextureSet().GetSet(0), {});
 
     scene.RecordOpaque(cmd_buff, gbuff_pipe_.GetLayout(), frame_idx, res_,
-                       desc_pool_);
+                       desc_pool_, camera.GetFrustum());
 
     cmd_buff.nextSubpass(vk::SubpassContents::eInline);
     cmd_buff.endRenderPass();

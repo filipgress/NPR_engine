@@ -249,7 +249,9 @@ void SceneLoader::AddMeshComp(Scene& scene, flecs::entity ent,
                               const tinygltf::Node& node, const int prim_idx,
                               LoaderCache& cache) {
   if (cache.meshes.contains({node.mesh, prim_idx})) {
-    ent.set<MeshComp>(cache.meshes.at({node.mesh, prim_idx}));
+    const auto& [mesh_comp, bb_comp] = cache.meshes.at({node.mesh, prim_idx});
+    ent.set<MeshComp>(mesh_comp);
+    ent.set<BoundingBoxComp>(bb_comp);
     return;
   }
 
@@ -257,6 +259,7 @@ void SceneLoader::AddMeshComp(Scene& scene, flecs::entity ent,
   const auto& prim = mesh.primitives[prim_idx];
 
   MeshComp mesh_comp;
+  BoundingBoxComp bb_comp;
 
   {  // load vertices
     int pos_acc_idx = GetAccessorIdx(prim, "POSITION", true);
@@ -294,6 +297,9 @@ void SceneLoader::AddMeshComp(Scene& scene, flecs::entity ent,
       if (tangent_data)
         vertices[i].tangent = glm::vec4(tangent_data[i][0], tangent_data[i][1],
                                         tangent_data[i][2], tangent_data[i][3]);
+
+      bb_comp.min_pos = glm::min(bb_comp.min_pos, vertices[i].pos);
+      bb_comp.max_pos = glm::max(bb_comp.max_pos, vertices[i].pos);
     }
 
     scene.gpu_res_->vbos.emplace_back(scene.gpu_res_->context,
@@ -336,7 +342,9 @@ void SceneLoader::AddMeshComp(Scene& scene, flecs::entity ent,
   }
 
   ent.set<MeshComp>(mesh_comp);
-  cache.meshes[{node.mesh, prim_idx}] = mesh_comp;
+  ent.set<BoundingBoxComp>(bb_comp);
+
+  cache.meshes[{node.mesh, prim_idx}] = {mesh_comp, bb_comp};
 }
 
 void SceneLoader::AddMaterialComp(Scene& scene, flecs::entity ent,

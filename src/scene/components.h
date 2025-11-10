@@ -8,6 +8,7 @@ namespace npr_scene {
 struct PrimitiveTag {
   /* MeshComp */
   /* MaterialComp */
+  /* BoundingBoxComp */
 };
 
 struct ObjectTag {
@@ -69,6 +70,15 @@ struct MaterialComp {
   bool double_sided{false};
   bool is_opaque{false};
   bool is_mask{false};
+};
+
+struct BoundingBoxComp {
+  glm::vec3 center{0.0f};
+  glm::vec3 extent{1.0f};
+  glm::mat3 inv_rot{1.0f};
+
+  glm::vec3 min_pos{std::numeric_limits<float>::max()};
+  glm::vec3 max_pos{std::numeric_limits<float>::min()};
 };
 
 struct PerspectiveComp {

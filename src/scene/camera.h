@@ -1,7 +1,7 @@
 #ifndef CAMERA_H_
 #define CAMERA_H_
 
-#include "frustrum.h"
+#include "frustum.h"
 #include "graphics/resources.h"
 
 #include <flecs.h>
@@ -52,7 +52,7 @@ class Camera {
   float GetAspect() const;
   void SetAspect(float aspect);
 
-  const Frustrum& GetFrustrum() const { return frustrum_; }
+  const Frustum& GetFrustum() const { return frustum_; }
   npr_graphics::CameraUnif GetCameraUnif() const {
     return {view_, proj_, proj_ * view_};
   }
@@ -86,7 +86,7 @@ class Camera {
   CameraProps props_{};
 
   flecs::entity ent_{};
-  Frustrum frustrum_{};
+  Frustum frustum_{};
 };
 
 }  // namespace npr_scene

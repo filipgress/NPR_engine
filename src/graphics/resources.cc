@@ -147,6 +147,7 @@ void Resources::CreateSphereMesh(vk::CommandBuffer cmd_buff) {
 
   std::vector<Vertex> vertices;
   std::vector<uint32_t> indices;
+  npr_scene::BoundingBoxComp bb;
 
   // vertices
   for (int y = 0; y <= rings; ++y) {
@@ -165,6 +166,8 @@ void Resources::CreateSphereMesh(vk::CommandBuffer cmd_buff) {
       glm::vec3 normal = glm::normalize(pos);
 
       vertices.push_back({pos, {}, normal, {}});
+      bb.min_pos = glm::min(bb.min_pos, pos);
+      bb.max_pos = glm::max(bb.max_pos, pos);
     }
   }
 
@@ -188,7 +191,7 @@ void Resources::CreateSphereMesh(vk::CommandBuffer cmd_buff) {
 
   sphere_mesh_ = std::make_unique<Mesh>(
       VertexBuffer{c_, cmd_buff, vertices, "sphere_mesh_vbo"},
-      IndexBuffer{c_, cmd_buff, indices, "sphere_mesh_ibo"});
+      IndexBuffer{c_, cmd_buff, indices, "sphere_mesh_ibo"}, bb);
 }
 
 void Resources::CreateConeMesh(vk::CommandBuffer cmd_buff) {
@@ -196,13 +199,21 @@ void Resources::CreateConeMesh(vk::CommandBuffer cmd_buff) {
 
   std::vector<Vertex> vertices;
   std::vector<uint32_t> indices;
+  npr_scene::BoundingBoxComp bb;
 
   // tip vertex
   vertices.push_back({glm::vec3(0, 0, 0), {}, glm::vec3(0, 0, 1), {}});
+
+  glm::vec3 tip_pos(0, 0, 0);
+  vertices.push_back({tip_pos, {}, glm::vec3(0, 0, 1), {}});
+  bb.min_pos = glm::min(bb.min_pos, tip_pos);
+  bb.max_pos = glm::max(bb.max_pos, tip_pos);
   int tip_idx = 0;
 
-  // base center vertex
-  vertices.push_back({glm::vec3(0, 0, -1), {}, glm::vec3(0, 0, -1), {}});
+  glm::vec3 base_center_pos(0, 0, -1);
+  vertices.push_back({base_center_pos, {}, glm::vec3(0, 0, -1), {}});
+  bb.min_pos = glm::min(bb.min_pos, base_center_pos);
+  bb.max_pos = glm::max(bb.max_pos, base_center_pos);
   int base_center_idx = 1;
 
   // base ring vertices
@@ -210,8 +221,11 @@ void Resources::CreateConeMesh(vk::CommandBuffer cmd_buff) {
     float angle = (float(i) / segments) * glm::two_pi<float>();
     float x = std::cos(angle);
     float y = std::sin(angle);
-    vertices.push_back(
-        {glm::vec3(x, y, -1), {}, glm::normalize(glm::vec3(x, y, 0.5f)), {}});
+
+    glm::vec3 pos(x, y, -1);
+    vertices.push_back({pos, {}, glm::normalize(glm::vec3(x, y, 0.5f)), {}});
+    bb.min_pos = glm::min(bb.min_pos, pos);
+    bb.max_pos = glm::max(bb.max_pos, pos);
   }
 
   // side faces (tip to base, CCW)
@@ -238,7 +252,7 @@ void Resources::CreateConeMesh(vk::CommandBuffer cmd_buff) {
 
   cone_mesh_ = std::make_unique<Mesh>(
       VertexBuffer{c_, cmd_buff, vertices, "cone_mesh_vbo"},
-      IndexBuffer{c_, cmd_buff, indices, "cone_mesh_ibo"});
+      IndexBuffer{c_, cmd_buff, indices, "cone_mesh_ibo"}, bb);
 }
 
 }  // namespace npr_graphics

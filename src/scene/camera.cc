@@ -8,7 +8,7 @@ Camera::Camera(ProjProps proj_props, CameraProps cam_props)
     : proj_props_(proj_props), props_(cam_props) {
   SetProjMat();
   SetViewMat();
-  frustrum_.Update(proj_ * view_);
+  frustum_.Update(proj_ * view_);
 }
 
 float Camera::GetAspect() const {
@@ -28,7 +28,7 @@ void Camera::SetAspect(float aspect) {
   if (ent_.is_valid()) return;
 
   SetProjMat();
-  frustrum_.Update(proj_ * view_);
+  frustum_.Update(proj_ * view_);
 }
 
 void Camera::SetEntity(flecs::entity ent) {
@@ -40,6 +40,7 @@ void Camera::SetEntity(flecs::entity ent) {
   target_ = dest_.pos + dest_.front * 5.0f;
 
   SetProjMat();
+  frustum_.Update(proj_ * view_);
 }
 
 void Camera::SetTrackTarget(const glm::vec3& target) {
@@ -70,6 +71,10 @@ void Camera::SetViewMat() {
 }
 
 void Camera::Update(float dt) {
+  if (glm::length(curr_.pos - dest_.pos) < 0.001f &&
+      glm::length(curr_.front - dest_.front) < 0.001f)
+    return;
+
   float t{0.0f};
   if (props_.mode == CameraMode::kOrbit) {
     t = glm::clamp(props_.orbit_anim_factor * dt, 0.0f, 1.0f);
@@ -83,14 +88,16 @@ void Camera::Update(float dt) {
   curr_.front = glm::normalize(glm::mix(curr_.front, dest_.front, t));
 
   SetViewMat();
-  frustrum_.Update(proj_ * view_);
+  frustum_.Update(proj_ * view_);
 }
 
 void Camera::InvalidateEntity() {
   if (!ent_.is_valid()) return;
 
   ent_ = flecs::entity();
+
   SetProjMat();
+  frustum_.Update(proj_ * view_);
 }
 
 void Camera::Orbit(glm::vec2 delta) {

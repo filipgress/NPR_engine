@@ -110,7 +110,7 @@ set(HEADER_FILES
     ./src/scene/world.h
     ./src/scene/components.h
     ./src/scene/camera.h
-    ./src/scene/frustrum.h
+    ./src/scene/frustum.h
     # window
     ./src/window/window.h
     ./src/window/event.h
@@ -145,7 +145,7 @@ set(SOURCE_FILES
     ./src/scene/scene_loader.cc
     ./src/scene/world.cc
     ./src/scene/camera.cc
-    ./src/scene/frustrum.cc
+    ./src/scene/frustum.cc
     # window
     ./src/window/window.cc
     # graphics
