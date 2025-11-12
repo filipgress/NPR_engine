@@ -37,7 +37,8 @@ class Renderer : public npr_core::NonCopyable {
  private:
   vk::CommandBuffer Record(uint image_idx, const npr_scene::Camera& camera,
                            npr_scene::Scene& scene, bool is_loading, float dt);
-  vk::CommandBuffer RecordFallback(uint image_idx, bool is_loading, float dt);
+  // vk::CommandBuffer RecordFallback(uint image_idx, bool is_loading, float
+  // dt);
 
   void RenderTargetResize();
   std::pair<vk::Viewport, vk::Rect2D> CalcViewportScissor(
@@ -56,31 +57,50 @@ class Renderer : public npr_core::NonCopyable {
   DescriptorPool desc_pool_{c_, res_};
 
   GBuffPass gbuff_pass_{c_, res_};
-  LoadPass load_pass_{c_, res_};
+  ABuffPass abuff_pass_{c_, res_};
+  // LoadPass load_pass_{c_, res_};
   SwapPass swap_pass_{c_, swapchain_};
 
   std::array<VertexShader, 2> vert_shaders_{
-      VertexShader{c_, "shaders/gbuff_vert.spv", "../shaders/gbuff.vert"},
-      VertexShader{c_, "shaders/quad_vert.spv", "../shaders/quad.vert"}};
+      VertexShader{c_, "shaders/quad_vert.spv", "../shaders/quad.vert"},
+      VertexShader{c_, "shaders/gbuff_vert.spv", "../shaders/gbuff.vert"}};
 
-  std::array<FragmentShader, 3> frag_shaders_{
-      FragmentShader{c_, "shaders/gbuff_frag.spv", "../shaders/gbuff.frag"},
+  std::array<FragmentShader, 4> frag_shaders_{
       FragmentShader{c_, "shaders/swap_frag.spv", "../shaders/swap.frag"},
-      FragmentShader{c_, "shaders/main_frag.spv", "../shaders/main.frag"},
+      FragmentShader{c_, "shaders/gbuff_frag.spv", "../shaders/gbuff.frag"},
+      FragmentShader{c_, "shaders/abuff_fill_frag.spv",
+                     "../shaders/abuff_fill.frag"},
+      FragmentShader{c_, "shaders/abuff_resolve_frag.spv",
+                     "../shaders/abuff_resolve.frag"},
   };
 
   PipelineCache pipe_cache_{c_};
   GBuffPipe gbuff_pipe_{c_,
                         pipe_cache_,
                         gbuff_pass_,
-                        vert_shaders_[0],
-                        frag_shaders_[0],
-                        res_.GetProps(),
+                        vert_shaders_[1],
+                        frag_shaders_[1],
+                        res_.GetProps().samples,
                         desc_pool_};
-  LoadPipe load_pipe_{c_, pipe_cache_, load_pass_, vert_shaders_[1],
-                      frag_shaders_[2]};
+  ABuffFillPipe abuff_fill_pipe_{c_,
+                                 pipe_cache_,
+                                 abuff_pass_,
+                                 vert_shaders_[1],
+                                 frag_shaders_[2],
+                                 res_.GetProps().samples,
+                                 desc_pool_};
+  ABuffResolvePipe abuff_resolve_pipe_{c_,
+                                       pipe_cache_,
+                                       abuff_pass_,
+                                       vert_shaders_[0],
+                                       frag_shaders_[3],
+                                       res_.GetProps().samples,
+                                       desc_pool_};
+
+  // LoadPipe load_pipe_{c_, pipe_cache_, load_pass_, vert_shaders_[0],
+  //                     frag_shaders_[0]};
   SwapPipe swap_pipe_{
-      c_,        pipe_cache_, swap_pass_, vert_shaders_[1], frag_shaders_[1],
+      c_,        pipe_cache_, swap_pass_, vert_shaders_[0], frag_shaders_[0],
       desc_pool_};
 };
 }  // namespace npr_graphics

@@ -9,6 +9,7 @@ DescriptorPool::DescriptorPool(const VulkanContext& context,
       gbuff_sets_{context, res.GetFrameCount()},
       camera_sets_{context, res.GetFrameCount()},
       material_sets_{context, res.GetFrameCount()},
+      abuff_sets_{context, res.GetFrameCount()},
       present_sets_{context, res.GetFrameCount()} {
   CreateDescriptorPool();
 
@@ -20,6 +21,9 @@ DescriptorPool::DescriptorPool(const VulkanContext& context,
 
   material_sets_.AllocSets(pool_);
   material_sets_.Update(res);
+
+  abuff_sets_.AllocSets(pool_);
+  abuff_sets_.Update(res);
 
   present_sets_.AllocSets(pool_);
   present_sets_.Update(res);
@@ -38,12 +42,16 @@ void DescriptorPool::CreateDescriptorPool() {
   pool_sizes.insert(pool_sizes.end(), material_sizes.begin(),
                     material_sizes.end());
 
+  const auto& abuff_sizes = abuff_sets_.GetPoolSizes();
+  pool_sizes.insert(pool_sizes.end(), abuff_sizes.begin(), abuff_sizes.end());
+
   const auto& present_sizes = present_sets_.GetPoolSizes();
   pool_sizes.insert(pool_sizes.end(), present_sizes.begin(),
                     present_sizes.end());
 
   uint32_t max_sets = gbuff_sets_.GetCount() + camera_sets_.GetCount() +
-                      material_sets_.GetCount() + present_sets_.GetCount();
+                      material_sets_.GetCount() + abuff_sets_.GetCount() +
+                      present_sets_.GetCount();
 
   vk::DescriptorPoolCreateInfo poolInfo{};
   poolInfo.poolSizeCount = pool_sizes.size();

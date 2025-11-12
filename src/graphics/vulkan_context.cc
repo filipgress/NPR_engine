@@ -153,9 +153,10 @@ VKAPI_ATTR uint32_t VKAPI_CALL VulkanContext::VulkanErrorCallback(
  */
 void VulkanContext::PickPhysDevice() {
   // required device features
-  device_feats_.independentBlend = VK_TRUE;   // WBOIT
-  device_feats_.sampleRateShading = VK_TRUE;  // MSAA
-  device_feats_.samplerAnisotropy = VK_TRUE;  // Anisotropic filtering
+  device_feats_.independentBlend = VK_TRUE;          // WBOIT
+  device_feats_.sampleRateShading = VK_TRUE;         // MSAA
+  device_feats_.samplerAnisotropy = VK_TRUE;         // Anisotropic filtering
+  device_feats_.fragmentStoresAndAtomics = VK_TRUE;  // K-buffer
 
   std::vector<vk::PhysicalDevice> devices =
       instance_.enumeratePhysicalDevices();

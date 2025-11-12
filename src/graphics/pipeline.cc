@@ -47,23 +47,20 @@ void Pipeline::CreateLayout(
                 vk::ObjectType::ePipelineLayout, GetDbgName() + "_layout");
 }
 
-void Pipeline::CreatePipeline(size_t subpass, bool use_vbo,
-                              const std::string& vert_entry,
+void Pipeline::CreatePipeline(size_t subpass, const std::string& vert_entry,
                               const std::string& frag_entry,
                               const std::vector<SpecConstInfo>& spec_consts) {
   DestroyPipeline();
-  PipelineData data;
 
-  auto shader_stages =
-      GetShaderStages(data, vert_entry, frag_entry, spec_consts);
-  auto vertex_input = GetVertexInputState(data, use_vbo);
+  auto shader_stages = GetShaderStages(vert_entry, frag_entry, spec_consts);
+  auto vertex_input = GetVertexInputState();
   auto input_assembly = GetInputAssemblyState();
   auto viewport = GetViewportState();
   auto rasterization = GetRasterizationState();
   auto multisample = GetMultisampleState();
   auto depth_stencil = GetDepthStencilState();
-  auto color_blend = GetColorBlendState(data);
-  auto dynamic_state = GetDynamicState(data);
+  auto color_blend = GetColorBlendState();
+  auto dynamic_state = GetDynamicState();
 
   vk::GraphicsPipelineCreateInfo pipeline_info{};
   pipeline_info.stageCount = shader_stages.size();
@@ -88,8 +85,7 @@ void Pipeline::CreatePipeline(size_t subpass, bool use_vbo,
 }
 
 std::array<vk::PipelineShaderStageCreateInfo, 2> Pipeline::GetShaderStages(
-    PipelineData& data, const std::string& vert_entry,
-    const std::string& frag_entry,
+    const std::string& vert_entry, const std::string& frag_entry,
     const std::vector<SpecConstInfo>& specialization_consts) {
   vert_shader_ver_ = vert_shader_.GetVersion();
   frag_shader_ver_ = frag_shader_.GetVersion();
@@ -99,93 +95,93 @@ std::array<vk::PipelineShaderStageCreateInfo, 2> Pipeline::GetShaderStages(
       frag_shader_.GetShaderStageInfo(frag_entry)};
 
   if (specialization_consts.empty()) return shader_stages;
-  if (data.specialization_data.empty()) {
-    data.specialization_entries.reserve(specialization_consts.size());
+  if (data_.specialization_data.empty()) {
+    data_.specialization_entries.reserve(specialization_consts.size());
     uint32_t offset = 0;
     for (const auto& spec : specialization_consts) {
-      data.specialization_entries.emplace_back(
+      data_.specialization_entries.emplace_back(
           vk::SpecializationMapEntry{spec.constant_id, offset, spec.size});
 
       // Copy data
       const uint8_t* byte_data = static_cast<const uint8_t*>(spec.data);
-      data.specialization_data.insert(data.specialization_data.end(), byte_data,
-                                      byte_data + spec.size);
+      data_.specialization_data.insert(data_.specialization_data.end(),
+                                       byte_data, byte_data + spec.size);
 
       offset += spec.size;
     }
+
+    data_.specialization_info.mapEntryCount =
+        data_.specialization_entries.size();
+    data_.specialization_info.pMapEntries = data_.specialization_entries.data();
+    data_.specialization_info.dataSize = data_.specialization_data.size();
+    data_.specialization_info.pData = data_.specialization_data.data();
   }
 
-  data.specialization_info.mapEntryCount = data.specialization_entries.size();
-  data.specialization_info.pMapEntries = data.specialization_entries.data();
-  data.specialization_info.dataSize = data.specialization_data.size();
-  data.specialization_info.pData = data.specialization_data.data();
-
-  shader_stages[1].pSpecializationInfo = &data.specialization_info;
+  shader_stages[1].pSpecializationInfo = &data_.specialization_info;
   return shader_stages;
 }
 
-vk::PipelineVertexInputStateCreateInfo Pipeline::GetVertexInputState(
-    PipelineData& data, bool use_vbo) const {
+vk::PipelineVertexInputStateCreateInfo Pipeline::GetVertexInputState() {
   vk::PipelineVertexInputStateCreateInfo vertex_input{};
 
-  if (use_vbo) {
+  if (data_.use_vbo) {
     // Vertex binding
-    data.binding_descs[0].binding = 0;
-    data.binding_descs[0].stride = sizeof(Vertex);
-    data.binding_descs[0].inputRate = vk::VertexInputRate::eVertex;
+    data_.binding_descs[0].binding = 0;
+    data_.binding_descs[0].stride = sizeof(Vertex);
+    data_.binding_descs[0].inputRate = vk::VertexInputRate::eVertex;
 
     // Instance binding
-    data.binding_descs[1].binding = 1;
-    data.binding_descs[1].stride = sizeof(InstanceData);
-    data.binding_descs[1].inputRate = vk::VertexInputRate::eInstance;
+    data_.binding_descs[1].binding = 1;
+    data_.binding_descs[1].stride = sizeof(InstanceData);
+    data_.binding_descs[1].inputRate = vk::VertexInputRate::eInstance;
 
-    data.attr_descs.resize(11);
+    data_.attr_descs.resize(11);
 
     // position
-    data.attr_descs[0].binding = 0;
-    data.attr_descs[0].location = 0;
-    data.attr_descs[0].format = vk::Format::eR32G32B32Sfloat;
-    data.attr_descs[0].offset = offsetof(Vertex, pos);
+    data_.attr_descs[0].binding = 0;
+    data_.attr_descs[0].location = 0;
+    data_.attr_descs[0].format = vk::Format::eR32G32B32Sfloat;
+    data_.attr_descs[0].offset = offsetof(Vertex, pos);
 
     // uv
-    data.attr_descs[1].binding = 0;
-    data.attr_descs[1].location = 1;
-    data.attr_descs[1].format = vk::Format::eR32G32Sfloat;
-    data.attr_descs[1].offset = offsetof(Vertex, uv);
+    data_.attr_descs[1].binding = 0;
+    data_.attr_descs[1].location = 1;
+    data_.attr_descs[1].format = vk::Format::eR32G32Sfloat;
+    data_.attr_descs[1].offset = offsetof(Vertex, uv);
 
     // normal
-    data.attr_descs[2].binding = 0;
-    data.attr_descs[2].location = 2;
-    data.attr_descs[2].format = vk::Format::eR32G32B32Sfloat;
-    data.attr_descs[2].offset = offsetof(Vertex, normal);
+    data_.attr_descs[2].binding = 0;
+    data_.attr_descs[2].location = 2;
+    data_.attr_descs[2].format = vk::Format::eR32G32B32Sfloat;
+    data_.attr_descs[2].offset = offsetof(Vertex, normal);
 
     // tan
-    data.attr_descs[3].binding = 0;
-    data.attr_descs[3].location = 3;
-    data.attr_descs[3].format = vk::Format::eR32G32B32A32Sfloat;
-    data.attr_descs[3].offset = offsetof(Vertex, tangent);
+    data_.attr_descs[3].binding = 0;
+    data_.attr_descs[3].location = 3;
+    data_.attr_descs[3].format = vk::Format::eR32G32B32A32Sfloat;
+    data_.attr_descs[3].offset = offsetof(Vertex, tangent);
 
     // model matrix (4 vec4s)
     for (int i = 0; i < 4; i++) {
-      data.attr_descs[4 + i].binding = 1;
-      data.attr_descs[4 + i].location = 4 + i;
-      data.attr_descs[4 + i].format = vk::Format::eR32G32B32A32Sfloat;
-      data.attr_descs[4 + i].offset = sizeof(glm::vec4) * i;
+      data_.attr_descs[4 + i].binding = 1;
+      data_.attr_descs[4 + i].location = 4 + i;
+      data_.attr_descs[4 + i].format = vk::Format::eR32G32B32A32Sfloat;
+      data_.attr_descs[4 + i].offset = sizeof(glm::vec4) * i;
     }
 
     // normal matrix (3 vec3s)
     for (int i = 0; i < 3; i++) {
-      data.attr_descs[8 + i].binding = 1;
-      data.attr_descs[8 + i].location = 8 + i;
-      data.attr_descs[8 + i].format = vk::Format::eR32G32B32Sfloat;
-      data.attr_descs[8 + i].offset =
+      data_.attr_descs[8 + i].binding = 1;
+      data_.attr_descs[8 + i].location = 8 + i;
+      data_.attr_descs[8 + i].format = vk::Format::eR32G32B32Sfloat;
+      data_.attr_descs[8 + i].offset =
           offsetof(InstanceData, normal) + sizeof(glm::vec3) * i;
     }
 
-    vertex_input.vertexBindingDescriptionCount = data.binding_descs.size();
-    vertex_input.pVertexBindingDescriptions = data.binding_descs.data();
-    vertex_input.vertexAttributeDescriptionCount = data.attr_descs.size();
-    vertex_input.pVertexAttributeDescriptions = data.attr_descs.data();
+    vertex_input.vertexBindingDescriptionCount = data_.binding_descs.size();
+    vertex_input.pVertexBindingDescriptions = data_.binding_descs.data();
+    vertex_input.vertexAttributeDescriptionCount = data_.attr_descs.size();
+    vertex_input.pVertexAttributeDescriptions = data_.attr_descs.data();
   } else {
     vertex_input.vertexBindingDescriptionCount = 0;
     vertex_input.vertexAttributeDescriptionCount = 0;
@@ -216,7 +212,7 @@ vk::PipelineRasterizationStateCreateInfo Pipeline::GetRasterizationState()
   rasterization.depthClampEnable = VK_FALSE;
   rasterization.rasterizerDiscardEnable = VK_FALSE;
   rasterization.polygonMode = vk::PolygonMode::eFill;
-  rasterization.cullMode = vk::CullModeFlagBits::eBack;
+  rasterization.cullMode = data_.cull_mode;
   rasterization.frontFace = vk::FrontFace::eCounterClockwise;
   rasterization.depthBiasEnable = VK_FALSE;
   rasterization.lineWidth = 1.0f;
@@ -225,8 +221,11 @@ vk::PipelineRasterizationStateCreateInfo Pipeline::GetRasterizationState()
 
 vk::PipelineMultisampleStateCreateInfo Pipeline::GetMultisampleState() const {
   vk::PipelineMultisampleStateCreateInfo multisample{};
-  multisample.rasterizationSamples = vk::SampleCountFlagBits::e1;
+  multisample.rasterizationSamples = data_.samples;
   multisample.sampleShadingEnable = VK_FALSE;
+  // multisample.sampleShadingEnable =
+  //     data_.samples == vk::SampleCountFlagBits::e1 ? VK_FALSE : VK_TRUE;
+  // multisample.minSampleShading = 1.0f;
 
   return multisample;
 }
@@ -242,48 +241,25 @@ vk::PipelineDepthStencilStateCreateInfo Pipeline::GetDepthStencilState() const {
   return depth_stencil;
 }
 
-vk::PipelineColorBlendStateCreateInfo Pipeline::GetColorBlendState(
-    PipelineData& data) const {
-  data.color_attachments.resize(1);
-
-  data.color_attachments[0].blendEnable = VK_FALSE;
-  data.color_attachments[0].colorWriteMask =
-      vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
-      vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
-
+vk::PipelineColorBlendStateCreateInfo Pipeline::GetColorBlendState() const {
   vk::PipelineColorBlendStateCreateInfo color_blend{};
   color_blend.logicOpEnable = VK_FALSE;
-  color_blend.attachmentCount = data.color_attachments.size();
-  color_blend.pAttachments = data.color_attachments.data();
+  color_blend.attachmentCount = data_.color_attachments.size();
+  color_blend.pAttachments = data_.color_attachments.data();
 
   return color_blend;
 }
 
-vk::PipelineDynamicStateCreateInfo Pipeline::GetDynamicState(
-    PipelineData& data) const {
-  data.dynamic_states = {
-      vk::DynamicState::eViewport,
-      vk::DynamicState::eScissor,
-      vk::DynamicState::eCullMode,
-  };
-
+vk::PipelineDynamicStateCreateInfo Pipeline::GetDynamicState() const {
   vk::PipelineDynamicStateCreateInfo dynamic_state{};
-  dynamic_state.dynamicStateCount = data.dynamic_states.size();
-  dynamic_state.pDynamicStates = data.dynamic_states.data();
+  dynamic_state.dynamicStateCount = data_.dynamic_states.size();
+  dynamic_state.pDynamicStates = data_.dynamic_states.data();
   return dynamic_state;
 }
 
 /*
  * GBuffPipe
  */
-
-vk::PipelineMultisampleStateCreateInfo GBuffPipe::GetMultisampleState() const {
-  vk::PipelineMultisampleStateCreateInfo multisample{};
-  multisample.rasterizationSamples = props_.samples;
-  multisample.sampleShadingEnable = VK_FALSE;
-  return multisample;
-}
-
 vk::PipelineDepthStencilStateCreateInfo GBuffPipe::GetDepthStencilState()
     const {
   vk::PipelineDepthStencilStateCreateInfo depth_stencil{};
@@ -292,7 +268,6 @@ vk::PipelineDepthStencilStateCreateInfo GBuffPipe::GetDepthStencilState()
   depth_stencil.depthCompareOp = vk::CompareOp::eLess;
   depth_stencil.stencilTestEnable = VK_TRUE;
 
-  // Configure front face stencil operations
   depth_stencil.front.failOp = vk::StencilOp::eKeep;
   depth_stencil.front.passOp = vk::StencilOp::eReplace;
   depth_stencil.front.depthFailOp = vk::StencilOp::eKeep;
@@ -306,22 +281,19 @@ vk::PipelineDepthStencilStateCreateInfo GBuffPipe::GetDepthStencilState()
   return depth_stencil;
 }
 
-vk::PipelineColorBlendStateCreateInfo GBuffPipe::GetColorBlendState(
-    PipelineData& data) const {
-  data.color_attachments.resize(5);
-  for (auto& att : data.color_attachments) {
-    att.blendEnable = VK_FALSE;
-    att.colorWriteMask =
-        vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
-        vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
-  }
-  data.color_attachments[4].colorWriteMask = vk::ColorComponentFlagBits::eR;
+/*
+ * ABuffFillPipe
+ */
+vk::PipelineDepthStencilStateCreateInfo ABuffFillPipe::GetDepthStencilState()
+    const {
+  vk::PipelineDepthStencilStateCreateInfo depth_stencil{};
+  depth_stencil.depthTestEnable = VK_TRUE;
+  depth_stencil.depthWriteEnable = VK_FALSE;
+  depth_stencil.depthCompareOp = vk::CompareOp::eLess;
+  depth_stencil.depthBoundsTestEnable = VK_FALSE;
+  depth_stencil.stencilTestEnable = VK_FALSE;
 
-  vk::PipelineColorBlendStateCreateInfo color_blend{};
-  color_blend.logicOpEnable = VK_FALSE;
-  color_blend.attachmentCount = data.color_attachments.size();
-  color_blend.pAttachments = data.color_attachments.data();
-  return color_blend;
+  return depth_stencil;
 }
 
 }  // namespace npr_graphics

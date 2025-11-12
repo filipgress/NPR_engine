@@ -78,6 +78,27 @@ class GBuffPass : public RenderPass {
   vk::AttachmentReference resolve_ref_{};
 };
 
+class ABuffPass : public RenderPass {
+ public:
+  ABuffPass(const VulkanContext& context, const Resources& res)
+      : RenderPass{context, res} {
+    Init();
+  }
+
+ private:
+  const std::string GetDbgName() const override { return "trans_abuff_pass"; }
+  void SetClearValues() override;
+
+  std::vector<vk::AttachmentDescription> GetAttachments() const override;
+  std::vector<vk::SubpassDependency> GetDependencies() const override;
+  std::vector<vk::SubpassDescription> GetSubpasses() override;
+  std::vector<vk::ImageView> GetAttachmentViews(int frame_idx) const override;
+
+ private:
+  vk::AttachmentReference color_ref_{};
+  vk::AttachmentReference depth_ref_{};
+};
+
 class LoadPass : public RenderPass {
  public:
   LoadPass(const VulkanContext& context, const Resources& res)

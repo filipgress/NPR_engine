@@ -29,8 +29,15 @@ struct PipelineData {
   std::array<vk::VertexInputBindingDescription, 2> binding_descs;
   std::vector<vk::VertexInputAttributeDescription> attr_descs;
 
-  std::vector<vk::PipelineColorBlendAttachmentState> color_attachments;
-  std::vector<vk::DynamicState> dynamic_states;
+  std::vector<vk::PipelineColorBlendAttachmentState> color_attachments{};
+  std::vector<vk::DynamicState> dynamic_states{
+      vk::DynamicState::eViewport,
+      vk::DynamicState::eScissor,
+  };
+
+  vk::CullModeFlagBits cull_mode{vk::CullModeFlagBits::eNone};
+  vk::SampleCountFlagBits samples{vk::SampleCountFlagBits::e1};
+  bool use_vbo{false};
 };
 
 class Pipeline : public npr_core::NonCopyable {
@@ -56,8 +63,7 @@ class Pipeline : public npr_core::NonCopyable {
 
  protected:
   void CreatePipeline(
-      size_t subpass = 0, bool use_vbo = false,
-      const std::string& vert_entry = "main",
+      size_t subpass = 0, const std::string& vert_entry = "main",
       const std::string& frag_entry = "main",
       const std::vector<SpecConstInfo>& specialization_consts = {});
   void DestroyPipeline();
@@ -69,12 +75,9 @@ class Pipeline : public npr_core::NonCopyable {
   virtual const std::string GetDbgName() const = 0;
 
   std::array<vk::PipelineShaderStageCreateInfo, 2> GetShaderStages(
-      PipelineData& data, const std::string& vert_entry,
-      const std::string& frag_entry,
+      const std::string& vert_entry, const std::string& frag_entry,
       const std::vector<SpecConstInfo>& specialization_consts = {});
-
-  vk::PipelineVertexInputStateCreateInfo GetVertexInputState(
-      PipelineData& data, bool use_vbo) const;
+  vk::PipelineVertexInputStateCreateInfo GetVertexInputState();
 
   virtual vk::PipelineInputAssemblyStateCreateInfo GetInputAssemblyState()
       const;
@@ -83,10 +86,8 @@ class Pipeline : public npr_core::NonCopyable {
       const;
   virtual vk::PipelineMultisampleStateCreateInfo GetMultisampleState() const;
   virtual vk::PipelineDepthStencilStateCreateInfo GetDepthStencilState() const;
-  virtual vk::PipelineColorBlendStateCreateInfo GetColorBlendState(
-      PipelineData& data) const;
-  virtual vk::PipelineDynamicStateCreateInfo GetDynamicState(
-      PipelineData& data) const;
+  virtual vk::PipelineColorBlendStateCreateInfo GetColorBlendState() const;
+  virtual vk::PipelineDynamicStateCreateInfo GetDynamicState() const;
 
   template <typename T>
   static PushConstInfo MakePushConst(vk::ShaderStageFlags stages) {
@@ -109,6 +110,8 @@ class Pipeline : public npr_core::NonCopyable {
   vk::Pipeline pipeline_{nullptr};
   vk::PipelineLayout layout_{nullptr};
 
+  PipelineData data_;
+
   // track currently used shader version for hot-reloading
   uint64_t vert_shader_ver_;
   uint64_t frag_shader_ver_;
@@ -118,33 +121,114 @@ class GBuffPipe : public Pipeline {
  public:
   GBuffPipe(const VulkanContext& context, const PipelineCache& cache,
             const GBuffPass& render_pass, VertexShader& vert_shader,
-            FragmentShader& frag_shader, const FrameProps& props,
+            FragmentShader& frag_shader, vk::SampleCountFlagBits samples,
             const DescriptorPool& desc_pool)
-      : Pipeline(context, cache, render_pass, vert_shader, frag_shader),
-        props_{props} {
+      : Pipeline(context, cache, render_pass, vert_shader, frag_shader) {
     CreateLayout(
         {desc_pool.GetCameraSets().GetLayout(), TextureArraySet(c_).GetLayout(),
          desc_pool.GetMaterialSets().GetLayout()},
         {});
+
+    data_.use_vbo = true;
+    data_.samples = samples;
+
+    data_.color_attachments.resize(5);
+    for (auto& att : data_.color_attachments) {
+      att.blendEnable = VK_FALSE;
+      att.colorWriteMask =
+          vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+          vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+    }
+    data_.color_attachments[4].colorWriteMask = vk::ColorComponentFlagBits::eR;
+
+    data_.dynamic_states = {vk::DynamicState::eViewport,
+                            vk::DynamicState::eScissor,
+                            vk::DynamicState::eCullMode};
+
     Recreate();
   }
 
   void Recreate() override {
-    CreatePipeline(0, true, "main", "main",
-                   {MakeSpecConst(0, static_cast<uint32_t>(props_.samples)),
+    CreatePipeline(0, "main", "main",
+                   {MakeSpecConst(0, static_cast<uint32_t>(data_.samples)),
                     MakeSpecConst(1, static_cast<uint32_t>(MAX_TEXTURES))});
   }
 
  private:
   const std::string GetDbgName() const override { return "gbuff_pipe"; }
-
-  vk::PipelineMultisampleStateCreateInfo GetMultisampleState() const override;
   vk::PipelineDepthStencilStateCreateInfo GetDepthStencilState() const override;
-  vk::PipelineColorBlendStateCreateInfo GetColorBlendState(
-      PipelineData& data) const override;
+};
+
+class ABuffFillPipe : public Pipeline {
+ public:
+  ABuffFillPipe(const VulkanContext& context, const PipelineCache& cache,
+                const ABuffPass& render_pass, VertexShader& vert_shader,
+                FragmentShader& frag_shader, vk::SampleCountFlagBits samples,
+                const DescriptorPool& desc_pool)
+      : Pipeline(context, cache, render_pass, vert_shader, frag_shader) {
+    CreateLayout(
+        {
+            desc_pool.GetCameraSets().GetLayout(),
+            TextureArraySet(c_).GetLayout(),
+            desc_pool.GetABufferSets().GetLayout(),
+            desc_pool.GetMaterialSets().GetLayout(),
+        },
+        {MakePushConst<ABuffFillPushConst>(
+            vk::ShaderStageFlagBits::eFragment)});
+
+    data_.use_vbo = true;
+    data_.samples = samples;
+    Recreate();
+  }
+
+  void Recreate() override {
+    CreatePipeline(0, "main", "main",
+                   {MakeSpecConst(0, static_cast<uint32_t>(data_.samples)),
+                    MakeSpecConst(1, static_cast<uint32_t>(MAX_TEXTURES))});
+  }
 
  private:
-  const FrameProps& props_;
+  const std::string GetDbgName() const override { return "abuff_fill_pipe"; }
+  vk::PipelineDepthStencilStateCreateInfo GetDepthStencilState() const override;
+};
+
+class ABuffResolvePipe : public Pipeline {
+ public:
+  ABuffResolvePipe(const VulkanContext& context, const PipelineCache& cache,
+                   const ABuffPass& render_pass, VertexShader& vert_shader,
+                   FragmentShader& frag_shader, vk::SampleCountFlagBits samples,
+                   const DescriptorPool& desc_pool)
+      : Pipeline(context, cache, render_pass, vert_shader, frag_shader),
+        samples_{samples} {
+    CreateLayout({desc_pool.GetABufferSets().GetLayout()},
+                 {MakePushConst<uint32_t>(vk::ShaderStageFlagBits::eFragment)});
+
+    data_.color_attachments.resize(1);
+    data_.color_attachments[0].blendEnable = VK_TRUE;
+    data_.color_attachments[0].colorWriteMask =
+        vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+        vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+
+    data_.color_attachments[0].srcColorBlendFactor = vk::BlendFactor::eOne;
+    data_.color_attachments[0].dstColorBlendFactor = vk::BlendFactor::eZero;
+    data_.color_attachments[0].colorBlendOp = vk::BlendOp::eAdd;
+    data_.color_attachments[0].srcAlphaBlendFactor = vk::BlendFactor::eOne;
+    data_.color_attachments[0].dstAlphaBlendFactor = vk::BlendFactor::eZero;
+    data_.color_attachments[0].alphaBlendOp = vk::BlendOp::eAdd;
+
+    Recreate();
+  }
+
+  void Recreate() override {
+    CreatePipeline(1, "main", "main",
+                   {MakeSpecConst(0, static_cast<uint32_t>(samples_))});
+  }
+
+ private:
+  const std::string GetDbgName() const override { return "abuff_resolve_pipe"; }
+
+ private:
+  vk::SampleCountFlagBits samples_;
 };
 
 class LoadPipe : public Pipeline {
@@ -154,6 +238,13 @@ class LoadPipe : public Pipeline {
            FragmentShader& frag_shader)
       : Pipeline(context, cache, render_pass, vert_shader, frag_shader) {
     CreateLayout();
+
+    data_.color_attachments.resize(1);
+    data_.color_attachments[0].blendEnable = VK_FALSE;
+    data_.color_attachments[0].colorWriteMask =
+        vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+        vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+
     Recreate();
   }
 
@@ -173,6 +264,13 @@ class SwapPipe : public Pipeline {
         // {desc_pool.GetPresentSets().GetLayout()},
         {desc_pool.GetGBuffSets().GetLayout()},
         {MakePushConst<LoadPushConst>(vk::ShaderStageFlagBits::eFragment)});
+
+    data_.color_attachments.resize(1);
+    data_.color_attachments[0].blendEnable = VK_FALSE;
+    data_.color_attachments[0].colorWriteMask =
+        vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+        vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+
     Recreate();
   }
 

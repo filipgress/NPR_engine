@@ -17,6 +17,8 @@ namespace npr_graphics {
 #define MAX_POINT_LIGHTS 4
 #define MAX_SPOT_LIGHTS 4
 
+#define ABUFF_INIT_SIZE 8  // avg fragments per pixel
+
 enum MaterialFlags : uint32_t {
   kNone = BIT(0),
   kDoubleSided = BIT(1),
@@ -68,6 +70,26 @@ struct LightStorage {
   SpotLightStorage spot_lights[MAX_SPOT_LIGHTS];
 };
 
+struct alignas(16) FragmentNode {
+  glm::vec4 color;
+  float depth;
+  uint32_t next;
+};
+
+struct alignas(16) ABuffFillPushConst {
+  uint32_t width{0};
+  uint32_t max_nodes;
+
+  uint32_t _padding[2];
+};
+
+struct alignas(16) ABuffResolvePushConst {
+  uint32_t width{0};
+  uint32_t max_sorted_nodes{4};
+
+  uint32_t _padding[2];
+};
+
 struct LoadPushConst {
   glm::uvec2 res{0};
   alignas(16) glm::vec3 t{0.0f};
@@ -97,6 +119,11 @@ struct FrameResources {
   std::unique_ptr<UniformBuffer<CameraUnif>> camera_ubo;
   std::unique_ptr<DynamicUniformBuffer<MaterialUnif>> material_ubo;
   std::unique_ptr<StorageBuffer<LightStorage>> light_storage;
+
+  // abuff transparency
+  std::unique_ptr<Buffer> abuff_heads;
+  std::unique_ptr<Buffer> abuff_nodes;
+  std::unique_ptr<Buffer> abuff_counter;
 
   // gpass
   std::unique_ptr<Texture> albedo_metallic_ms;
@@ -139,6 +166,7 @@ class Resources : public npr_core::NonCopyable {
  private:
   void CreateImages();
   void CreateBuffers();
+  void CreateABuffer();
 
   void CreateSphereMesh(vk::CommandBuffer cmd_buff);
   void CreateConeMesh(vk::CommandBuffer cmd_buff);

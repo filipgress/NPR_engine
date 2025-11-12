@@ -6,12 +6,11 @@
 #include "image.h"
 
 namespace npr_graphics {
-class Resources;
-class DescriptorSets : public npr_core::NonCopyable {
+class BaseDescSets : public npr_core::NonCopyable {
  public:
-  DescriptorSets(const VulkanContext& context, uint count)
+  BaseDescSets(const VulkanContext& context, uint count)
       : c_{context}, count_{count} {}
-  virtual ~DescriptorSets() {
+  virtual ~BaseDescSets() {
     if (layout_) c_.GetDevice().destroyDescriptorSetLayout(layout_);
   }
 
@@ -33,29 +32,16 @@ class DescriptorSets : public npr_core::NonCopyable {
   uint count_{0};
 };
 
-class GBuffSets : public DescriptorSets {
+/*
+ * SingleTexSets
+ */
+class SingleTexSets : public BaseDescSets {
  public:
-  GBuffSets(const VulkanContext& context, uint count)
-      : DescriptorSets{context, count} {
+  SingleTexSets(const VulkanContext& context, uint count)
+      : BaseDescSets{context, count} {
     CreateLayout();
   }
-
-  void Update(const Resources& res) const;
-  std::vector<vk::DescriptorPoolSize> GetPoolSizes() const override {
-    return {{vk::DescriptorType::eCombinedImageSampler, 5 * count_}};
-  }
-
- private:
-  void CreateLayout() override;
-};
-
-class TextureSets : public DescriptorSets {
- public:
-  TextureSets(const VulkanContext& context, uint count)
-      : DescriptorSets{context, count} {
-    CreateLayout();
-  }
-  virtual ~TextureSets() = default;
+  virtual ~SingleTexSets() = default;
 
   void Update(const Resources& res) const;
   std::vector<vk::DescriptorPoolSize> GetPoolSizes() const override {
@@ -68,43 +54,29 @@ class TextureSets : public DescriptorSets {
                                    int frame_idx) const = 0;
 };
 
-class PresentSets : public TextureSets {
+class PresentSets : public SingleTexSets {
  public:
   PresentSets(const VulkanContext& context, uint count)
-      : TextureSets{context, count} {}
+      : SingleTexSets{context, count} {}
 
   const Texture* GetAttach(const Resources& res, int frame_idx) const override {
     return res.GetResources()[frame_idx].present_color.get();
   }
 };
 
-class TextureArraySet : public DescriptorSets {
+/*
+ * SingleBuffSets
+ */
+class SingleBuffSets : public BaseDescSets {
  public:
-  TextureArraySet(const VulkanContext& context) : DescriptorSets{context, 1} {
-    CreateLayout();
-  }
-
-  void Update(const std::vector<npr_graphics::Texture>& textures,
-              const npr_graphics::Texture& default_tex) const;
-  void Update(uint idx, const npr_graphics::Texture& texture) const;
-  std::vector<vk::DescriptorPoolSize> GetPoolSizes() const override {
-    return {{vk::DescriptorType::eCombinedImageSampler, MAX_TEXTURES}};
-  }
-
- private:
-  void CreateLayout() override;
-};
-
-class BufferSets : public DescriptorSets {
- public:
-  BufferSets(const VulkanContext& context, uint count, vk::DescriptorType type,
-             vk::ShaderStageFlags stage_flags)
-      : DescriptorSets{context, count},
+  SingleBuffSets(const VulkanContext& context, uint count,
+                 vk::DescriptorType type, vk::ShaderStageFlags stage_flags)
+      : BaseDescSets{context, count},
         desc_type_{type},
         stage_flags_{stage_flags} {
     CreateLayout();
   }
-  virtual ~BufferSets() = default;
+  virtual ~SingleBuffSets() = default;
 
   void Update(vk::Buffer buffer, vk::DeviceSize range, uint idx) const;
   std::vector<vk::DescriptorPoolSize> GetPoolSizes() const override {
@@ -119,23 +91,82 @@ class BufferSets : public DescriptorSets {
   vk::ShaderStageFlags stage_flags_;
 };
 
-class CameraUnifSets : public BufferSets {
+class CameraUnifSets : public SingleBuffSets {
  public:
   CameraUnifSets(const VulkanContext& context, uint count)
-      : BufferSets{context, count, vk::DescriptorType::eUniformBuffer,
-                   vk::ShaderStageFlagBits::eVertex |
+      : SingleBuffSets{context, count, vk::DescriptorType::eUniformBuffer,
+                       vk::ShaderStageFlagBits::eVertex |
+                           vk::ShaderStageFlagBits::eFragment} {}
+
+  void Update(const Resources& res) const;
+};
+
+class MaterialUnifSets : public SingleBuffSets {
+ public:
+  MaterialUnifSets(const VulkanContext& context, uint count)
+      : SingleBuffSets{context, count,
+                       vk::DescriptorType::eUniformBufferDynamic,
                        vk::ShaderStageFlagBits::eFragment} {}
 
   void Update(const Resources& res) const;
 };
 
-class MaterialUnifSets : public BufferSets {
+/*
+ * GBuffSets
+ */
+class GBuffSets : public BaseDescSets {
  public:
-  MaterialUnifSets(const VulkanContext& context, uint count)
-      : BufferSets{context, count, vk::DescriptorType::eUniformBufferDynamic,
-                   vk::ShaderStageFlagBits::eFragment} {}
+  GBuffSets(const VulkanContext& context, uint count)
+      : BaseDescSets{context, count} {
+    CreateLayout();
+  }
 
   void Update(const Resources& res) const;
+  std::vector<vk::DescriptorPoolSize> GetPoolSizes() const override {
+    return {{vk::DescriptorType::eCombinedImageSampler, 5 * count_}};
+  }
+
+ private:
+  void CreateLayout() override;
+};
+
+/*
+ * TextureArraySet
+ */
+class TextureArraySet : public BaseDescSets {
+ public:
+  TextureArraySet(const VulkanContext& context) : BaseDescSets{context, 1} {
+    CreateLayout();
+  }
+
+  void Update(const std::vector<npr_graphics::Texture>& textures,
+              const npr_graphics::Texture& default_tex) const;
+  void Update(uint idx, const npr_graphics::Texture& texture) const;
+  std::vector<vk::DescriptorPoolSize> GetPoolSizes() const override {
+    return {{vk::DescriptorType::eCombinedImageSampler, MAX_TEXTURES}};
+  }
+
+ private:
+  void CreateLayout() override;
+};
+
+/*
+ * ABufferSets
+ */
+class ABufferSets : public BaseDescSets {
+ public:
+  ABufferSets(const VulkanContext& context, uint count)
+      : BaseDescSets{context, count} {
+    CreateLayout();
+  }
+
+  void Update(const Resources& res) const;
+  std::vector<vk::DescriptorPoolSize> GetPoolSizes() const override {
+    return {{vk::DescriptorType::eStorageBuffer, 3 * count_}};
+  }
+
+ private:
+  void CreateLayout() override;
 };
 
 }  // namespace npr_graphics

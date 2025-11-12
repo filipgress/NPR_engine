@@ -1,7 +1,7 @@
 #version 450
 
-layout(constant_id = 0) const int NUM_SAMPLES = 4;
-layout(constant_id = 1) const int MAX_TEXTURES = 128;
+layout(constant_id = 0) const uint SAMPLES = 4;
+layout(constant_id = 1) const uint MAX_TEXTURES = 128;
 
 layout(location = 0) in vec2 frag_uv;
 layout(location = 1) in vec3 frag_pos;
@@ -26,7 +26,7 @@ layout(set = 2, binding = 0) uniform MaterialUniform {
   uint flags;
 } material;
 
-uint coverage_mask = (1u << NUM_SAMPLES) - 1u;
+uint coverage_mask = (1u << SAMPLES) - 1u;
 const uint MATERIAL_DOUBLE_SIDED = 1 << 0;
 const uint MATERIAL_MASK = 1 << 2;
 

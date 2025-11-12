@@ -19,6 +19,7 @@ Resources::Resources(const VulkanContext& context, const CommandPool& cmd_pool,
 
   CreateImages();
   CreateBuffers();
+  CreateABuffer();
 
   auto cmd_buff = cmd_pool.BeginSingleTimeCmds();
   {
@@ -107,8 +108,46 @@ void Resources::CreateBuffers() {
         c_, MAX_INSTANCES, "instance_buff" + std::to_string(idx));
     res.light_storage = std::make_unique<StorageBuffer<LightStorage>>(
         c_, "light_storage_buff" + std::to_string(idx));
-
     idx++;
+  }
+}
+
+void Resources::CreateABuffer() {
+  if (frame_resources_[0].abuff_heads) {
+    c_.GetDevice().waitIdle();
+    for (auto& res : frame_resources_) {
+      res.abuff_heads.reset();
+      res.abuff_nodes.reset();
+      res.abuff_counter.reset();
+    }
+  }
+
+  uint32_t total_samples = frame_props_.extent.width *
+                           frame_props_.extent.height *
+                           static_cast<uint32_t>(frame_props_.samples);
+  uint32_t max_nodes = total_samples * ABUFF_INIT_SIZE;
+
+  for (auto& res : frame_resources_) {
+    res.abuff_nodes = std::make_unique<Buffer>(
+        c_,
+        vk::BufferUsageFlagBits::eStorageBuffer |
+            vk::BufferUsageFlagBits::eTransferDst,
+        vk::MemoryPropertyFlagBits::eDeviceLocal, vk::SharingMode::eExclusive,
+        max_nodes * sizeof(FragmentNode), "abuff_nodes");
+
+    res.abuff_heads = std::make_unique<Buffer>(
+        c_,
+        vk::BufferUsageFlagBits::eStorageBuffer |
+            vk::BufferUsageFlagBits::eTransferDst,
+        vk::MemoryPropertyFlagBits::eDeviceLocal, vk::SharingMode::eExclusive,
+        total_samples * sizeof(uint32_t), "abuff_heads");
+
+    res.abuff_counter = std::make_unique<Buffer>(
+        c_,
+        vk::BufferUsageFlagBits::eStorageBuffer |
+            vk::BufferUsageFlagBits::eTransferDst,
+        vk::MemoryPropertyFlagBits::eDeviceLocal, vk::SharingMode::eExclusive,
+        sizeof(uint32_t), "abuff_counter");
   }
 }
 
