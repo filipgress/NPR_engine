@@ -84,4 +84,28 @@ void Scene::WaitForAsync() {
   gpu_init_ = false;
 }
 
+void Scene::RecordOpaque(vk::CommandBuffer cmd_buff, vk::PipelineLayout layout,
+                         const npr_graphics::FrameResources& frame_res,
+                         const uint32_t set_idx, vk::DescriptorSet material_set,
+                         const Frustum& frustum) const {
+  world_.Record(
+      cmd_buff, layout, frame_res, set_idx, material_set, frustum, *gpu_res_,
+      true, [](const MeshMaterialKey& key) {
+        return key.material.flags & npr_graphics::MaterialFlags::kOpaque ||
+               key.material.flags & npr_graphics::MaterialFlags::kMask;
+      });
+}
+
+void Scene::RecordTrans(vk::CommandBuffer cmd_buff, vk::PipelineLayout layout,
+                        const npr_graphics::FrameResources& frame_res,
+                        const uint32_t set_idx, vk::DescriptorSet material_set,
+                        const Frustum& frustum) const {
+  world_.Record(
+      cmd_buff, layout, frame_res, set_idx, material_set, frustum, *gpu_res_,
+      false, [](const MeshMaterialKey& key) {
+        return !(key.material.flags & npr_graphics::MaterialFlags::kOpaque) &&
+               !(key.material.flags & npr_graphics::MaterialFlags::kMask);
+      });
+}
+
 }  // namespace npr_scene

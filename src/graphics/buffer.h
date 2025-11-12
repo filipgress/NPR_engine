@@ -118,9 +118,7 @@ class InstanceBuffer : public Buffer {
         max_instances_{max_instances} {}
 
   void Write(const std::vector<InstanceData>& instances, uint32_t offset = 0) {
-    assert(instances.size() <= GetMaxInstances());
-
-    if (offset + instances.size() > GetMaxInstances()) offset = 0;
+    assert(offset + instances.size() <= GetMaxInstances());
     if (!mapped_mem_)
       mapped_mem_ = c_.GetDevice().mapMemory(buff_mem_, 0, size_);
 

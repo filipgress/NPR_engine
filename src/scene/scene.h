@@ -66,19 +66,20 @@ class Scene : npr_core::NonCopyable {
   const GpuResources& GetGpuResources() const { return *gpu_res_; }
   auto& GetCameraQuery() const { return world_.camera_query_; }
 
-  void RecordOpaque(vk::CommandBuffer cmd_buff, vk::PipelineLayout layout,
-                    uint frame_idx, const npr_graphics::Resources& res,
-                    const npr_graphics::DescriptorPool& desc_pool,
-                    const Frustum& frustum) const {
-    world_.RecordOpaque(cmd_buff, layout, frame_idx, res, desc_pool, frustum,
-                        *gpu_res_);
-  }
-
   void InitGPU(npr_core::TaskManager& tasks, std::function<void()> on_complete);
 
   bool IsLoading();
   bool IsValid() { return !IsLoading() && valid_; };
   bool IsInit() const { return gpu_init_; }
+
+  void RecordOpaque(vk::CommandBuffer cmd_buff, vk::PipelineLayout layout,
+                    const npr_graphics::FrameResources& frame_res,
+                    const uint32_t set_idx, vk::DescriptorSet material_set,
+                    const Frustum& frustum) const;
+  void RecordTrans(vk::CommandBuffer cmd_buff, vk::PipelineLayout layout,
+                   const npr_graphics::FrameResources& frame_res,
+                   const uint32_t set_idx, vk::DescriptorSet material_set,
+                   const Frustum& frustum) const;
 
  private:
   void Prepare(const npr_graphics::VulkanContext& context,

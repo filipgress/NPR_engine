@@ -3,8 +3,8 @@
 
 #include "components.h"
 #include "frustum.h"
-#include "graphics/descriptor_pool.h"
 
+#include "graphics/resources.h"
 #include <flecs.h>
 
 namespace npr_scene {
@@ -40,6 +40,8 @@ struct PerInstanceData {
 };
 
 class World : npr_core::NonCopyable {
+  using KeyPredFn = std::function<bool(const MeshMaterialKey&)>;
+
   friend class SceneLoader;
   friend class Scene;
 
@@ -48,10 +50,11 @@ class World : npr_core::NonCopyable {
   void Reset();
   void BuildQueries();
 
-  void RecordOpaque(vk::CommandBuffer cmd_buff, vk::PipelineLayout layout,
-                    uint frame_idx, const npr_graphics::Resources& res,
-                    const npr_graphics::DescriptorPool& desc_pool,
-                    const Frustum& frustum, const GpuResources& gpu_res) const;
+  void Record(vk::CommandBuffer cmd_buff, vk::PipelineLayout layout,
+              const npr_graphics::FrameResources& frame_res, uint32_t set_idx,
+              vk::DescriptorSet material_set, const Frustum& frustum,
+              const GpuResources& gpu_res, bool set_culling,
+              KeyPredFn pred) const;
 
   void UpdateTransforms();
   void UpdateBoundingBoxes();

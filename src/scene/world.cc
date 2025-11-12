@@ -122,17 +122,14 @@ void World::UpdateInstances() {
 
 uint World::material_at{0};
 uint World::instance_at{0};
-void World::RecordOpaque(vk::CommandBuffer cmd_buff, vk::PipelineLayout layout,
-                         uint frame_idx, const npr_graphics::Resources& res,
-                         const npr_graphics::DescriptorPool& desc_pool,
-                         const Frustum& frustum,
-                         const GpuResources& gpu_res) const {
+void World::Record(vk::CommandBuffer cmd_buff, vk::PipelineLayout layout,
+                   const npr_graphics::FrameResources& frame_res,
+                   uint32_t set_idx, vk::DescriptorSet material_set,
+                   const Frustum& frustum, const GpuResources& gpu_res,
+                   bool set_culling, KeyPredFn pred) const {
   for (const auto& [key, instances] : instances_) {
     const auto& mat = key.material;
-    if ((!(mat.flags & MaterialFlags::kOpaque) &&
-         !(mat.flags & MaterialFlags::kMask)) ||
-        instances.empty())
-      continue;
+    if (instances.empty() || (pred && !pred(key))) continue;
 
     std::vector<InstanceData> visible_instances;
     visible_instances.reserve(instances.size());
@@ -146,24 +143,27 @@ void World::RecordOpaque(vk::CommandBuffer cmd_buff, vk::PipelineLayout layout,
 
     if (visible_instances.empty()) continue;
 
-    cmd_buff.setCullMode((mat.flags & MaterialFlags::kDoubleSided)
-                             ? vk::CullModeFlagBits::eNone
-                             : vk::CullModeFlagBits::eBack);
+    if (set_culling)
+      cmd_buff.setCullMode((mat.flags & MaterialFlags::kDoubleSided)
+                               ? vk::CullModeFlagBits::eNone
+                               : vk::CullModeFlagBits::eBack);
 
-    auto& material_ubo = *res.GetResources()[frame_idx].material_ubo;
+    auto& material_ubo = *frame_res.material_ubo;
     material_ubo.Write(material_at, mat);
-    cmd_buff.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, layout, 2,
-                                desc_pool.GetMaterialSets().GetSet(frame_idx),
+    cmd_buff.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, layout,
+                                set_idx, material_set,
                                 material_ubo.GetElemOffset(material_at));
 
-    res.GetResources()[frame_idx].instance_buff->Write(visible_instances,
-                                                       instance_at);
+    // wrap-around for instance_at
+    if (instance_at + visible_instances.size() >= MAX_INSTANCES)
+      instance_at = 0;
+    frame_res.instance_buff->Write(visible_instances, instance_at);
 
     std::array<vk::DeviceSize, 2> offsets = {
         0, instance_at * sizeof(InstanceData)};
     std::array<vk::Buffer, 2> buffers = {
         gpu_res.vbos[key.mesh.vbo_idx].GetBuffer(),
-        res.GetResources()[frame_idx].instance_buff->GetBuffer()};
+        frame_res.instance_buff->GetBuffer()};
 
     cmd_buff.bindVertexBuffers(0, buffers.size(), buffers.data(),
                                offsets.data());
@@ -179,9 +179,7 @@ void World::RecordOpaque(vk::CommandBuffer cmd_buff, vk::PipelineLayout layout,
     }
 
     material_at = (material_at + 1) % MAX_MATERIALS;
-    instance_at =
-        (instance_at + visible_instances.size()) %
-        res.GetResources()[frame_idx].instance_buff->GetMaxInstances();
+    instance_at = (instance_at + visible_instances.size()) % MAX_INSTANCES;
   }
 }
 
