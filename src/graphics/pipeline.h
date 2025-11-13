@@ -20,7 +20,7 @@ struct SpecConstInfo {
   const void* data;
 };
 
-// Data to keep alive during pipeline creation
+// data to keep alive during pipeline creation
 struct PipelineData {
   std::vector<vk::SpecializationMapEntry> specialization_entries;
   std::vector<uint8_t> specialization_data;
@@ -203,6 +203,7 @@ class ABuffResolvePipe : public Pipeline {
     CreateLayout({desc_pool.GetABufferSets().GetLayout()},
                  {MakePushConst<uint32_t>(vk::ShaderStageFlagBits::eFragment)});
 
+    // present_color
     data_.color_attachments.resize(1);
     data_.color_attachments[0].blendEnable = VK_TRUE;
     data_.color_attachments[0].colorWriteMask =
@@ -210,10 +211,13 @@ class ABuffResolvePipe : public Pipeline {
         vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
 
     data_.color_attachments[0].srcColorBlendFactor = vk::BlendFactor::eOne;
-    data_.color_attachments[0].dstColorBlendFactor = vk::BlendFactor::eZero;
+    data_.color_attachments[0].dstColorBlendFactor =
+        vk::BlendFactor::eOneMinusSrcAlpha;
     data_.color_attachments[0].colorBlendOp = vk::BlendOp::eAdd;
+
     data_.color_attachments[0].srcAlphaBlendFactor = vk::BlendFactor::eOne;
-    data_.color_attachments[0].dstAlphaBlendFactor = vk::BlendFactor::eZero;
+    data_.color_attachments[0].dstAlphaBlendFactor =
+        vk::BlendFactor::eOneMinusSrcAlpha;
     data_.color_attachments[0].alphaBlendOp = vk::BlendOp::eAdd;
 
     Recreate();
@@ -231,27 +235,97 @@ class ABuffResolvePipe : public Pipeline {
   vk::SampleCountFlagBits samples_;
 };
 
-class LoadPipe : public Pipeline {
+class WBoitAccPipe : public Pipeline {
  public:
-  LoadPipe(const VulkanContext& context, const PipelineCache& cache,
-           const LoadPass& render_pass, VertexShader& vert_shader,
-           FragmentShader& frag_shader)
+  WBoitAccPipe(const VulkanContext& context, const PipelineCache& cache,
+               const WBoitPass& render_pass, VertexShader& vert_shader,
+               FragmentShader& frag_shader, vk::SampleCountFlagBits samples,
+               const DescriptorPool& desc_pool)
       : Pipeline(context, cache, render_pass, vert_shader, frag_shader) {
-    CreateLayout();
+    CreateLayout(
+        {
+            desc_pool.GetCameraSets().GetLayout(),
+            TextureArraySet(c_).GetLayout(),
+            desc_pool.GetMaterialSets().GetLayout(),
+        },
+        {MakePushConst<ABuffFillPushConst>(
+            vk::ShaderStageFlagBits::eFragment)});
 
-    data_.color_attachments.resize(1);
-    data_.color_attachments[0].blendEnable = VK_FALSE;
+    data_.use_vbo = true;
+    data_.samples = samples;
+
+    data_.color_attachments.resize(2);
+
+    // acc_color_res
+    data_.color_attachments[0].blendEnable = VK_TRUE;
     data_.color_attachments[0].colorWriteMask =
         vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
         vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+    data_.color_attachments[0].srcColorBlendFactor = vk::BlendFactor::eOne;
+    data_.color_attachments[0].dstColorBlendFactor = vk::BlendFactor::eOne;
+    data_.color_attachments[0].colorBlendOp = vk::BlendOp::eAdd;
+    data_.color_attachments[0].srcAlphaBlendFactor = vk::BlendFactor::eOne;
+    data_.color_attachments[0].dstAlphaBlendFactor = vk::BlendFactor::eOne;
+    data_.color_attachments[0].alphaBlendOp = vk::BlendOp::eAdd;
+
+    // acc_weight_res
+    data_.color_attachments[1].blendEnable = VK_TRUE;
+    data_.color_attachments[1].colorWriteMask =
+        vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+        vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+    data_.color_attachments[1].srcColorBlendFactor = vk::BlendFactor::eOne;
+    data_.color_attachments[1].dstColorBlendFactor = vk::BlendFactor::eOne;
+    data_.color_attachments[1].colorBlendOp = vk::BlendOp::eAdd;
+    data_.color_attachments[1].srcAlphaBlendFactor = vk::BlendFactor::eOne;
+    data_.color_attachments[1].dstAlphaBlendFactor = vk::BlendFactor::eOne;
+    data_.color_attachments[1].alphaBlendOp = vk::BlendOp::eAdd;
 
     Recreate();
   }
 
-  void Recreate() override { CreatePipeline(); }
+  void Recreate() override {
+    CreatePipeline(0, "main", "main",
+                   {MakeSpecConst(0, static_cast<uint32_t>(data_.samples)),
+                    MakeSpecConst(1, static_cast<uint32_t>(MAX_TEXTURES))});
+  }
 
  private:
-  const std::string GetDbgName() const override { return "load_pipe"; }
+  const std::string GetDbgName() const override { return "wboit_acc_pipe"; }
+  vk::PipelineDepthStencilStateCreateInfo GetDepthStencilState() const override;
+};
+
+class WBoitComposePipe : public Pipeline {
+ public:
+  WBoitComposePipe(const VulkanContext& context, const PipelineCache& cache,
+                   const WBoitPass& render_pass, VertexShader& vert_shader,
+                   FragmentShader& frag_shader, const DescriptorPool& desc_pool)
+      : Pipeline(context, cache, render_pass, vert_shader, frag_shader) {
+    CreateLayout({desc_pool.GetWBoitInputSets().GetLayout()}, {});
+
+    // present_color
+    data_.color_attachments.resize(1);
+    data_.color_attachments[0].blendEnable = VK_TRUE;
+    data_.color_attachments[0].colorWriteMask =
+        vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+        vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+
+    data_.color_attachments[0].srcColorBlendFactor = vk::BlendFactor::eOne;
+    data_.color_attachments[0].dstColorBlendFactor =
+        vk::BlendFactor::eOneMinusSrcAlpha;
+    data_.color_attachments[0].colorBlendOp = vk::BlendOp::eAdd;
+
+    data_.color_attachments[0].srcAlphaBlendFactor = vk::BlendFactor::eOne;
+    data_.color_attachments[0].dstAlphaBlendFactor =
+        vk::BlendFactor::eOneMinusSrcAlpha;
+    data_.color_attachments[0].alphaBlendOp = vk::BlendOp::eAdd;
+
+    Recreate();
+  }
+
+  void Recreate() override { CreatePipeline(1, "main", "main"); }
+
+ private:
+  const std::string GetDbgName() const override { return "wboit_compose_pipe"; }
 };
 
 class SwapPipe : public Pipeline {
@@ -261,8 +335,8 @@ class SwapPipe : public Pipeline {
            FragmentShader& frag_shader, const DescriptorPool& desc_pool)
       : Pipeline(context, cache, render_pass, vert_shader, frag_shader) {
     CreateLayout(
-        // {desc_pool.GetPresentSets().GetLayout()},
-        {desc_pool.GetGBuffSets().GetLayout()},
+        {desc_pool.GetPresentSets().GetLayout()},
+        // {desc_pool.GetGBuffSets().GetLayout()},
         {MakePushConst<LoadPushConst>(vk::ShaderStageFlagBits::eFragment)});
 
     data_.color_attachments.resize(1);

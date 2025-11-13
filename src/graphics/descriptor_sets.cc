@@ -343,4 +343,64 @@ void ABufferSets::Update(const Resources& res) const {
   }
 }
 
+/*
+ * WBoitInputSets
+ */
+void WBoitInputSets::CreateLayout() {
+  std::array<vk::DescriptorSetLayoutBinding, 2> bindings;
+
+  // acc_color_res (input attachment 0)
+  bindings[0].binding = 0;
+  bindings[0].descriptorType = vk::DescriptorType::eInputAttachment;
+  bindings[0].descriptorCount = 1;
+  bindings[0].stageFlags = vk::ShaderStageFlagBits::eFragment;
+
+  // acc_weight_res (input attachment 1)
+  bindings[1].binding = 1;
+  bindings[1].descriptorType = vk::DescriptorType::eInputAttachment;
+  bindings[1].descriptorCount = 1;
+  bindings[1].stageFlags = vk::ShaderStageFlagBits::eFragment;
+
+  vk::DescriptorSetLayoutCreateInfo layout_info{};
+  layout_info.bindingCount = bindings.size();
+  layout_info.pBindings = bindings.data();
+
+  layout_ = c_.GetDevice().createDescriptorSetLayout(layout_info);
+  c_.SetDbgName((uint64_t)(VkDescriptorSetLayout)layout_,
+                vk::ObjectType::eDescriptorSetLayout, "wboit_input_set_layout");
+}
+
+void WBoitInputSets::Update(const Resources& res) const {
+  const auto& per_frame_res = res.GetResources();
+  assert(count_ == per_frame_res.size());
+
+  for (size_t i = 0; i < per_frame_res.size(); ++i) {
+    const auto& frame_res = per_frame_res[i];
+    std::array<vk::DescriptorImageInfo, 2> image_infos;
+
+    // acc_color_res
+    image_infos[0].imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+    image_infos[0].imageView = frame_res.acc_color_res->GetImageView();
+    image_infos[0].sampler = VK_NULL_HANDLE;
+
+    // acc_weight_res
+    image_infos[1].imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+    image_infos[1].imageView = frame_res.acc_weight_res->GetImageView();
+    image_infos[1].sampler = VK_NULL_HANDLE;
+
+    std::array<vk::WriteDescriptorSet, 2> desc_writes;
+    for (size_t j = 0; j < 2; ++j) {
+      desc_writes[j].dstSet = sets_[i];
+      desc_writes[j].dstBinding = j;
+      desc_writes[j].dstArrayElement = 0;
+      desc_writes[j].descriptorType = vk::DescriptorType::eInputAttachment;
+      desc_writes[j].descriptorCount = 1;
+      desc_writes[j].pImageInfo = &image_infos[j];
+    }
+
+    c_.GetDevice().updateDescriptorSets(desc_writes.size(), desc_writes.data(),
+                                        0, nullptr);
+  }
+}
+
 }  // namespace npr_graphics

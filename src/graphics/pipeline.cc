@@ -223,9 +223,6 @@ vk::PipelineMultisampleStateCreateInfo Pipeline::GetMultisampleState() const {
   vk::PipelineMultisampleStateCreateInfo multisample{};
   multisample.rasterizationSamples = data_.samples;
   multisample.sampleShadingEnable = VK_FALSE;
-  // multisample.sampleShadingEnable =
-  //     data_.samples == vk::SampleCountFlagBits::e1 ? VK_FALSE : VK_TRUE;
-  // multisample.minSampleShading = 1.0f;
 
   return multisample;
 }
@@ -285,6 +282,21 @@ vk::PipelineDepthStencilStateCreateInfo GBuffPipe::GetDepthStencilState()
  * ABuffFillPipe
  */
 vk::PipelineDepthStencilStateCreateInfo ABuffFillPipe::GetDepthStencilState()
+    const {
+  vk::PipelineDepthStencilStateCreateInfo depth_stencil{};
+  depth_stencil.depthTestEnable = VK_TRUE;
+  depth_stencil.depthWriteEnable = VK_FALSE;
+  depth_stencil.depthCompareOp = vk::CompareOp::eLess;
+  depth_stencil.depthBoundsTestEnable = VK_FALSE;
+  depth_stencil.stencilTestEnable = VK_FALSE;
+
+  return depth_stencil;
+}
+
+/*
+ * WBoitAccPipe
+ */
+vk::PipelineDepthStencilStateCreateInfo WBoitAccPipe::GetDepthStencilState()
     const {
   vk::PipelineDepthStencilStateCreateInfo depth_stencil{};
   depth_stencil.depthTestEnable = VK_TRUE;

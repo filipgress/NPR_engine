@@ -11,7 +11,8 @@ App::App()
   npr_scene::SceneLoader::LoadAsync(
       renderer_, *scene_swap_, tasks_,
       [this]() { scene_swap_.swap(active_scene_); },
-      "../assets/scene_graph/scene.gltf");
+      // "../assets/scene_graph/scene.gltf");
+      "../assets/market/scene.gltf");
 
   tasks_.Add([&]() {
     if (inputs_.key_tokens.contains(GLFW_KEY_LEFT_CONTROL) &&

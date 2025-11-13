@@ -37,8 +37,27 @@ class Renderer : public npr_core::NonCopyable {
  private:
   vk::CommandBuffer Record(uint image_idx, const npr_scene::Camera& camera,
                            npr_scene::Scene& scene, bool is_loading, float dt);
-  // vk::CommandBuffer RecordFallback(uint image_idx, bool is_loading, float
-  // dt);
+
+  void RecordGBufferPass(vk::CommandBuffer cmd_buff, uint frame_idx,
+                         const npr_graphics::FrameResources& frame_res,
+                         const vk::Extent2D& res_extent,
+                         const npr_scene::Camera& camera,
+                         npr_scene::Scene& scene);
+  void RecordLightPass(vk::CommandBuffer cmd_buff, uint frame_idx,
+                       const vk::Extent2D& res_extent);
+  void RecordABufferPass(vk::CommandBuffer cmd_buff, uint frame_idx,
+                         const npr_graphics::FrameResources& frame_res,
+                         const vk::Extent2D& res_extent,
+                         const npr_scene::Camera& camera,
+                         npr_scene::Scene& scene);
+  void RecordWBoitPass(vk::CommandBuffer cmd_buff, uint frame_idx,
+                       const npr_graphics::FrameResources& frame_res,
+                       const vk::Extent2D& res_extent,
+                       const npr_scene::Camera& camera,
+                       npr_scene::Scene& scene);
+  void RecordSwapPass(vk::CommandBuffer cmd_buff, uint image_idx,
+                      uint frame_idx, float camera_aspect, bool is_loading,
+                      float dt);
 
   void RenderTargetResize();
   std::pair<vk::Viewport, vk::Rect2D> CalcViewportScissor(
@@ -57,21 +76,26 @@ class Renderer : public npr_core::NonCopyable {
   DescriptorPool desc_pool_{c_, res_};
 
   GBuffPass gbuff_pass_{c_, res_};
+  LightPass light_pass_{c_, res_};
   ABuffPass abuff_pass_{c_, res_};
-  // LoadPass load_pass_{c_, res_};
+  WBoitPass wboit_pass_{c_, res_};
   SwapPass swap_pass_{c_, swapchain_};
 
   std::array<VertexShader, 2> vert_shaders_{
       VertexShader{c_, "shaders/quad_vert.spv", "../shaders/quad.vert"},
       VertexShader{c_, "shaders/gbuff_vert.spv", "../shaders/gbuff.vert"}};
 
-  std::array<FragmentShader, 4> frag_shaders_{
+  std::array<FragmentShader, 6> frag_shaders_{
       FragmentShader{c_, "shaders/swap_frag.spv", "../shaders/swap.frag"},
       FragmentShader{c_, "shaders/gbuff_frag.spv", "../shaders/gbuff.frag"},
       FragmentShader{c_, "shaders/abuff_fill_frag.spv",
                      "../shaders/abuff_fill.frag"},
       FragmentShader{c_, "shaders/abuff_resolve_frag.spv",
                      "../shaders/abuff_resolve.frag"},
+      FragmentShader{c_, "shaders/wboit_acc_frag.spv",
+                     "../shaders/wboit_acc.frag"},
+      FragmentShader{c_, "shaders/wboit_compose_frag.spv",
+                     "../shaders/wboit_compose.frag"},
   };
 
   PipelineCache pipe_cache_{c_};
@@ -96,9 +120,16 @@ class Renderer : public npr_core::NonCopyable {
                                        frag_shaders_[3],
                                        res_.GetProps().samples,
                                        desc_pool_};
-
-  // LoadPipe load_pipe_{c_, pipe_cache_, load_pass_, vert_shaders_[0],
-  //                     frag_shaders_[0]};
+  WBoitAccPipe wboit_acc_pipe_{c_,
+                               pipe_cache_,
+                               wboit_pass_,
+                               vert_shaders_[1],
+                               frag_shaders_[4],
+                               res_.GetProps().samples,
+                               desc_pool_};
+  WBoitComposePipe wboit_compose_pipe_{
+      c_,        pipe_cache_, wboit_pass_, vert_shaders_[0], frag_shaders_[5],
+      desc_pool_};
   SwapPipe swap_pipe_{
       c_,        pipe_cache_, swap_pass_, vert_shaders_[0], frag_shaders_[0],
       desc_pool_};

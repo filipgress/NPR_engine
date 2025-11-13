@@ -18,6 +18,7 @@ class DescriptorPool : public npr_core::NonCopyable {
   const CameraUnifSets& GetCameraSets() const { return camera_sets_; }
   const MaterialUnifSets& GetMaterialSets() const { return material_sets_; }
   const ABufferSets& GetABufferSets() const { return abuff_sets_; }
+  const WBoitInputSets& GetWBoitInputSets() const { return wboit_input_sets_; }
   const PresentSets& GetPresentSets() const { return present_sets_; }
 
  private:
@@ -32,6 +33,7 @@ class DescriptorPool : public npr_core::NonCopyable {
   CameraUnifSets camera_sets_;
   MaterialUnifSets material_sets_;
   ABufferSets abuff_sets_;
+  WBoitInputSets wboit_input_sets_;
   PresentSets present_sets_;
 };
 

@@ -78,6 +78,26 @@ class GBuffPass : public RenderPass {
   vk::AttachmentReference resolve_ref_{};
 };
 
+class LightPass : public RenderPass {
+ public:
+  LightPass(const VulkanContext& context, const Resources& res)
+      : RenderPass{context, res} {
+    Init();
+  }
+
+ private:
+  const std::string GetDbgName() const override { return "light_pass"; }
+  void SetClearValues() override;
+
+  std::vector<vk::AttachmentDescription> GetAttachments() const override;
+  std::vector<vk::SubpassDependency> GetDependencies() const override;
+  std::vector<vk::SubpassDescription> GetSubpasses() override;
+  std::vector<vk::ImageView> GetAttachmentViews(int frame_idx) const override;
+
+ private:
+  vk::AttachmentReference color_ref_{};
+};
+
 class ABuffPass : public RenderPass {
  public:
   ABuffPass(const VulkanContext& context, const Resources& res)
@@ -86,7 +106,7 @@ class ABuffPass : public RenderPass {
   }
 
  private:
-  const std::string GetDbgName() const override { return "trans_abuff_pass"; }
+  const std::string GetDbgName() const override { return "abuff_pass"; }
   void SetClearValues() override;
 
   std::vector<vk::AttachmentDescription> GetAttachments() const override;
@@ -99,15 +119,15 @@ class ABuffPass : public RenderPass {
   vk::AttachmentReference depth_ref_{};
 };
 
-class LoadPass : public RenderPass {
+class WBoitPass : public RenderPass {
  public:
-  LoadPass(const VulkanContext& context, const Resources& res)
+  WBoitPass(const VulkanContext& context, const Resources& res)
       : RenderPass{context, res} {
     Init();
   }
 
  private:
-  const std::string GetDbgName() const override { return "load_pass"; }
+  const std::string GetDbgName() const override { return "wboit_pass"; }
   void SetClearValues() override;
 
   std::vector<vk::AttachmentDescription> GetAttachments() const override;
@@ -116,7 +136,12 @@ class LoadPass : public RenderPass {
   std::vector<vk::ImageView> GetAttachmentViews(int frame_idx) const override;
 
  private:
-  vk::AttachmentReference color_ref_{};
+  std::array<vk::AttachmentReference, 2> acc_refs_{};
+  std::array<vk::AttachmentReference, 2> resolve_refs_{};
+  vk::AttachmentReference depth_ref_{};
+
+  vk::AttachmentReference color_ref{};
+  std::array<vk::AttachmentReference, 2> input_refs_{};
 };
 
 class SwapPass : public BasePass {

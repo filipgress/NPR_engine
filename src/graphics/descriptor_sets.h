@@ -169,6 +169,25 @@ class ABufferSets : public BaseDescSets {
   void CreateLayout() override;
 };
 
+/*
+ * WBoitInputSets
+ */
+class WBoitInputSets : public BaseDescSets {
+ public:
+  WBoitInputSets(const VulkanContext& context, uint count)
+      : BaseDescSets{context, count} {
+    CreateLayout();
+  }
+
+  void Update(const Resources& res) const;
+  std::vector<vk::DescriptorPoolSize> GetPoolSizes() const override {
+    return {{vk::DescriptorType::eInputAttachment, 2 * count_}};
+  }
+
+ private:
+  void CreateLayout() override;
+};
+
 }  // namespace npr_graphics
 
 #endif  // DESCRIPTOR_SETS_H_

@@ -34,7 +34,7 @@ Resources::Resources(const VulkanContext& context, const CommandPool& cmd_pool,
 void Resources::CreateImages() {
   uint idx{0};
   for (auto& res : frame_resources_) {
-    // gpass
+    // gbuff pass
     res.albedo_metallic_ms = std::make_unique<Texture>(
         c_, frame_props_.albedo_format, frame_props_.extent,
         vk::ImageUsageFlagBits::eColorAttachment |
@@ -84,6 +84,38 @@ void Resources::CreateImages() {
             vk::ImageUsageFlagBits::eSampled,
         vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil,
         frame_props_.samples, "depth_stencil_ms" + std::to_string(idx));
+
+    // wboit pass
+    res.acc_color_ms = std::make_unique<Image>(
+        c_, frame_props_.acc_color_format, frame_props_.extent,
+        vk::ImageUsageFlagBits::eColorAttachment |
+            vk::ImageUsageFlagBits::eTransientAttachment,
+        vk::ImageAspectFlagBits::eColor, vk::SharingMode::eExclusive,
+        frame_props_.samples, 1, "acc_color_ms_" + std::to_string(idx));
+
+    res.acc_color_res = std::make_unique<Image>(
+        c_, frame_props_.acc_color_format, frame_props_.extent,
+        vk::ImageUsageFlagBits::eColorAttachment |
+            vk::ImageUsageFlagBits::eTransientAttachment |
+            vk::ImageUsageFlagBits::eInputAttachment,
+        vk::ImageAspectFlagBits::eColor, vk::SharingMode::eExclusive,
+        vk::SampleCountFlagBits::e1, 1, "acc_color_res_" + std::to_string(idx));
+
+    res.acc_weight_ms = std::make_unique<Image>(
+        c_, frame_props_.acc_weight_format, frame_props_.extent,
+        vk::ImageUsageFlagBits::eColorAttachment |
+            vk::ImageUsageFlagBits::eTransientAttachment,
+        vk::ImageAspectFlagBits::eColor, vk::SharingMode::eExclusive,
+        frame_props_.samples, 1, "acc_weight_ms_" + std::to_string(idx));
+
+    res.acc_weight_res = std::make_unique<Image>(
+        c_, frame_props_.acc_weight_format, frame_props_.extent,
+        vk::ImageUsageFlagBits::eColorAttachment |
+            vk::ImageUsageFlagBits::eTransientAttachment |
+            vk::ImageUsageFlagBits::eInputAttachment,
+        vk::ImageAspectFlagBits::eColor, vk::SharingMode::eExclusive,
+        vk::SampleCountFlagBits::e1, 1,
+        "acc_weight_res_" + std::to_string(idx));
 
     // swap pass
     res.present_color = std::make_unique<Texture>(

@@ -112,6 +112,10 @@ struct FrameProps {
   const vk::Format position_format = vk::Format::eR16G16B16A16Sfloat;
   const vk::Format normal_format = vk::Format::eR16G16B16A16Sfloat;
   const vk::Format coverage_format = vk::Format::eR16Sfloat;
+
+  // wboit layout
+  const vk::Format acc_color_format = vk::Format::eR16G16B16A16Sfloat;
+  const vk::Format acc_weight_format = vk::Format::eR16Sfloat;
 };
 
 struct FrameResources {
@@ -119,11 +123,6 @@ struct FrameResources {
   std::unique_ptr<UniformBuffer<CameraUnif>> camera_ubo;
   std::unique_ptr<DynamicUniformBuffer<MaterialUnif>> material_ubo;
   std::unique_ptr<StorageBuffer<LightStorage>> light_storage;
-
-  // abuff transparency
-  std::unique_ptr<Buffer> abuff_heads;
-  std::unique_ptr<Buffer> abuff_nodes;
-  std::unique_ptr<Buffer> abuff_counter;
 
   // gpass
   std::unique_ptr<Texture> albedo_metallic_ms;
@@ -135,6 +134,18 @@ struct FrameResources {
   std::unique_ptr<Texture> coverage_res;
 
   std::unique_ptr<Texture> depth_stencil_ms;
+
+  // abuff transparency
+  std::unique_ptr<Buffer> abuff_heads;
+  std::unique_ptr<Buffer> abuff_nodes;
+  std::unique_ptr<Buffer> abuff_counter;
+
+  // wboit
+  std::unique_ptr<Image> acc_color_ms;
+  std::unique_ptr<Image> acc_color_res;
+
+  std::unique_ptr<Image> acc_weight_ms;
+  std::unique_ptr<Image> acc_weight_res;
 
   // swap pass
   std::unique_ptr<Texture> present_color;
