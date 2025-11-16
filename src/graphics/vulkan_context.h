@@ -29,6 +29,9 @@ class VulkanContext : public npr_core::NonCopyable {
   VulkanContext(const npr_window::Window& window);
   ~VulkanContext();
 
+  uint32_t GetAPIVersion() const { return api_version_; }
+  vk::Instance GetInstance() const { return instance_; }
+  vk::PhysicalDevice GetPhysicalDevice() const { return phys_device_; }
   vk::Device GetDevice() const { return device_; }
   vk::SurfaceKHR GetSurface() const { return surface_; }
 
@@ -82,6 +85,8 @@ class VulkanContext : public npr_core::NonCopyable {
   QFamilies GetQueueFamilies(vk::PhysicalDevice device) const;
 
  private:
+  uint32_t api_version_{0};
+
   vk::Instance instance_{nullptr};
   vk::SurfaceKHR surface_{nullptr};
 

@@ -72,7 +72,7 @@ set(IMGUI_SOURCES
     ${IMGUI_DIR}/imgui_draw.cpp
     ${IMGUI_DIR}/imgui_tables.cpp
     ${IMGUI_DIR}/imgui_widgets.cpp
-    # ${IMGUI_DIR}/imgui_demo.cpp
+    ${IMGUI_DIR}/imgui_demo.cpp
     ${IMGUI_DIR}/backends/imgui_impl_vulkan.cpp
     ${IMGUI_DIR}/backends/imgui_impl_glfw.cpp
 )
@@ -129,6 +129,7 @@ set(HEADER_FILES
     ./src/graphics/descriptor_pool.h
     ./src/graphics/descriptor_sets.h
     ./src/graphics/render_pass.h
+    ./src/graphics/gui_manager.cc
     ./src/graphics/shader.h
     ./src/graphics/pipeline.h
     ./src/graphics/pipeline_cache.h
@@ -160,6 +161,7 @@ set(SOURCE_FILES
     ./src/graphics/descriptor_pool.cc
     ./src/graphics/descriptor_sets.cc
     ./src/graphics/render_pass.cc
+    ./src/graphics/gui_manager.cc
     ./src/graphics/shader.cc
     ./src/graphics/pipeline.cc
     ./src/graphics/pipeline_cache.cc

@@ -27,19 +27,19 @@ VulkanContext::~VulkanContext() {
 }
 
 void VulkanContext::CreateInstance() {
-  uint32_t inst_ver = vk::enumerateInstanceVersion();
-  inst_ver &= ~0xFFFU;  // zero out patch number
+  api_version_ = vk::enumerateInstanceVersion();
+  api_version_ &= ~0xFFFU;  // zero out patch number
 
   INFO(PROJECT_NAME, " version: ", PROJECT_VERSION_MAJOR, ".",
        PROJECT_VERSION_MINOR);
-  INFO("vulkan version: ", VK_API_VERSION_MAJOR(inst_ver), ".",
-       VK_API_VERSION_MINOR(inst_ver));
+  INFO("vulkan version: ", VK_API_VERSION_MAJOR(api_version_), ".",
+       VK_API_VERSION_MINOR(api_version_));
 
   vk::ApplicationInfo app_info{};
   app_info.pApplicationName = PROJECT_NAME;
   app_info.applicationVersion =
       VK_MAKE_VERSION(PROJECT_VERSION_MAJOR, PROJECT_VERSION_MINOR, 0);
-  app_info.apiVersion = inst_ver;
+  app_info.apiVersion = api_version_;
 
   uint32_t exts_count{0};
   const char** req_exts = glfwGetRequiredInstanceExtensions(&exts_count);

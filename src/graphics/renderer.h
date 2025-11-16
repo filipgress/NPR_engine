@@ -7,8 +7,9 @@
 #include "descriptor_pool.h"
 #include "sync.h"
 #include "resources.h"
-#include "shader.h"
 #include "render_pass.h"
+#include "gui_manager.h"
+#include "shader.h"
 #include "pipeline.h"
 #include "pipeline_cache.h"
 
@@ -108,6 +109,8 @@ class Renderer : public npr_core::NonCopyable {
   };
 
   PipelineCache pipe_cache_{c_};
+  GuiManager gui_manager_{window_, c_, swapchain_, swap_pass_, pipe_cache_};
+
   GBuffPipe gbuff_pipe_{
       c_,
       pipe_cache_,

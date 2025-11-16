@@ -116,4 +116,33 @@ void TexDescriptorPool::CreateDescriptorPool() {
                 vk::ObjectType::eDescriptorPool, "tex_descriptor_pool");
 }
 
+/*
+ * ImGuiDescriptorPool
+ */
+ImGuiDescriptorPool::ImGuiDescriptorPool(const VulkanContext& context)
+    : c_{context} {
+  std::vector<vk::DescriptorPoolSize> pool_sizes = {
+      {vk::DescriptorType::eSampler, 1000},
+      {vk::DescriptorType::eCombinedImageSampler, 1000},
+      {vk::DescriptorType::eSampledImage, 1000},
+      {vk::DescriptorType::eStorageImage, 1000},
+      {vk::DescriptorType::eUniformTexelBuffer, 1000},
+      {vk::DescriptorType::eStorageTexelBuffer, 1000},
+      {vk::DescriptorType::eUniformBuffer, 1000},
+      {vk::DescriptorType::eStorageBuffer, 1000},
+      {vk::DescriptorType::eUniformBufferDynamic, 1000},
+      {vk::DescriptorType::eStorageBufferDynamic, 1000},
+      {vk::DescriptorType::eInputAttachment, 1000}};
+
+  vk::DescriptorPoolCreateInfo pool_info{};
+  pool_info.flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet;
+  pool_info.maxSets = 1000 * pool_sizes.size();
+  pool_info.poolSizeCount = pool_sizes.size();
+  pool_info.pPoolSizes = pool_sizes.data();
+
+  pool_ = c_.GetDevice().createDescriptorPool(pool_info);
+  c_.SetDbgName((uint64_t)(VkDescriptorPool)pool_,
+                vk::ObjectType::eDescriptorPool, "gui_descriptor_pool");
+}
+
 }  // namespace npr_graphics

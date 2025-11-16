@@ -39,9 +39,8 @@ void Renderer::Render(const Camera& camera, Scene& scene, bool is_loading,
 
   // record & submit commands
   vk::CommandBuffer cmd_buff;
-  if (scene.IsValid() && scene.IsInit()) {
+  if (scene.IsValid() && scene.IsInit())
     cmd_buff = Record(image_idx, camera, scene, is_loading, dt);
-  }
 
   auto render_finished = sync_.GetRenderFinished(image_idx);
 
@@ -88,6 +87,8 @@ vk::CommandBuffer Renderer::Record(uint image_idx, const Camera& camera,
   auto res_extent = res_.GetProps().extent;
 
   frame_res.camera_ubo->Write(camera.GetCameraUnif());
+
+  gui_manager_.NewFrame();
 
   vk::Rect2D scissor{{0, 0}, res_extent};
   vk::Viewport viewport(0, 0, res_extent.width, res_extent.height, 0.0f, 1.0f);
@@ -351,6 +352,10 @@ void Renderer::RecordSwapPass(vk::CommandBuffer cmd_buff, uint image_idx,
   //                             {});
 
   cmd_buff.draw(3, 1, 0, 0);
+  cmd_buff.nextSubpass(vk::SubpassContents::eInline);
+
+  gui_manager_.Render(cmd_buff);
+
   cmd_buff.endRenderPass();
 }
 

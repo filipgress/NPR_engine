@@ -852,6 +852,8 @@ std::vector<vk::ImageView> WBoitPass::GetAttachmentViews(int frame_idx) const {
  */
 void SwapPass::SetClearValues() {
   clear_values_.resize(1);
+
+  // swapchain image
   clear_values_[0].color = std::array<float, 4>{0.0f, 0.0f, 0.0f, 1.0f};
 }
 
@@ -870,13 +872,13 @@ std::vector<vk::AttachmentDescription> SwapPass::GetAttachments() const {
 }
 
 std::vector<vk::SubpassDependency> SwapPass::GetDependencies() const {
-  std::vector<vk::SubpassDependency> deps(1);
+  std::vector<vk::SubpassDependency> deps(2);
 
   {
     deps[0].srcSubpass = VK_SUBPASS_EXTERNAL;
     deps[0].dstSubpass = 0;
 
-    // wait for previous pass (ABuffPass/WBoitPass) to write present_color
+    // wait for ABuffPass/WBoitPass to write present_color
     deps[0].srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
     deps[0].srcAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
 
@@ -889,6 +891,21 @@ std::vector<vk::SubpassDependency> SwapPass::GetDependencies() const {
     deps[0].dependencyFlags = vk::DependencyFlagBits::eByRegion;
   }
 
+  {
+    deps[1].srcSubpass = 0;
+    deps[1].dstSubpass = 1;
+
+    // wait for swapchain image to be available
+    deps[1].srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+    deps[1].srcAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
+
+    deps[1].dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+    deps[1].dstAccessMask = vk::AccessFlagBits::eColorAttachmentRead |
+                            vk::AccessFlagBits::eColorAttachmentWrite;
+
+    deps[1].dependencyFlags = vk::DependencyFlagBits::eByRegion;
+  }
+
   // no need for a second dependency since this is the last pass
   // synchronization to present is handled by semaphores in the main loop
   // wait_stage = COLOR_ATTACHMENT_OUTPUT
@@ -897,14 +914,18 @@ std::vector<vk::SubpassDependency> SwapPass::GetDependencies() const {
 }
 
 std::vector<vk::SubpassDescription> SwapPass::GetSubpasses() {
+  std::vector<vk::SubpassDescription> subpasses(2);
+
   color_ref_ = {0, vk::ImageLayout::eColorAttachmentOptimal};
+  subpasses[0].pipelineBindPoint = vk::PipelineBindPoint::eGraphics;
+  subpasses[0].colorAttachmentCount = 1;
+  subpasses[0].pColorAttachments = &color_ref_;
 
-  vk::SubpassDescription subpass{};
-  subpass.pipelineBindPoint = vk::PipelineBindPoint::eGraphics;
-  subpass.colorAttachmentCount = 1;
-  subpass.pColorAttachments = &color_ref_;
+  subpasses[1].pipelineBindPoint = vk::PipelineBindPoint::eGraphics;
+  subpasses[1].colorAttachmentCount = 1;
+  subpasses[1].pColorAttachments = &color_ref_;
 
-  return {subpass};
+  return subpasses;
 }
 
 void SwapPass::CreateFramebuffers() {

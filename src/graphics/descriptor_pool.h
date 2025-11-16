@@ -64,6 +64,20 @@ class TexDescriptorPool : public npr_core::NonCopyable {
   TextureArraySet tex_set_{c_};
 };
 
+class ImGuiDescriptorPool : public npr_core::NonCopyable {
+ public:
+  ImGuiDescriptorPool(const VulkanContext& context);
+  ~ImGuiDescriptorPool() {
+    if (pool_) c_.GetDevice().destroyDescriptorPool(pool_);
+  }
+
+  vk::DescriptorPool GetPool() const { return pool_; }
+
+ private:
+  const VulkanContext& c_;
+  vk::DescriptorPool pool_{nullptr};
+};
+
 }  // namespace npr_graphics
 
 #endif  // DESCRIPTOR_POOL_H_

@@ -10,6 +10,7 @@ struct SwapProps {
   vk::Format format;
   vk::ColorSpaceKHR color_space;
 
+  uint min_image_count;
   uint image_count;
 
   bool is_HDR{false};

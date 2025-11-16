@@ -53,7 +53,8 @@ void Swapchain::CreateSwapchain(glm::ivec2 frame_size,
   vk::SwapchainCreateInfoKHR swapchain_info{};
   swapchain_info.flags = vk::SwapchainCreateFlagsKHR();
   swapchain_info.surface = c_.GetSurface();
-  swapchain_info.minImageCount = ChooseMinFrameCount(swap_supp);
+  swapchain_info.minImageCount = props_.min_image_count =
+      ChooseMinFrameCount(swap_supp);
   swapchain_info.imageFormat = props_.format;
   swapchain_info.imageColorSpace = props_.color_space;
   swapchain_info.imageArrayLayers = 1;

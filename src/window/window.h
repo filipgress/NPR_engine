@@ -21,6 +21,7 @@ class Window {
 
   static void ErrorCallback(int err_code, const char* desc);
 
+  GLFWwindow* GetNative() const { return window_; }
   glm::ivec2 GetSize() const;
   float GetAspect() const;
 
