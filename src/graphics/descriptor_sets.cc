@@ -274,6 +274,69 @@ void TextureArraySet::Update(uint idx,
 }
 
 /*
+ * AOSet
+ */
+void AOSet::CreateLayout() {
+  std::array<vk::DescriptorSetLayoutBinding, 2> bindings;
+
+  // ao_kernel
+  bindings[0].binding = 0;
+  bindings[0].descriptorType = vk::DescriptorType::eUniformBuffer;
+  bindings[0].descriptorCount = 1;
+  bindings[0].stageFlags = vk::ShaderStageFlagBits::eFragment;
+
+  // ao_noise_tex
+  bindings[1].binding = 1;
+  bindings[1].descriptorType = vk::DescriptorType::eCombinedImageSampler;
+  bindings[1].descriptorCount = 1;
+  bindings[1].stageFlags = vk::ShaderStageFlagBits::eFragment;
+
+  vk::DescriptorSetLayoutCreateInfo layout_info{};
+  layout_info.bindingCount = bindings.size();
+  layout_info.pBindings = bindings.data();
+
+  layout_ = c_.GetDevice().createDescriptorSetLayout(layout_info);
+  c_.SetDbgName((uint64_t)(VkDescriptorSetLayout)layout_,
+                vk::ObjectType::eDescriptorSetLayout, "ao_set_layout");
+}
+
+void AOSet::Update(const Resources& res) const {
+  // ao_kernel
+  vk::DescriptorBufferInfo kernel_info{};
+  kernel_info.buffer = res.GetAOKernel().GetBuffer();
+  kernel_info.offset = 0;
+  kernel_info.range = VK_WHOLE_SIZE;
+
+  // ao_noise_tex
+  const auto& noise_tex = res.GetAONoiseTex();
+  vk::DescriptorImageInfo noise_info{};
+  noise_info.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+  noise_info.imageView = noise_tex.GetImageView();
+  noise_info.sampler = noise_tex.GetSampler();
+
+  std::array<vk::WriteDescriptorSet, 2> desc_writes;
+
+  // ao_kernel
+  desc_writes[0].dstSet = sets_[0];
+  desc_writes[0].dstBinding = 0;
+  desc_writes[0].dstArrayElement = 0;
+  desc_writes[0].descriptorType = vk::DescriptorType::eUniformBuffer;
+  desc_writes[0].descriptorCount = 1;
+  desc_writes[0].pBufferInfo = &kernel_info;
+
+  // ao_noise_tex
+  desc_writes[1].dstSet = sets_[0];
+  desc_writes[1].dstBinding = 1;
+  desc_writes[1].dstArrayElement = 0;
+  desc_writes[1].descriptorType = vk::DescriptorType::eCombinedImageSampler;
+  desc_writes[1].descriptorCount = 1;
+  desc_writes[1].pImageInfo = &noise_info;
+
+  c_.GetDevice().updateDescriptorSets(desc_writes.size(), desc_writes.data(), 0,
+                                      nullptr);
+}
+
+/*
  * ABufferSets
  */
 void ABufferSets::CreateLayout() {

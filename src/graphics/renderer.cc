@@ -97,10 +97,11 @@ vk::CommandBuffer Renderer::Record(uint image_idx, const Camera& camera,
   cmd_buff.setViewport(0, viewport);
 
   RecordGBufferPass(cmd_buff, frame_idx, frame_res, res_extent, camera, scene);
-  RecordLightPass(cmd_buff, frame_idx, res_extent);
+  RecordAOPass(cmd_buff, frame_idx, res_extent);
+  // RecordLightPass(cmd_buff, frame_idx, res_extent);
   // RecordABufferPass(cmd_buff, frame_idx, frame_res, res_extent, camera,
   // scene);
-  RecordWBoitPass(cmd_buff, frame_idx, frame_res, res_extent, camera, scene);
+  // RecordWBoitPass(cmd_buff, frame_idx, frame_res, res_extent, camera, scene);
   RecordSwapPass(cmd_buff, image_idx, frame_idx, camera.GetAspect(), is_loading,
                  dt);
 
@@ -131,6 +132,69 @@ void Renderer::RecordGBufferPass(vk::CommandBuffer cmd_buff, uint frame_idx,
                      camera.GetFrustum());
 
   cmd_buff.nextSubpass(vk::SubpassContents::eInline);  // resolve coverage_ms
+  cmd_buff.endRenderPass();
+}
+
+void Renderer::RecordAOPass(vk::CommandBuffer cmd_buff, uint frame_idx,
+                            const vk::Extent2D& res_extent) {
+  cmd_buff.beginRenderPass(ao_pass_.BeginInfo(frame_idx, res_extent),
+                           vk::SubpassContents::eInline);
+
+  cmd_buff.bindPipeline(vk::PipelineBindPoint::eGraphics,
+                        ao_gen_pipe_.GetPipeline());
+
+  cmd_buff.bindDescriptorSets(  // camera
+      vk::PipelineBindPoint::eGraphics, ao_gen_pipe_.GetLayout(), 0,
+      desc_pool_.GetCameraSets().GetSet(frame_idx), {});
+
+  cmd_buff.bindDescriptorSets(  // gbuff
+      vk::PipelineBindPoint::eGraphics, ao_gen_pipe_.GetLayout(), 1,
+      desc_pool_.GetGBuffSets().GetSet(frame_idx), {});
+
+  cmd_buff.bindDescriptorSets(  // kernel + noise texture
+      vk::PipelineBindPoint::eGraphics, ao_gen_pipe_.GetLayout(), 2,
+      desc_pool_.GetAOSet().GetSet(0), {});
+
+  cmd_buff.draw(3, 1, 0, 0);
+  cmd_buff.endRenderPass();
+
+  // horizontal blur pass
+  cmd_buff.beginRenderPass(ao_blur_h_pass_.BeginInfo(frame_idx, res_extent),
+                           vk::SubpassContents::eInline);
+
+  cmd_buff.bindPipeline(vk::PipelineBindPoint::eGraphics,
+                        ao_blur_pipe_.GetPipeline());
+
+  cmd_buff.bindDescriptorSets(  // ao_res
+      vk::PipelineBindPoint::eGraphics, ao_blur_pipe_.GetLayout(), 0,
+      desc_pool_.GetAOResSets().GetSet(frame_idx), {});
+
+  auto& blur_pc = res_.GetSSAOBlurPC();
+  blur_pc.flags.x = 0;  // horizontal
+  cmd_buff.pushConstants(ao_blur_pipe_.GetLayout(),
+                         vk::ShaderStageFlagBits::eFragment, 0,
+                         sizeof(BlurPushConst), &blur_pc);
+
+  cmd_buff.draw(3, 1, 0, 0);
+  cmd_buff.endRenderPass();
+
+  // vertical blur pass
+  cmd_buff.beginRenderPass(ao_blur_v_pass_.BeginInfo(frame_idx, res_extent),
+                           vk::SubpassContents::eInline);
+
+  cmd_buff.bindPipeline(vk::PipelineBindPoint::eGraphics,
+                        ao_blur_pipe_.GetPipeline());
+
+  cmd_buff.bindDescriptorSets(  // ao_temp input
+      vk::PipelineBindPoint::eGraphics, ao_blur_pipe_.GetLayout(), 0,
+      desc_pool_.GetAOTempSets().GetSet(frame_idx), {});
+
+  blur_pc.flags.x = 1;  // vertical
+  cmd_buff.pushConstants(ao_blur_pipe_.GetLayout(),
+                         vk::ShaderStageFlagBits::eFragment, 0,
+                         sizeof(BlurPushConst), &blur_pc);
+
+  cmd_buff.draw(3, 1, 0, 0);
   cmd_buff.endRenderPass();
 }
 
@@ -275,9 +339,12 @@ void Renderer::RecordSwapPass(vk::CommandBuffer cmd_buff, uint image_idx,
                          sizeof(load_data), &load_data);
   cmd_buff.bindPipeline(vk::PipelineBindPoint::eGraphics,
                         swap_pipe_.GetPipeline());
-  cmd_buff.bindDescriptorSets(
-      vk::PipelineBindPoint::eGraphics, swap_pipe_.GetLayout(), 0,
-      desc_pool_.GetPresentSets().GetSet(frame_idx), {});
+  cmd_buff.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                              swap_pipe_.GetLayout(), 0,
+                              desc_pool_.GetAOResSets().GetSet(frame_idx), {});
+  // cmd_buff.bindDescriptorSets(
+  //     vk::PipelineBindPoint::eGraphics, swap_pipe_.GetLayout(), 0,
+  //     desc_pool_.GetPresentSets().GetSet(frame_idx), {});
   // cmd_buff.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
   //                             swap_pipe_.GetLayout(), 0,
   //                             desc_pool_.GetGBuffSets().GetSet(frame_idx),
@@ -349,6 +416,8 @@ void Renderer::SwapShaders() {
   c_.GetDevice().waitIdle();
 
   if (!gbuff_pipe_.IsUpToDate()) gbuff_pipe_.Recreate();
+  if (!ao_gen_pipe_.IsUpToDate()) ao_gen_pipe_.Recreate();
+  if (!ao_blur_pipe_.IsUpToDate()) ao_blur_pipe_.Recreate();
   if (!abuff_fill_pipe_.IsUpToDate()) abuff_fill_pipe_.Recreate();
   if (!abuff_resolve_pipe_.IsUpToDate()) abuff_resolve_pipe_.Recreate();
   if (!wboit_acc_pipe_.IsUpToDate()) wboit_acc_pipe_.Recreate();

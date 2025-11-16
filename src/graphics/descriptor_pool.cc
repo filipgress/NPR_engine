@@ -9,6 +9,9 @@ DescriptorPool::DescriptorPool(const VulkanContext& context,
       gbuff_sets_{context, res.GetFrameCount()},
       camera_sets_{context, res.GetFrameCount()},
       material_sets_{context, res.GetFrameCount()},
+      ao_set_{context},
+      ao_res_sets_{context, res.GetFrameCount()},
+      ao_temp_sets_{context, res.GetFrameCount()},
       abuff_sets_{context, res.GetFrameCount()},
       wboit_input_sets_{context, res.GetFrameCount()},
       present_sets_{context, res.GetFrameCount()} {
@@ -22,6 +25,15 @@ DescriptorPool::DescriptorPool(const VulkanContext& context,
 
   material_sets_.AllocSets(pool_);
   material_sets_.Update(res);
+
+  ao_set_.AllocSets(pool_);
+  ao_set_.Update(res);
+
+  ao_res_sets_.AllocSets(pool_);
+  ao_res_sets_.Update(res);
+
+  ao_temp_sets_.AllocSets(pool_);
+  ao_temp_sets_.Update(res);
 
   abuff_sets_.AllocSets(pool_);
   abuff_sets_.Update(res);
@@ -46,6 +58,16 @@ void DescriptorPool::CreateDescriptorPool() {
   pool_sizes.insert(pool_sizes.end(), material_sizes.begin(),
                     material_sizes.end());
 
+  const auto& ao_sizes = ao_set_.GetPoolSizes();
+  pool_sizes.insert(pool_sizes.end(), ao_sizes.begin(), ao_sizes.end());
+
+  const auto& ao_res_sizes = ao_res_sets_.GetPoolSizes();
+  pool_sizes.insert(pool_sizes.end(), ao_res_sizes.begin(), ao_res_sizes.end());
+
+  const auto& ao_temp_sizes = ao_temp_sets_.GetPoolSizes();
+  pool_sizes.insert(pool_sizes.end(), ao_temp_sizes.begin(),
+                    ao_temp_sizes.end());
+
   const auto& abuff_sizes = abuff_sets_.GetPoolSizes();
   pool_sizes.insert(pool_sizes.end(), abuff_sizes.begin(), abuff_sizes.end());
 
@@ -57,8 +79,10 @@ void DescriptorPool::CreateDescriptorPool() {
                     present_sizes.end());
 
   uint32_t max_sets = gbuff_sets_.GetCount() + camera_sets_.GetCount() +
-                      material_sets_.GetCount() + abuff_sets_.GetCount() +
-                      wboit_input_sets_.GetCount() + present_sets_.GetCount();
+                      material_sets_.GetCount() + ao_set_.GetCount() +
+                      ao_res_sets_.GetCount() + ao_temp_sets_.GetCount() +
+                      abuff_sets_.GetCount() + wboit_input_sets_.GetCount() +
+                      present_sets_.GetCount();
 
   vk::DescriptorPoolCreateInfo poolInfo{};
   poolInfo.poolSizeCount = pool_sizes.size();

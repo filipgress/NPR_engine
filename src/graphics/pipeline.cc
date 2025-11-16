@@ -263,6 +263,7 @@ vk::PipelineDepthStencilStateCreateInfo GBuffPipe::GetDepthStencilState()
   depth_stencil.depthTestEnable = VK_TRUE;
   depth_stencil.depthWriteEnable = VK_TRUE;
   depth_stencil.depthCompareOp = vk::CompareOp::eLess;
+  depth_stencil.depthBoundsTestEnable = VK_FALSE;
   depth_stencil.stencilTestEnable = VK_TRUE;
 
   depth_stencil.front.failOp = vk::StencilOp::eKeep;
@@ -271,6 +272,31 @@ vk::PipelineDepthStencilStateCreateInfo GBuffPipe::GetDepthStencilState()
   depth_stencil.front.compareOp = vk::CompareOp::eAlways;
   depth_stencil.front.compareMask = BIT(1);
   depth_stencil.front.writeMask = BIT(1);
+  depth_stencil.front.reference = BIT(1);
+
+  depth_stencil.back = depth_stencil.front;
+
+  return depth_stencil;
+}
+
+/*
+ * AOGenPipe
+ */
+vk::PipelineDepthStencilStateCreateInfo AOGenPipe::GetDepthStencilState()
+    const {
+  vk::PipelineDepthStencilStateCreateInfo depth_stencil{};
+  depth_stencil.depthTestEnable = VK_FALSE;
+  depth_stencil.depthWriteEnable = VK_FALSE;
+  depth_stencil.depthCompareOp = vk::CompareOp::eAlways;
+  depth_stencil.depthBoundsTestEnable = VK_FALSE;
+  depth_stencil.stencilTestEnable = VK_TRUE;
+
+  depth_stencil.front.failOp = vk::StencilOp::eKeep;
+  depth_stencil.front.passOp = vk::StencilOp::eKeep;
+  depth_stencil.front.depthFailOp = vk::StencilOp::eKeep;
+  depth_stencil.front.compareOp = vk::CompareOp::eEqual;
+  depth_stencil.front.compareMask = BIT(1);
+  depth_stencil.front.writeMask = 0;
   depth_stencil.front.reference = BIT(1);
 
   depth_stencil.back = depth_stencil.front;

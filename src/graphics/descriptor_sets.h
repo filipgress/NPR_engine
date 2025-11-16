@@ -64,6 +64,25 @@ class PresentSets : public SingleTexSets {
   }
 };
 
+class AOResSets : public SingleTexSets {
+ public:
+  AOResSets(const VulkanContext& context, uint count)
+      : SingleTexSets{context, count} {}
+
+  const Texture* GetAttach(const Resources& res, int frame_idx) const override {
+    return res.GetResources()[frame_idx].ao_res.get();
+  }
+};
+
+class AOTempSets : public SingleTexSets {
+ public:
+  AOTempSets(const VulkanContext& context, uint count)
+      : SingleTexSets{context, count} {}
+
+  const Texture* GetAttach(const Resources& res, int frame_idx) const override {
+    return res.GetResources()[frame_idx].ao_temp.get();
+  }
+};
 /*
  * SingleBuffSets
  */
@@ -144,6 +163,25 @@ class TextureArraySet : public BaseDescSets {
   void Update(uint idx, const npr_graphics::Texture& texture) const;
   std::vector<vk::DescriptorPoolSize> GetPoolSizes() const override {
     return {{vk::DescriptorType::eCombinedImageSampler, MAX_TEXTURES}};
+  }
+
+ private:
+  void CreateLayout() override;
+};
+
+/*
+ * AOSet
+ */
+class AOSet : public BaseDescSets {
+ public:
+  AOSet(const VulkanContext& context) : BaseDescSets{context, 1} {
+    CreateLayout();
+  }
+
+  void Update(const Resources& res) const;
+  std::vector<vk::DescriptorPoolSize> GetPoolSizes() const override {
+    return {{vk::DescriptorType::eUniformBuffer, 1},
+            {vk::DescriptorType::eCombinedImageSampler, 1}};
   }
 
  private:

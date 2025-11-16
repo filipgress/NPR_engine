@@ -39,5 +39,5 @@ void main() {
       1e-2, 3e3);
 
   acc_color = vec4(lit_color * albedo.a, albedo.a) * w;
-  acc_alpha = albedo.a * w;
+  acc_alpha = albedo.a;
 }

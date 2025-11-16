@@ -10,9 +10,8 @@ App::App()
       scene_swap_{std::make_unique<npr_scene::Scene>()} {
   npr_scene::SceneLoader::LoadAsync(
       renderer_, *scene_swap_, tasks_,
-      [this]() { scene_swap_.swap(active_scene_); },
-      // "../assets/scene_graph/scene.gltf");
-      "../assets/market/scene.gltf");
+      [this]() { scene_swap_.swap(active_scene_); }, "../assets/ds/scene.gltf");
+  // "../assets/market/scene.gltf");
 
   tasks_.Add([&]() {
     if (inputs_.key_tokens.contains(GLFW_KEY_LEFT_CONTROL) &&

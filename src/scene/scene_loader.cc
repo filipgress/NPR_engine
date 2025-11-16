@@ -199,6 +199,9 @@ void SceneLoader::LoadLight(flecs::entity node_ent,
     range_comp.range = gltf_light.range;
     node_ent.set<RangeComp>(range_comp);
 
+    auto& tf = node_ent.get_mut<TransformComp>();
+    tf.scale = glm::vec3(range_comp.range);
+
   } else if (gltf_light.type == "spot") {
     node_ent.add<SpotLightTag>();
 
@@ -210,6 +213,10 @@ void SceneLoader::LoadLight(flecs::entity node_ent,
     spot_comp.inner_cone_angle = gltf_light.spot.innerConeAngle;
     spot_comp.outer_cone_angle = gltf_light.spot.outerConeAngle;
     node_ent.set<SpotComp>(spot_comp);
+
+    auto base_radius = range_comp.range * std::tan(spot_comp.outer_cone_angle);
+    auto& tf = node_ent.get_mut<TransformComp>();
+    tf.scale = glm::vec3(base_radius, base_radius, range_comp.range);
 
   } else {
     INFO("[warn]: skipping unsupported light type: " + gltf_light.type);

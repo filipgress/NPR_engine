@@ -1,4 +1,5 @@
 #include "resources.h"
+#include <random>
 
 namespace npr_graphics {
 
@@ -19,11 +20,15 @@ Resources::Resources(const VulkanContext& context, const CommandPool& cmd_pool,
 
   CreateImages();
   CreateBuffers();
-  CreateABuffer();
+  CreateABuffers();
+
+  CreateAOKernel();
+  ssao_blur_ = CreateGaussianKernel(5);
 
   auto cmd_buff = cmd_pool.BeginSingleTimeCmds();
   {
     CreateDefaultColorTex(cmd_buff);
+    CreateAONoiseTex(cmd_buff);
 
     CreateSphereMesh(cmd_buff);
     CreateConeMesh(cmd_buff);
@@ -85,6 +90,28 @@ void Resources::CreateImages() {
         vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil,
         frame_props_.samples, "depth_stencil_ms" + std::to_string(idx));
 
+    // ao pass
+    res.ao_ms = std::make_unique<Image>(
+        c_, frame_props_.ao_format, frame_props_.extent,
+        vk::ImageUsageFlagBits::eColorAttachment |
+            vk::ImageUsageFlagBits::eTransientAttachment,
+        vk::ImageAspectFlagBits::eColor, vk::SharingMode::eExclusive,
+        frame_props_.samples, 1, "ao_ms_" + std::to_string(idx));
+
+    res.ao_res = std::make_unique<Texture>(
+        c_, frame_props_.ao_format, frame_props_.extent,
+        vk::ImageUsageFlagBits::eColorAttachment |
+            vk::ImageUsageFlagBits::eSampled,
+        vk::ImageAspectFlagBits::eColor, vk::SampleCountFlagBits::e1,
+        "ao_res_" + std::to_string(idx));
+
+    res.ao_temp = std::make_unique<Texture>(
+        c_, frame_props_.ao_format, frame_props_.extent,
+        vk::ImageUsageFlagBits::eColorAttachment |
+            vk::ImageUsageFlagBits::eSampled,
+        vk::ImageAspectFlagBits::eColor, vk::SampleCountFlagBits::e1,
+        "ao_temp_" + std::to_string(idx));
+
     // wboit pass
     res.acc_color_ms = std::make_unique<Image>(
         c_, frame_props_.acc_color_format, frame_props_.extent,
@@ -144,7 +171,7 @@ void Resources::CreateBuffers() {
   }
 }
 
-void Resources::CreateABuffer() {
+void Resources::CreateABuffers() {
   if (frame_resources_[0].abuff_heads) {
     c_.GetDevice().waitIdle();
     for (auto& res : frame_resources_) {
@@ -210,6 +237,74 @@ vk::SampleCountFlagBits Resources::GetMaxSamples() {
   if (counts & vk::SampleCountFlagBits::e2) return vk::SampleCountFlagBits::e2;
 
   return vk::SampleCountFlagBits::e1;
+}
+
+BlurPushConst Resources::CreateGaussianKernel(int radius) {
+  BlurPushConst blur_pc;
+
+  radius = std::clamp(radius, 1, MAX_GAUSSIAN_RADIUS);
+  blur_pc.flags.y = radius;
+
+  float sigma = radius / 3.0f;
+  float sigma_sq = 2.0f * sigma * sigma;
+
+  float sum = 0.0f;
+
+  for (int i = 0; i <= radius; ++i) {
+    float w = std::exp(-float(i * i) / sigma_sq);
+    blur_pc.weights[i] = w;
+    sum += (i == 0) ? w : 2.0f * w;
+  }
+
+  for (int i = 0; i <= radius; ++i) blur_pc.weights[i] /= sum;
+
+  return blur_pc;
+}
+
+void Resources::CreateAONoiseTex(vk::CommandBuffer cmd_buff) {
+  std::vector<glm::vec2> noise(AO_NOISE_DIM * AO_NOISE_DIM);
+
+  std::mt19937 rng(std::random_device{}());
+  std::uniform_real_distribution<float> dist(-1.0f, 1.0f);
+
+  for (auto& n : noise) n = glm::normalize(glm::vec2(dist(rng), dist(rng)));
+
+  SamplerProps props;
+  props.address_mode_U = vk::SamplerAddressMode::eRepeat;
+  props.address_mode_V = vk::SamplerAddressMode::eRepeat;
+
+  ao_noise_tex_ = std::make_unique<Texture>(
+      c_, frame_props_.ao_noise_format,
+      vk::Extent2D{AO_NOISE_DIM, AO_NOISE_DIM},
+      vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
+      vk::ImageAspectFlagBits::eColor, vk::SampleCountFlagBits::e1,
+      "ao_noise_tex", props);
+
+  ao_noise_tex_->Write(cmd_buff, noise.data(),
+                       sizeof(glm::vec2) * noise.size());
+}
+
+void Resources::CreateAOKernel() {
+  AOKernel kernel;
+
+  std::mt19937 rng(std::random_device{}());
+  std::uniform_real_distribution<float> rand01(0.0f, 1.0f);
+
+  for (int i = 0; i < AO_KERNEL_SIZE; ++i) {
+    glm::vec4 sample(rand01(rng) * 2.0f - 1.0f, rand01(rng) * 2.0f - 1.0f,
+                     rand01(rng), 0.0f);
+    sample = glm::normalize(sample);
+    sample *= rand01(rng);
+
+    float scale = float(i) / float(AO_KERNEL_SIZE - 1);
+    scale = glm::mix(0.1f, 1.0f, scale * scale);
+    sample *= scale;
+
+    kernel[i] = sample;
+  }
+
+  ao_kernel_ = std::make_unique<UniformBuffer<AOKernel>>(c_, "ao_kernel_unif");
+  ao_kernel_->Write(kernel);
 }
 
 void Resources::CreateSphereMesh(vk::CommandBuffer cmd_buff) {

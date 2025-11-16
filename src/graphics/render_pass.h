@@ -78,6 +78,69 @@ class GBuffPass : public RenderPass {
   vk::AttachmentReference resolve_ref_{};
 };
 
+class AOGenPass : public RenderPass {
+ public:
+  AOGenPass(const VulkanContext& context, const Resources& res)
+      : RenderPass{context, res} {
+    Init();
+  }
+
+ private:
+  const std::string GetDbgName() const override { return "ao_gen_pass"; }
+  void SetClearValues() override;
+
+  std::vector<vk::AttachmentDescription> GetAttachments() const override;
+  std::vector<vk::SubpassDependency> GetDependencies() const override;
+  std::vector<vk::SubpassDescription> GetSubpasses() override;
+  std::vector<vk::ImageView> GetAttachmentViews(int frame_idx) const override;
+
+ private:
+  vk::AttachmentReference ao_ms_ref_{};
+  vk::AttachmentReference ao_res_ref_{};
+  vk::AttachmentReference depth_ref_{};
+};
+
+class BlurPass : public RenderPass {
+ public:
+  BlurPass(const VulkanContext& context, const Resources& res,
+           vk::Format format)
+      : RenderPass(context, res), format_{format} {}
+
+ private:
+  void SetClearValues() override;
+  std::vector<vk::AttachmentDescription> GetAttachments() const override;
+  std::vector<vk::SubpassDependency> GetDependencies() const override;
+  std::vector<vk::SubpassDescription> GetSubpasses() override;
+
+ private:
+  vk::Format format_;
+  vk::AttachmentReference color_ref_{};
+};
+
+class AOBlurHPass : public BlurPass {
+ public:
+  AOBlurHPass(const VulkanContext& context, const Resources& res)
+      : BlurPass(context, res, res.GetProps().ao_format) {
+    Init();
+  }
+
+ private:
+  std::vector<vk::ImageView> GetAttachmentViews(int frame_idx) const override;
+  const std::string GetDbgName() const override { return "ao_blur_h_pass"; }
+};
+
+class AOBlurVPass : public BlurPass {
+ public:
+  AOBlurVPass(const VulkanContext& context, const Resources& res)
+      : BlurPass(context, res, res.GetProps().ao_format) {
+    Init();
+  }
+
+ private:
+  std::vector<vk::ImageView> GetAttachmentViews(int frame_idx) const override;
+  const std::string GetDbgName() const override { return "ao_blur_v_pass"; }
+};
+
 class LightPass : public RenderPass {
  public:
   LightPass(const VulkanContext& context, const Resources& res)

@@ -9,8 +9,8 @@ layout(location = 2) in mat3 TBN;
 
 layout(location = 0) out vec4 out_albedo; // rgb = albedo, a = metallic
 layout(location = 1) out vec4 out_emissive; // rgb = emissive, a = roughness
-layout(location = 2) out vec4 out_position; // xyz = world position, w = unused
-layout(location = 3) out vec4 out_normal; // xyz = world normal, w = unused
+layout(location = 2) out vec4 out_position; // xyz = view space position, w = unused
+layout(location = 3) out vec4 out_normal; // xyz = view space normal, w = unused
 layout(location = 4) out float out_coverage; // Coverage for MSAA resolve
 
 layout(set = 1, binding = 0) uniform sampler2D textures[MAX_TEXTURES];

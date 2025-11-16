@@ -108,10 +108,10 @@ void Image::AllocMem() {
 Texture::Texture(const VulkanContext& context, vk::Format format,
                  vk::Extent2D extent, vk::ImageUsageFlags usage,
                  vk::ImageAspectFlags aspect, vk::SampleCountFlagBits samples,
-                 std::string dbg_name)
+                 std::string dbg_name, const SamplerProps& sampler_props)
     : Image(context, format, extent, usage, aspect, vk::SharingMode::eExclusive,
             samples, 1, dbg_name) {
-  CreateSampler();
+  CreateSampler(sampler_props);
 }
 
 Texture::Texture(const VulkanContext& context, const TextureProps& data,
@@ -182,12 +182,28 @@ void Texture::CreateSampler(const SamplerProps& props) {
   sampler_ = c_.GetDevice().createSampler(samplerInfo);
 }
 
+void Texture::Write(vk::CommandBuffer cmd_buff, void* data, size_t buff_size,
+                    vk::ImageLayout src_layout) {
+  if (!staging_buff_)
+    staging_buff_ = std::make_unique<StagingBuffer>(c_, buff_size);
+  staging_buff_->Write(nullptr, data);
+
+  Transition(cmd_buff, src_layout, vk::ImageLayout::eTransferDstOptimal, 0,
+             mip_levels_);
+
+  CopyFromBuffer(cmd_buff);
+  GenerateMipmaps(cmd_buff);
+
+  Transition(cmd_buff, vk::ImageLayout::eTransferDstOptimal,
+             vk::ImageLayout::eShaderReadOnlyOptimal, mip_levels_ - 1, 1);
+}
+
 void Texture::Write(vk::CommandBuffer cmd_buff,
                     const std::vector<unsigned char>& data,
                     vk::ImageLayout src_layout) {
   if (!staging_buff_)
     staging_buff_ = std::make_unique<StagingBuffer>(c_, data.size());
-  staging_buff_->Write(cmd_buff, data.data());
+  staging_buff_->Write(nullptr, data.data());
 
   Transition(cmd_buff, src_layout, vk::ImageLayout::eTransferDstOptimal, 0,
              mip_levels_);

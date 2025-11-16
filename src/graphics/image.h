@@ -72,7 +72,8 @@ class Texture : public Image {
  public:
   Texture(const VulkanContext& context, vk::Format format, vk::Extent2D extent,
           vk::ImageUsageFlags usage, vk::ImageAspectFlags aspect,
-          vk::SampleCountFlagBits samples, std::string dbg_name);
+          vk::SampleCountFlagBits samples, std::string dbg_name,
+          const SamplerProps& sampler_props = SamplerProps());
   Texture(const VulkanContext& context, const TextureProps& data,
           const SamplerProps& sampler_props = SamplerProps());
   Texture(Texture&&) noexcept;
@@ -82,6 +83,8 @@ class Texture : public Image {
   static TextureTypeInfo GetTypeInfo(TextureType type);
 
   void DestroyStagingBuff() { staging_buff_.reset(); }
+  void Write(vk::CommandBuffer cmd_buff, void* data, size_t elem_size,
+             vk::ImageLayout src_layout = vk::ImageLayout::eUndefined);
   void Write(vk::CommandBuffer cmd_buff, const std::vector<unsigned char>& data,
              vk::ImageLayout src_layout = vk::ImageLayout::eUndefined);
 

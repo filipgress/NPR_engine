@@ -17,6 +17,9 @@ class DescriptorPool : public npr_core::NonCopyable {
   const GBuffSets& GetGBuffSets() const { return gbuff_sets_; }
   const CameraUnifSets& GetCameraSets() const { return camera_sets_; }
   const MaterialUnifSets& GetMaterialSets() const { return material_sets_; }
+  const AOSet& GetAOSet() const { return ao_set_; }
+  const AOResSets& GetAOResSets() const { return ao_res_sets_; }
+  const AOTempSets& GetAOTempSets() const { return ao_temp_sets_; }
   const ABufferSets& GetABufferSets() const { return abuff_sets_; }
   const WBoitInputSets& GetWBoitInputSets() const { return wboit_input_sets_; }
   const PresentSets& GetPresentSets() const { return present_sets_; }
@@ -32,6 +35,11 @@ class DescriptorPool : public npr_core::NonCopyable {
   GBuffSets gbuff_sets_;
   CameraUnifSets camera_sets_;
   MaterialUnifSets material_sets_;
+
+  AOSet ao_set_;
+  AOResSets ao_res_sets_;
+  AOTempSets ao_temp_sets_;
+
   ABufferSets abuff_sets_;
   WBoitInputSets wboit_input_sets_;
   PresentSets present_sets_;

@@ -11,13 +11,19 @@ namespace npr_graphics {
 
 #define MAX_TEXTURES 128
 #define MAX_MATERIALS 1024
-#define MAX_INSTANCES 16384
+#define MAX_INSTANCES 65536  // 2^16
 
 #define MAX_DIR_LIGHTS 2
 #define MAX_POINT_LIGHTS 4
 #define MAX_SPOT_LIGHTS 4
 
 #define ABUFF_INIT_SIZE 8  // avg fragments per pixel
+
+#define AO_NOISE_DIM 4
+#define AO_KERNEL_SIZE 64
+using AOKernel = std::array<glm::vec4, AO_KERNEL_SIZE>;
+
+#define MAX_GAUSSIAN_RADIUS 10
 
 enum MaterialFlags : uint32_t {
   kNone = BIT(0),
@@ -90,6 +96,11 @@ struct alignas(16) ABuffResolvePushConst {
   uint32_t _padding[2];
 };
 
+struct alignas(16) BlurPushConst {
+  glm::ivec4 flags;  // x = horizontal(1) / vertical(0), y = radius, zw = unused
+  float weights[MAX_GAUSSIAN_RADIUS + 1];  // weights[0] to weights[radius]
+};
+
 struct LoadPushConst {
   glm::uvec2 res{0};
   alignas(16) glm::vec3 t{0.0f};
@@ -113,6 +124,10 @@ struct FrameProps {
   const vk::Format normal_format = vk::Format::eR16G16B16A16Sfloat;
   const vk::Format coverage_format = vk::Format::eR16Sfloat;
 
+  // ao
+  const vk::Format ao_noise_format = vk::Format::eR16G16Sfloat;
+  const vk::Format ao_format = vk::Format::eR8Unorm;
+
   // wboit layout
   const vk::Format acc_color_format = vk::Format::eR16G16B16A16Sfloat;
   const vk::Format acc_weight_format = vk::Format::eR16Sfloat;
@@ -134,6 +149,11 @@ struct FrameResources {
   std::unique_ptr<Texture> coverage_res;
 
   std::unique_ptr<Texture> depth_stencil_ms;
+
+  // ao
+  std::unique_ptr<Image> ao_ms;
+  std::unique_ptr<Texture> ao_res;
+  std::unique_ptr<Texture> ao_temp;  // for separable blur
 
   // abuff transparency
   std::unique_ptr<Buffer> abuff_heads;
@@ -169,7 +189,11 @@ class Resources : public npr_core::NonCopyable {
 
   uint GetFrameCount() const { return frame_count_; }
   const FrameProps& GetProps() const { return frame_props_; }
+  BlurPushConst& GetSSAOBlurPC() { return ssao_blur_; }
   const Texture& GetDefaultColorTex() const { return *default_color_tex_; }
+  const Texture& GetAONoiseTex() const { return *ao_noise_tex_; }
+  const UniformBuffer<AOKernel>& GetAOKernel() const { return *ao_kernel_; }
+
   const std::vector<FrameResources>& GetResources() const {
     return frame_resources_;
   }
@@ -177,7 +201,11 @@ class Resources : public npr_core::NonCopyable {
  private:
   void CreateImages();
   void CreateBuffers();
-  void CreateABuffer();
+  void CreateABuffers();
+  BlurPushConst CreateGaussianKernel(int radius);
+
+  void CreateAONoiseTex(vk::CommandBuffer cmd_buff);
+  void CreateAOKernel();
 
   void CreateSphereMesh(vk::CommandBuffer cmd_buff);
   void CreateConeMesh(vk::CommandBuffer cmd_buff);
@@ -194,6 +222,12 @@ class Resources : public npr_core::NonCopyable {
   uint frame_count_;
 
   std::unique_ptr<Texture> default_color_tex_;
+
+  // ao resources
+  std::unique_ptr<Texture> ao_noise_tex_;
+  std::unique_ptr<UniformBuffer<AOKernel>> ao_kernel_;
+
+  BlurPushConst ssao_blur_;
 
   // primitive meshes / light volumes
   std::unique_ptr<Mesh> cone_mesh_;

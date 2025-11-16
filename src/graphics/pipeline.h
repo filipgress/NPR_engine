@@ -159,6 +159,67 @@ class GBuffPipe : public Pipeline {
   vk::PipelineDepthStencilStateCreateInfo GetDepthStencilState() const override;
 };
 
+class AOGenPipe : public Pipeline {
+ public:
+  AOGenPipe(const VulkanContext& context, const PipelineCache& cache,
+            const AOGenPass& render_pass, VertexShader& vert_shader,
+            FragmentShader& frag_shader, vk::SampleCountFlagBits samples,
+            const DescriptorPool& desc_pool)
+      : Pipeline(context, cache, render_pass, vert_shader, frag_shader) {
+    CreateLayout({desc_pool.GetCameraSets().GetLayout(),
+                  desc_pool.GetGBuffSets().GetLayout(),
+                  desc_pool.GetAOSet().GetLayout()},
+                 {});
+
+    data_.samples = samples;
+
+    // ao_ms output
+    data_.color_attachments.resize(1);
+    data_.color_attachments[0].blendEnable = VK_FALSE;
+    data_.color_attachments[0].colorWriteMask = vk::ColorComponentFlagBits::eR;
+
+    Recreate();
+  }
+
+  void Recreate() override {
+    CreatePipeline(0, "main", "main",
+                   {MakeSpecConst(0, static_cast<uint32_t>(AO_NOISE_DIM)),
+                    MakeSpecConst(1, static_cast<uint32_t>(AO_KERNEL_SIZE))});
+  }
+
+ private:
+  const std::string GetDbgName() const override { return "ao_gen_pipe"; }
+  vk::PipelineDepthStencilStateCreateInfo GetDepthStencilState() const override;
+};
+
+class AOBlurPipe : public Pipeline {
+ public:
+  AOBlurPipe(const VulkanContext& context, const PipelineCache& cache,
+             const BlurPass& render_pass, VertexShader& vert_shader,
+             FragmentShader& frag_shader, const DescriptorPool& desc_pool)
+      : Pipeline(context, cache, render_pass, vert_shader, frag_shader) {
+    CreateLayout(
+        {desc_pool.GetAOResSets().GetLayout()},
+        {MakePushConst<BlurPushConst>(vk::ShaderStageFlagBits::eFragment)});
+
+    // ao_res or ao_temp output
+    data_.color_attachments.resize(1);
+    data_.color_attachments[0].blendEnable = VK_FALSE;
+    data_.color_attachments[0].colorWriteMask = vk::ColorComponentFlagBits::eR;
+
+    Recreate();
+  }
+
+  void Recreate() override {
+    CreatePipeline(
+        0, "main", "main",
+        {MakeSpecConst(0, static_cast<uint32_t>(MAX_GAUSSIAN_RADIUS))});
+  }
+
+ private:
+  const std::string GetDbgName() const override { return "ao_blur_pipe"; }
+};
+
 class ABuffFillPipe : public Pipeline {
  public:
   ABuffFillPipe(const VulkanContext& context, const PipelineCache& cache,
@@ -335,7 +396,8 @@ class SwapPipe : public Pipeline {
            FragmentShader& frag_shader, const DescriptorPool& desc_pool)
       : Pipeline(context, cache, render_pass, vert_shader, frag_shader) {
     CreateLayout(
-        {desc_pool.GetPresentSets().GetLayout()},
+        {desc_pool.GetAOResSets().GetLayout()},
+        // {desc_pool.GetPresentSets().GetLayout()},
         // {desc_pool.GetGBuffSets().GetLayout()},
         {MakePushConst<LoadPushConst>(vk::ShaderStageFlagBits::eFragment)});
 
