@@ -11,7 +11,8 @@ enum class EventType {
   kMousePress,
   kMouseRelease,
   kMouseMove,
-  kMouseScroll
+  kMouseScroll,
+  kMouseEnter
 };
 
 #define EVENT_TYPE(type)                                                      \

@@ -99,6 +99,14 @@ void Window::SetEventCallbacks() {
         MouseMoveEvent e({pos_x, pos_y});
         callback_fn(e);
       });
+
+  glfwSetCursorEnterCallback(window_, [](GLFWwindow* window, int entered) {
+    auto callback_fn =
+        *static_cast<EventCallbackFn*>(glfwGetWindowUserPointer(window));
+
+    MouseEnterEvent e(entered);
+    callback_fn(e);
+  });
 }
 
 vk::SurfaceKHR Window::CreateSurface(vk::Instance instance) const {

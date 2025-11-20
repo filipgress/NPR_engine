@@ -1,5 +1,5 @@
-#ifndef MOUSE_H_
-#define MOUSE_H_
+#ifndef MOUSE_EVENT_H_
+#define MOUSE_EVENT_H_
 
 #include "event.h"
 
@@ -75,6 +75,25 @@ class MouseMoveEvent : public Event {
  private:
   glm::vec2 move_;
 };
+
+class MouseEnterEvent : public Event {
+ public:
+  MouseEnterEvent(bool entered) : entered_(entered) {}
+
+  bool HasEntered() const { return entered_; }
+
+  std::string ToString() const override {
+    std::stringstream ss;
+    ss << "MouseEnterEvent: " << (entered_ ? "Entered" : "Left");
+    return ss.str();
+  }
+
+  EVENT_TYPE(kMouseEnter)
+
+ private:
+  bool entered_;
+};
+
 }  // namespace npr_window
 
-#endif  // MOUSE_H_
+#endif  // MOUSE_EVENT_H_

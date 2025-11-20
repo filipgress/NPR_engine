@@ -18,6 +18,9 @@ class App : public NonCopyable {
   void Run();
 
  private:
+  void Update();
+  void ProcessInput();
+
   void OnEvent(npr_window::Event& e);
 
  private:
@@ -25,8 +28,9 @@ class App : public NonCopyable {
   npr_graphics::Renderer renderer_{window_};
 
   npr_scene::Camera camera_{window_.GetAspect()};
+
   std::unique_ptr<npr_scene::Scene> active_scene_;
-  std::unique_ptr<npr_scene::Scene> scene_swap_;
+  std::unique_ptr<npr_scene::Scene> loading_scene_;
 
   FrameTimer timer_{0, [this](npr_window::Event& e) { return OnEvent(e); }};
   InputHandler inputs_;

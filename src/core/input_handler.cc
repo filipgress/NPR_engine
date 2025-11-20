@@ -18,11 +18,19 @@ void InputHandler::OnEvent(npr_window::Event& e) {
     return false;
   });
   dispatcher.Dispatch<MouseMoveEvent>([this](MouseMoveEvent& e) {
+    if (should_skip > 0) {
+      last_mouse_pos = e.GetMove();
+      should_skip--;
+    }
     curr_mouse_pos = e.GetMove();
     return false;
   });
   dispatcher.Dispatch<MouseScrollEvent>([this](MouseScrollEvent& e) {
     acc_mouse_scroll += e.GetOffset();
+    return false;
+  });
+  dispatcher.Dispatch<MouseEnterEvent>([this](MouseEnterEvent&) {
+    ResetMouse();
     return false;
   });
 
@@ -47,6 +55,12 @@ void InputHandler::Update(glm::ivec2 window_size) {
   last_mouse_pos = curr_mouse_pos;
 
   mouse_move = {delta.x / window_size.x, delta.y / window_size.y};
+}
+
+void InputHandler::ResetMouse() {
+  should_skip = SKIP_N_FRAMES;
+  last_mouse_pos = curr_mouse_pos;
+  mouse_move = {0.0f, 0.0f};
 }
 
 }  // namespace npr_core

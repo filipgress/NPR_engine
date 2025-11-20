@@ -48,6 +48,10 @@ class Camera {
 
   CameraMode GetMode() const { return props_.mode; }
   void SetMode(CameraMode mode) { props_.mode = mode; }
+  void ToggleMode() {
+    props_.mode = props_.mode == CameraMode::kFree ? CameraMode::kOrbit
+                                                   : CameraMode::kFree;
+  }
 
   float GetAspect() const;
   void SetAspect(float aspect);
