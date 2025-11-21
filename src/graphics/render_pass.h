@@ -1,14 +1,14 @@
 #ifndef RENDER_PASS_H_
 #define RENDER_PASS_H_
 
-#include "vulkan_context.h"
+#include "context.h"
 #include "swapchain.h"
 #include "resources.h"
 
 namespace npr_graphics {
 class BasePass : public npr_core::NonCopyable {
  public:
-  BasePass(const VulkanContext& context) : c_{context} {}
+  BasePass(const Context& ctx) : ctx_{ctx} {}
   virtual ~BasePass();
 
   vk::RenderPassBeginInfo BeginInfo(uint frame_idx, vk::Extent2D extent) const;
@@ -34,7 +34,7 @@ class BasePass : public npr_core::NonCopyable {
   virtual std::vector<vk::SubpassDescription> GetSubpasses() = 0;
 
  protected:
-  const VulkanContext& c_;
+  const Context& ctx_;
 
   vk::RenderPass render_pass_{nullptr};
   std::vector<vk::Framebuffer> framebuffers_;
@@ -43,8 +43,8 @@ class BasePass : public npr_core::NonCopyable {
 
 class RenderPass : public BasePass {
  public:
-  RenderPass(const VulkanContext& context, const Resources& res)
-      : BasePass{context}, res_{res} {}
+  RenderPass(const Context& ctx, const Resources& res)
+      : BasePass{ctx}, res_{res} {}
   virtual ~RenderPass() = default;
 
  protected:
@@ -58,8 +58,7 @@ class RenderPass : public BasePass {
 
 class GBuffPass : public RenderPass {
  public:
-  GBuffPass(const VulkanContext& context, const Resources& res)
-      : RenderPass{context, res} {
+  GBuffPass(const Context& ctx, const Resources& res) : RenderPass{ctx, res} {
     Init();
   }
 
@@ -80,8 +79,7 @@ class GBuffPass : public RenderPass {
 
 class AOGenPass : public RenderPass {
  public:
-  AOGenPass(const VulkanContext& context, const Resources& res)
-      : RenderPass{context, res} {
+  AOGenPass(const Context& ctx, const Resources& res) : RenderPass{ctx, res} {
     Init();
   }
 
@@ -102,9 +100,8 @@ class AOGenPass : public RenderPass {
 
 class BlurPass : public RenderPass {
  public:
-  BlurPass(const VulkanContext& context, const Resources& res,
-           vk::Format format)
-      : RenderPass(context, res), format_{format} {}
+  BlurPass(const Context& ctx, const Resources& res, vk::Format format)
+      : RenderPass(ctx, res), format_{format} {}
 
  private:
   void SetClearValues() override;
@@ -119,8 +116,8 @@ class BlurPass : public RenderPass {
 
 class AOBlurHPass : public BlurPass {
  public:
-  AOBlurHPass(const VulkanContext& context, const Resources& res)
-      : BlurPass(context, res, res.GetProps().ao_format) {
+  AOBlurHPass(const Context& ctx, const Resources& res)
+      : BlurPass(ctx, res, res.GetProps().ao_format) {
     Init();
   }
 
@@ -131,8 +128,8 @@ class AOBlurHPass : public BlurPass {
 
 class AOBlurVPass : public BlurPass {
  public:
-  AOBlurVPass(const VulkanContext& context, const Resources& res)
-      : BlurPass(context, res, res.GetProps().ao_format) {
+  AOBlurVPass(const Context& ctx, const Resources& res)
+      : BlurPass(ctx, res, res.GetProps().ao_format) {
     Init();
   }
 
@@ -143,8 +140,7 @@ class AOBlurVPass : public BlurPass {
 
 class LightPass : public RenderPass {
  public:
-  LightPass(const VulkanContext& context, const Resources& res)
-      : RenderPass{context, res} {
+  LightPass(const Context& ctx, const Resources& res) : RenderPass{ctx, res} {
     Init();
   }
 
@@ -163,8 +159,7 @@ class LightPass : public RenderPass {
 
 class ABuffPass : public RenderPass {
  public:
-  ABuffPass(const VulkanContext& context, const Resources& res)
-      : RenderPass{context, res} {
+  ABuffPass(const Context& ctx, const Resources& res) : RenderPass{ctx, res} {
     Init();
   }
 
@@ -184,8 +179,7 @@ class ABuffPass : public RenderPass {
 
 class WBoitPass : public RenderPass {
  public:
-  WBoitPass(const VulkanContext& context, const Resources& res)
-      : RenderPass{context, res} {
+  WBoitPass(const Context& ctx, const Resources& res) : RenderPass{ctx, res} {
     Init();
   }
 
@@ -209,8 +203,8 @@ class WBoitPass : public RenderPass {
 
 class SwapPass : public BasePass {
  public:
-  SwapPass(const VulkanContext& context, const Swapchain& swapchain)
-      : BasePass{context}, swapchain_{swapchain} {
+  SwapPass(const Context& ctx, const Swapchain& swapchain)
+      : BasePass{ctx}, swapchain_{swapchain} {
     Init();
   }
 

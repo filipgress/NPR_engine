@@ -5,7 +5,7 @@ using namespace npr_scene;
 void Renderer::Render(const Camera& camera, Scene& scene, bool is_loading,
                       float dt) {
   if (!scene.IsValid() || !scene.IsInit()) return;
-  auto device = c_.GetDevice();
+  auto device = ctx_.GetDevice();
 
   // wait for in flight fence
   auto [in_flight, image_available] = sync_.GetFrameSyncObjs();
@@ -55,7 +55,7 @@ void Renderer::Render(const Camera& camera, Scene& scene, bool is_loading,
   submit_info.signalSemaphoreCount = 1;
   submit_info.pSignalSemaphores = &render_finished;
 
-  c_.GetGraphicsQ().submit(submit_info, in_flight);
+  ctx_.GetGraphicsQ().submit(submit_info, in_flight);
 
   // present to screen
   vk::PresentInfoKHR present_info{};
@@ -65,7 +65,7 @@ void Renderer::Render(const Camera& camera, Scene& scene, bool is_loading,
   present_info.pSwapchains = &swapchain;
   present_info.pImageIndices = &image_idx;
 
-  auto res_present = c_.GetPresentQ().presentKHR(present_info);
+  auto res_present = ctx_.GetPresentQ().presentKHR(present_info);
   if (res_present == vk::Result::eErrorOutOfDateKHR ||
       res_present == vk::Result::eSuboptimalKHR ||
       swapchain_.GetProps().dirty) {
@@ -385,7 +385,7 @@ std::pair<vk::Viewport, vk::Rect2D> Renderer::CalcViewportScissor(
 }
 
 void Renderer::RenderTargetResize() {
-  c_.GetDevice().waitIdle();
+  ctx_.GetDevice().waitIdle();
 
   swapchain_.Recreate(window_.GetSize());
   swap_pass_.CreateFramebuffers();
@@ -418,7 +418,7 @@ void Renderer::SwapShaders() {
   }
 
   if (!is_dirty) return;
-  c_.GetDevice().waitIdle();
+  ctx_.GetDevice().waitIdle();
 
   if (!gbuff_pipe_.IsUpToDate()) gbuff_pipe_.Recreate();
   if (!ao_gen_pipe_.IsUpToDate()) ao_gen_pipe_.Recreate();

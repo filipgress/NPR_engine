@@ -1,14 +1,14 @@
 #ifndef IMAGE_H_
 #define IMAGE_H_
 
-#include "vulkan_context.h"
+#include "context.h"
 #include "buffer.h"
 
 namespace npr_graphics {
 
 class Image : public npr_core::NonCopyable {
  public:
-  Image(const VulkanContext& context, vk::Format format, vk::Extent2D extent,
+  Image(const Context& ctx, vk::Format format, vk::Extent2D extent,
         vk::ImageUsageFlags usage, vk::ImageAspectFlags aspect,
         vk::SharingMode sharing_mode, vk::SampleCountFlagBits samples,
         uint32_t mip_levels, std::string dbg_name);
@@ -30,7 +30,7 @@ class Image : public npr_core::NonCopyable {
   }
 
  protected:
-  const VulkanContext& c_;
+  const Context& ctx_;
 
   vk::Image image_{nullptr};
   vk::DeviceMemory image_mem_{nullptr};
@@ -70,11 +70,11 @@ struct SamplerProps {
 
 class Texture : public Image {
  public:
-  Texture(const VulkanContext& context, vk::Format format, vk::Extent2D extent,
+  Texture(const Context& ctx, vk::Format format, vk::Extent2D extent,
           vk::ImageUsageFlags usage, vk::ImageAspectFlags aspect,
           vk::SampleCountFlagBits samples, std::string dbg_name,
           const SamplerProps& sampler_props = SamplerProps());
-  Texture(const VulkanContext& context, const TextureProps& data,
+  Texture(const Context& ctx, const TextureProps& data,
           const SamplerProps& sampler_props = SamplerProps());
   Texture(Texture&&) noexcept;
   ~Texture();

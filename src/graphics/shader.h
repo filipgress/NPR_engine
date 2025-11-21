@@ -1,12 +1,12 @@
 #ifndef SHADER_H_
 #define SHADER_H_
 
-#include "vulkan_context.h"
+#include "context.h"
 
 namespace npr_graphics {
 class Shader : public npr_core::NonCopyable {
  public:
-  Shader(const VulkanContext& context, vk::ShaderStageFlagBits stage,
+  Shader(const Context& ctx, vk::ShaderStageFlagBits stage,
          const std::string& spirv_path, const std::string& src_path = "");
 
   virtual ~Shader();
@@ -31,7 +31,7 @@ class Shader : public npr_core::NonCopyable {
   }
 
  protected:
-  const VulkanContext& c_;
+  const Context& ctx_;
 
   vk::ShaderStageFlagBits stage_;
   vk::ShaderModule module_{nullptr};
@@ -48,18 +48,16 @@ class Shader : public npr_core::NonCopyable {
 
 class VertexShader : public Shader {
  public:
-  VertexShader(const VulkanContext& context, const std::string& spirv_path,
+  VertexShader(const Context& ctx, const std::string& spirv_path,
                const std::string& src_path = "")
-      : Shader{context, vk::ShaderStageFlagBits::eVertex, spirv_path,
-               src_path} {}
+      : Shader{ctx, vk::ShaderStageFlagBits::eVertex, spirv_path, src_path} {}
 };
 
 class FragmentShader : public Shader {
  public:
-  FragmentShader(const VulkanContext& context, const std::string& spirv_path,
+  FragmentShader(const Context& ctx, const std::string& spirv_path,
                  const std::string& src_path = "")
-      : Shader{context, vk::ShaderStageFlagBits::eFragment, spirv_path,
-               src_path} {}
+      : Shader{ctx, vk::ShaderStageFlagBits::eFragment, spirv_path, src_path} {}
 };
 
 }  // namespace npr_graphics

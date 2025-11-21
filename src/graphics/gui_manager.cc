@@ -28,18 +28,17 @@ void GuiManager::CheckVkResult(VkResult result) {
                              std::to_string(result));
 }
 
-GuiManager::GuiManager(const npr_window::Window& window,
-                       const VulkanContext& context, const Swapchain& swapchain,
-                       const SwapPass& swap_pass,
+GuiManager::GuiManager(const npr_window::Window& window, const Context& ctx,
+                       const Swapchain& swapchain, const SwapPass& swap_pass,
                        const PipelineCache& pipeline_cache)
-    : desc_pool_{context} {
+    : desc_pool_{ctx} {
   // init imgui context
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
   ImGui::StyleColorsDark();
 
-  VulkanHandles handles{context.GetInstance(), context.GetDevice()};
-  ImGui_ImplVulkan_LoadFunctions(context.GetAPIVersion(),
+  VulkanHandles handles{ctx.GetInstance(), ctx.GetDevice()};
+  ImGui_ImplVulkan_LoadFunctions(ctx.GetAPIVersion(),
                                  GuiManager::VulkanLoaderFn, &handles);
 
   // init glfw backend
@@ -47,12 +46,12 @@ GuiManager::GuiManager(const npr_window::Window& window,
 
   // init vulkan backend
   ImGui_ImplVulkan_InitInfo init_info{};
-  init_info.ApiVersion = context.GetAPIVersion();
-  init_info.Instance = context.GetInstance();
-  init_info.PhysicalDevice = context.GetPhysicalDevice();
-  init_info.Device = context.GetDevice();
-  init_info.QueueFamily = context.GetQFamilies().graphics_i.value();
-  init_info.Queue = context.GetGraphicsQ();
+  init_info.ApiVersion = ctx.GetAPIVersion();
+  init_info.Instance = ctx.GetInstance();
+  init_info.PhysicalDevice = ctx.GetPhysicalDevice();
+  init_info.Device = ctx.GetDevice();
+  init_info.QueueFamily = ctx.GetQFamilies().graphics_i.value();
+  init_info.Queue = ctx.GetGraphicsQ();
   init_info.PipelineCache = pipeline_cache.GetCache();
   init_info.DescriptorPool = desc_pool_.GetPool();
   init_info.RenderPass = swap_pass.GetRenderPass();

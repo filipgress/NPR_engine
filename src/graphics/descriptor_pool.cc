@@ -3,18 +3,17 @@
 
 namespace npr_graphics {
 
-DescriptorPool::DescriptorPool(const VulkanContext& context,
-                               const Resources& res)
-    : c_{context},
-      gbuff_sets_{context, res.GetFrameCount()},
-      camera_sets_{context, res.GetFrameCount()},
-      material_sets_{context, res.GetFrameCount()},
-      ao_set_{context},
-      ao_res_sets_{context, res.GetFrameCount()},
-      ao_temp_sets_{context, res.GetFrameCount()},
-      abuff_sets_{context, res.GetFrameCount()},
-      wboit_input_sets_{context, res.GetFrameCount()},
-      present_sets_{context, res.GetFrameCount()} {
+DescriptorPool::DescriptorPool(const Context& ctx, const Resources& res)
+    : ctx_{ctx},
+      gbuff_sets_{ctx, res.GetFrameCount()},
+      camera_sets_{ctx, res.GetFrameCount()},
+      material_sets_{ctx, res.GetFrameCount()},
+      ao_set_{ctx},
+      ao_res_sets_{ctx, res.GetFrameCount()},
+      ao_temp_sets_{ctx, res.GetFrameCount()},
+      abuff_sets_{ctx, res.GetFrameCount()},
+      wboit_input_sets_{ctx, res.GetFrameCount()},
+      present_sets_{ctx, res.GetFrameCount()} {
   CreateDescriptorPool();
 
   gbuff_sets_.AllocSets(pool_);
@@ -89,16 +88,16 @@ void DescriptorPool::CreateDescriptorPool() {
   poolInfo.pPoolSizes = pool_sizes.data();
   poolInfo.maxSets = max_sets;
 
-  pool_ = c_.GetDevice().createDescriptorPool(poolInfo);
-  c_.SetDbgName((uint64_t)(VkDescriptorPool)pool_,
-                vk::ObjectType::eDescriptorPool, "main_descriptor_pool");
+  pool_ = ctx_.GetDevice().createDescriptorPool(poolInfo);
+  ctx_.SetDbgName((uint64_t)(VkDescriptorPool)pool_,
+                  vk::ObjectType::eDescriptorPool, "main_descriptor_pool");
 }
 
 /*
  * TexDescriptorPool
  */
-TexDescriptorPool::TexDescriptorPool(const VulkanContext& context)
-    : c_{context}, tex_set_{context} {
+TexDescriptorPool::TexDescriptorPool(const Context& ctx)
+    : ctx_{ctx}, tex_set_{ctx} {
   CreateDescriptorPool();
   tex_set_.AllocSets(pool_);
 }
@@ -111,16 +110,15 @@ void TexDescriptorPool::CreateDescriptorPool() {
   poolInfo.pPoolSizes = tex_sizes.data();
   poolInfo.maxSets = tex_set_.GetCount();
 
-  pool_ = c_.GetDevice().createDescriptorPool(poolInfo);
-  c_.SetDbgName((uint64_t)(VkDescriptorPool)pool_,
-                vk::ObjectType::eDescriptorPool, "tex_descriptor_pool");
+  pool_ = ctx_.GetDevice().createDescriptorPool(poolInfo);
+  ctx_.SetDbgName((uint64_t)(VkDescriptorPool)pool_,
+                  vk::ObjectType::eDescriptorPool, "tex_descriptor_pool");
 }
 
 /*
  * ImGuiDescriptorPool
  */
-ImGuiDescriptorPool::ImGuiDescriptorPool(const VulkanContext& context)
-    : c_{context} {
+ImGuiDescriptorPool::ImGuiDescriptorPool(const Context& ctx) : ctx_{ctx} {
   std::vector<vk::DescriptorPoolSize> pool_sizes = {
       {vk::DescriptorType::eSampler, 1000},
       {vk::DescriptorType::eCombinedImageSampler, 1000},
@@ -140,9 +138,9 @@ ImGuiDescriptorPool::ImGuiDescriptorPool(const VulkanContext& context)
   pool_info.poolSizeCount = pool_sizes.size();
   pool_info.pPoolSizes = pool_sizes.data();
 
-  pool_ = c_.GetDevice().createDescriptorPool(pool_info);
-  c_.SetDbgName((uint64_t)(VkDescriptorPool)pool_,
-                vk::ObjectType::eDescriptorPool, "gui_descriptor_pool");
+  pool_ = ctx_.GetDevice().createDescriptorPool(pool_info);
+  ctx_.SetDbgName((uint64_t)(VkDescriptorPool)pool_,
+                  vk::ObjectType::eDescriptorPool, "gui_descriptor_pool");
 }
 
 }  // namespace npr_graphics

@@ -1,7 +1,7 @@
 #ifndef DESCRIPTOR_POOL_H_
 #define DESCRIPTOR_POOL_H_
 
-#include "vulkan_context.h"
+#include "context.h"
 #include "descriptor_sets.h"
 
 namespace npr_graphics {
@@ -9,9 +9,9 @@ namespace npr_graphics {
 class Resources;
 class DescriptorPool : public npr_core::NonCopyable {
  public:
-  DescriptorPool(const VulkanContext& context, const Resources& res);
+  DescriptorPool(const Context& ctx, const Resources& res);
   ~DescriptorPool() {
-    if (pool_) c_.GetDevice().destroyDescriptorPool(pool_);
+    if (pool_) ctx_.GetDevice().destroyDescriptorPool(pool_);
   }
 
   const GBuffSets& GetGBuffSets() const { return gbuff_sets_; }
@@ -28,7 +28,7 @@ class DescriptorPool : public npr_core::NonCopyable {
   void CreateDescriptorPool();
 
  private:
-  const VulkanContext& c_;
+  const Context& ctx_;
 
   vk::DescriptorPool pool_{nullptr};
 
@@ -47,9 +47,9 @@ class DescriptorPool : public npr_core::NonCopyable {
 
 class TexDescriptorPool : public npr_core::NonCopyable {
  public:
-  TexDescriptorPool(const VulkanContext& context);
+  TexDescriptorPool(const Context& ctx);
   ~TexDescriptorPool() {
-    if (pool_) c_.GetDevice().destroyDescriptorPool(pool_);
+    if (pool_) ctx_.GetDevice().destroyDescriptorPool(pool_);
   }
 
   const TextureArraySet& GetTextureSet() const { return tex_set_; }
@@ -58,23 +58,23 @@ class TexDescriptorPool : public npr_core::NonCopyable {
   void CreateDescriptorPool();
 
  private:
-  const VulkanContext& c_;
+  const Context& ctx_;
 
   vk::DescriptorPool pool_{nullptr};
-  TextureArraySet tex_set_{c_};
+  TextureArraySet tex_set_{ctx_};
 };
 
 class ImGuiDescriptorPool : public npr_core::NonCopyable {
  public:
-  ImGuiDescriptorPool(const VulkanContext& context);
+  ImGuiDescriptorPool(const Context& ctx);
   ~ImGuiDescriptorPool() {
-    if (pool_) c_.GetDevice().destroyDescriptorPool(pool_);
+    if (pool_) ctx_.GetDevice().destroyDescriptorPool(pool_);
   }
 
   vk::DescriptorPool GetPool() const { return pool_; }
 
  private:
-  const VulkanContext& c_;
+  const Context& ctx_;
   vk::DescriptorPool pool_{nullptr};
 };
 

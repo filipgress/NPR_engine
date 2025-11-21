@@ -119,7 +119,7 @@ set(HEADER_FILES
     ./src/window/app_event.h
     # graphics
     ./src/graphics/renderer.h
-    ./src/graphics/vulkan_context.h
+    ./src/graphics/context.h
     ./src/graphics/swapchain.h
     ./src/graphics/sync.h
     ./src/graphics/resources.h
@@ -151,7 +151,7 @@ set(SOURCE_FILES
     ./src/window/window.cc
     # graphics
     ./src/graphics/renderer.cc
-    ./src/graphics/vulkan_context.cc
+    ./src/graphics/context.cc
     ./src/graphics/swapchain.cc
     ./src/graphics/sync.cc
     ./src/graphics/resources.cc

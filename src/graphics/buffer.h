@@ -1,14 +1,14 @@
 #ifndef BUFFER_H_
 #define BUFFER_H_
 
-#include "vulkan_context.h"
+#include "context.h"
 
 namespace npr_graphics {
 
 class StagingBuffer;
 class Buffer : public npr_core::NonCopyable {
  public:
-  Buffer(const VulkanContext& context, vk::BufferUsageFlags usage,
+  Buffer(const Context& ctx, vk::BufferUsageFlags usage,
          vk::MemoryPropertyFlags mem_props, vk::SharingMode sharing_mode,
          uint32_t size, const std::string& dbg_name);
   Buffer(Buffer&&) noexcept;
@@ -20,7 +20,7 @@ class Buffer : public npr_core::NonCopyable {
 
   void DestroyStagingBuff() { staging_buff_.reset(); }
   void UnmapMemory() {
-    if (mapped_mem_) c_.GetDevice().unmapMemory(buff_mem_);
+    if (mapped_mem_) ctx_.GetDevice().unmapMemory(buff_mem_);
     mapped_mem_ = nullptr;
   }
 
@@ -29,7 +29,7 @@ class Buffer : public npr_core::NonCopyable {
   void AllocMem();
 
  protected:
-  const VulkanContext& c_;
+  const Context& ctx_;
 
   vk::Buffer buff_;
   vk::DeviceMemory buff_mem_;
@@ -46,8 +46,8 @@ class Buffer : public npr_core::NonCopyable {
 
 class StagingBuffer : public Buffer {
  public:
-  StagingBuffer(const VulkanContext& context, uint32_t size)
-      : Buffer(context, vk::BufferUsageFlagBits::eTransferSrc,
+  StagingBuffer(const Context& ctx, uint32_t size)
+      : Buffer(ctx, vk::BufferUsageFlagBits::eTransferSrc,
                vk::MemoryPropertyFlagBits::eHostVisible |
                    vk::MemoryPropertyFlagBits::eHostCoherent,
                vk::SharingMode::eExclusive, size, "staging_buff") {}
@@ -63,9 +63,9 @@ struct Vertex {
 
 class VertexBuffer : public Buffer {
  public:
-  VertexBuffer(const VulkanContext& context, vk::CommandBuffer cmd_buff,
+  VertexBuffer(const Context& ctx, vk::CommandBuffer cmd_buff,
                const std::vector<Vertex>& vertices, const std::string& dbg_name)
-      : Buffer(context,
+      : Buffer(ctx,
                vk::BufferUsageFlagBits::eVertexBuffer |
                    vk::BufferUsageFlagBits::eTransferDst,
                vk::MemoryPropertyFlagBits::eDeviceLocal,
@@ -83,9 +83,9 @@ class VertexBuffer : public Buffer {
 
 class IndexBuffer : public Buffer {
  public:
-  IndexBuffer(const VulkanContext& context, vk::CommandBuffer cmd_buff,
+  IndexBuffer(const Context& ctx, vk::CommandBuffer cmd_buff,
               const std::vector<uint32_t>& indices, const std::string& dbg_name)
-      : Buffer(context,
+      : Buffer(ctx,
                vk::BufferUsageFlagBits::eIndexBuffer |
                    vk::BufferUsageFlagBits::eTransferDst,
                vk::MemoryPropertyFlagBits::eDeviceLocal,
@@ -108,9 +108,9 @@ struct InstanceData {
 
 class InstanceBuffer : public Buffer {
  public:
-  InstanceBuffer(const VulkanContext& context, uint32_t max_instances,
+  InstanceBuffer(const Context& ctx, uint32_t max_instances,
                  const std::string& dbg_name)
-      : Buffer(context, vk::BufferUsageFlagBits::eVertexBuffer,
+      : Buffer(ctx, vk::BufferUsageFlagBits::eVertexBuffer,
                vk::MemoryPropertyFlagBits::eHostVisible |
                    vk::MemoryPropertyFlagBits::eHostCoherent,
                vk::SharingMode::eExclusive,
@@ -120,7 +120,7 @@ class InstanceBuffer : public Buffer {
   void Write(const std::vector<InstanceData>& instances, uint32_t offset = 0) {
     assert(offset + instances.size() <= GetMaxInstances());
     if (!mapped_mem_)
-      mapped_mem_ = c_.GetDevice().mapMemory(buff_mem_, 0, size_);
+      mapped_mem_ = ctx_.GetDevice().mapMemory(buff_mem_, 0, size_);
 
     memcpy(static_cast<char*>(mapped_mem_) + offset * sizeof(InstanceData),
            instances.data(), instances.size() * sizeof(InstanceData));
@@ -135,8 +135,8 @@ class InstanceBuffer : public Buffer {
 template <typename T>
 class UniformBuffer : public Buffer {
  public:
-  UniformBuffer(const VulkanContext& context, const std::string& dbg_name)
-      : Buffer(context, vk::BufferUsageFlagBits::eUniformBuffer,
+  UniformBuffer(const Context& ctx, const std::string& dbg_name)
+      : Buffer(ctx, vk::BufferUsageFlagBits::eUniformBuffer,
                vk::MemoryPropertyFlagBits::eHostVisible |
                    vk::MemoryPropertyFlagBits::eHostCoherent,
                vk::SharingMode::eExclusive, sizeof(T), dbg_name) {}
@@ -146,14 +146,14 @@ class UniformBuffer : public Buffer {
 template <typename T>
 class DynamicUniformBuffer : public Buffer {
  public:
-  DynamicUniformBuffer(const VulkanContext& context, uint32_t obj_count,
+  DynamicUniformBuffer(const Context& ctx, uint32_t obj_count,
                        const std::string& dbg_name)
-      : Buffer{context,
+      : Buffer{ctx,
                vk::BufferUsageFlagBits::eUniformBuffer,
                vk::MemoryPropertyFlagBits::eHostVisible |
                    vk::MemoryPropertyFlagBits::eHostCoherent,
                vk::SharingMode::eExclusive,
-               CalcBufferSize(context, obj_count),
+               CalcBufferSize(ctx, obj_count),
                dbg_name} {}
 
   uint32_t GetElemSize() const { return aligned_size_; }
@@ -165,16 +165,15 @@ class DynamicUniformBuffer : public Buffer {
   void Write(uint32_t idx, const T& ubo) {
     assert(idx < elem_count_);
     if (!mapped_mem_)
-      mapped_mem_ = c_.GetDevice().mapMemory(buff_mem_, 0, size_);
+      mapped_mem_ = ctx_.GetDevice().mapMemory(buff_mem_, 0, size_);
     memcpy(static_cast<char*>(mapped_mem_) + idx * aligned_size_, &ubo,
            sizeof(T));
   }
 
  private:
-  uint32_t CalcBufferSize(const VulkanContext& context, uint32_t elem_count) {
+  uint32_t CalcBufferSize(const Context& ctx, uint32_t elem_count) {
     aligned_size_ = npr_core::Align(
-        sizeof(T),
-        context.GetProperties().limits.minUniformBufferOffsetAlignment);
+        sizeof(T), ctx.GetProperties().limits.minUniformBufferOffsetAlignment);
     elem_count_ = elem_count;
 
     return aligned_size_ * elem_count_;
@@ -188,8 +187,8 @@ class DynamicUniformBuffer : public Buffer {
 template <typename T>
 class StorageBuffer : public Buffer {
  public:
-  StorageBuffer(const VulkanContext& context, const std::string& dbg_name)
-      : Buffer(context,
+  StorageBuffer(const Context& ctx, const std::string& dbg_name)
+      : Buffer(ctx,
                vk::BufferUsageFlagBits::eStorageBuffer |
                    vk::BufferUsageFlagBits::eTransferDst,
                vk::MemoryPropertyFlagBits::eDeviceLocal,

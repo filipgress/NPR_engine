@@ -2,12 +2,11 @@
 
 namespace npr_graphics {
 
-Image::Image(const VulkanContext& context, vk::Format format,
-             vk::Extent2D extent, vk::ImageUsageFlags usage,
-             vk::ImageAspectFlags aspect, vk::SharingMode sharing_mode,
-             vk::SampleCountFlagBits samples, uint32_t mip_levels,
-             std::string dbg_name)
-    : c_{context},
+Image::Image(const Context& ctx, vk::Format format, vk::Extent2D extent,
+             vk::ImageUsageFlags usage, vk::ImageAspectFlags aspect,
+             vk::SharingMode sharing_mode, vk::SampleCountFlagBits samples,
+             uint32_t mip_levels, std::string dbg_name)
+    : ctx_{ctx},
       format_{format},
       aspect_{aspect},
       extent_{extent},
@@ -20,7 +19,7 @@ Image::Image(const VulkanContext& context, vk::Format format,
 }
 
 Image::Image(Image&& other) noexcept
-    : c_(other.c_),
+    : ctx_(other.ctx_),
       image_(std::move(other.image_)),
       image_mem_(std::move(other.image_mem_)),
       image_view_(std::move(other.image_view_)),
@@ -36,7 +35,7 @@ Image::Image(Image&& other) noexcept
 }
 
 Image::~Image() {
-  auto device = c_.GetDevice();
+  auto device = ctx_.GetDevice();
 
   if (image_view_) device.destroyImageView(image_view_);
   if (image_mem_) device.freeMemory(image_mem_);
@@ -57,7 +56,7 @@ void Image::CreateImage(vk::ImageUsageFlags usage,
   image_info.tiling = vk::ImageTiling::eOptimal;
   image_info.usage = usage;
 
-  auto q_families = c_.GetQFamilies();
+  auto q_families = ctx_.GetQFamilies();
   if (sharing_mode == vk::SharingMode::eConcurrent &&
       q_families.graphics_i.value() != q_families.transfer_i.value()) {
     uint32_t indices[] = {q_families.graphics_i.value(),
@@ -70,8 +69,8 @@ void Image::CreateImage(vk::ImageUsageFlags usage,
     image_info.sharingMode = vk::SharingMode::eExclusive;
   }
 
-  image_ = c_.GetDevice().createImage(image_info);
-  c_.SetDbgName((uint64_t)(VkImage)image_, vk::ObjectType::eImage, dbg_name_);
+  image_ = ctx_.GetDevice().createImage(image_info);
+  ctx_.SetDbgName((uint64_t)(VkImage)image_, vk::ObjectType::eImage, dbg_name_);
 }
 
 void Image::CreateImageView() {
@@ -85,16 +84,16 @@ void Image::CreateImageView() {
   view_info.subresourceRange.baseArrayLayer = 0;
   view_info.subresourceRange.layerCount = 1;
 
-  image_view_ = c_.GetDevice().createImageView(view_info);
+  image_view_ = ctx_.GetDevice().createImageView(view_info);
 }
 
 void Image::AllocMem() {
-  auto device = c_.GetDevice();
+  auto device = ctx_.GetDevice();
 
   vk::MemoryRequirements mem_req = device.getImageMemoryRequirements(image_);
   vk::MemoryAllocateInfo alloc_info{};
   alloc_info.allocationSize = mem_req.size;
-  alloc_info.memoryTypeIndex = c_.FindMemTypeIdx(
+  alloc_info.memoryTypeIndex = ctx_.FindMemTypeIdx(
       mem_req.memoryTypeBits, vk::MemoryPropertyFlagBits::eDeviceLocal);
 
   image_mem_ = device.allocateMemory(alloc_info);
@@ -105,18 +104,18 @@ void Image::AllocMem() {
  * Texture
  */
 
-Texture::Texture(const VulkanContext& context, vk::Format format,
-                 vk::Extent2D extent, vk::ImageUsageFlags usage,
-                 vk::ImageAspectFlags aspect, vk::SampleCountFlagBits samples,
-                 std::string dbg_name, const SamplerProps& sampler_props)
-    : Image(context, format, extent, usage, aspect, vk::SharingMode::eExclusive,
+Texture::Texture(const Context& ctx, vk::Format format, vk::Extent2D extent,
+                 vk::ImageUsageFlags usage, vk::ImageAspectFlags aspect,
+                 vk::SampleCountFlagBits samples, std::string dbg_name,
+                 const SamplerProps& sampler_props)
+    : Image(ctx, format, extent, usage, aspect, vk::SharingMode::eExclusive,
             samples, 1, dbg_name) {
   CreateSampler(sampler_props);
 }
 
-Texture::Texture(const VulkanContext& context, const TextureProps& data,
+Texture::Texture(const Context& ctx, const TextureProps& data,
                  const SamplerProps& sampler_props)
-    : Image{context,
+    : Image{ctx,
             GetTypeInfo(data.type).format,
             vk::Extent2D{data.width, data.height},
             vk::ImageUsageFlagBits::eTransferSrc |
@@ -138,7 +137,7 @@ Texture::Texture(Texture&& other) noexcept
 }
 
 Texture::~Texture() {
-  if (sampler_) c_.GetDevice().destroySampler(sampler_);
+  if (sampler_) ctx_.GetDevice().destroySampler(sampler_);
 }
 
 TextureTypeInfo Texture::GetTypeInfo(TextureType type) {
@@ -179,13 +178,13 @@ void Texture::CreateSampler(const SamplerProps& props) {
   samplerInfo.maxLod = mip_levels_;
   samplerInfo.mipLodBias = props.mip_bias;
 
-  sampler_ = c_.GetDevice().createSampler(samplerInfo);
+  sampler_ = ctx_.GetDevice().createSampler(samplerInfo);
 }
 
 void Texture::Write(vk::CommandBuffer cmd_buff, void* data, size_t buff_size,
                     vk::ImageLayout src_layout) {
   if (!staging_buff_)
-    staging_buff_ = std::make_unique<StagingBuffer>(c_, buff_size);
+    staging_buff_ = std::make_unique<StagingBuffer>(ctx_, buff_size);
   staging_buff_->Write(nullptr, data);
 
   Transition(cmd_buff, src_layout, vk::ImageLayout::eTransferDstOptimal, 0,
@@ -202,7 +201,7 @@ void Texture::Write(vk::CommandBuffer cmd_buff,
                     const std::vector<unsigned char>& data,
                     vk::ImageLayout src_layout) {
   if (!staging_buff_)
-    staging_buff_ = std::make_unique<StagingBuffer>(c_, data.size());
+    staging_buff_ = std::make_unique<StagingBuffer>(ctx_, data.size());
   staging_buff_->Write(nullptr, data.data());
 
   Transition(cmd_buff, src_layout, vk::ImageLayout::eTransferDstOptimal, 0,
@@ -298,7 +297,7 @@ void Texture::CopyFromBuffer(vk::CommandBuffer cmd_buff) {
 void Texture::GenerateMipmaps(vk::CommandBuffer cmd_buff) {
   if (mip_levels_ == 1) return;
 
-  const auto& props = c_.GetFormatProperties(format_);
+  const auto& props = ctx_.GetFormatProperties(format_);
   if (!(props.optimalTilingFeatures & vk::FormatFeatureFlagBits::eBlitSrc) ||
       !(props.optimalTilingFeatures & vk::FormatFeatureFlagBits::eBlitDst))
     throw std::runtime_error("texture image format doesn't support blitting!");

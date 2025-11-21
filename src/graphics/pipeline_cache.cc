@@ -2,22 +2,22 @@
 
 namespace npr_graphics {
 
-PipelineCache::PipelineCache(const VulkanContext& context) : c_{context} {
+PipelineCache::PipelineCache(const Context& ctx) : ctx_{ctx} {
   auto cache_data = Load();
 
   vk::PipelineCacheCreateInfo cache_info{};
   cache_info.initialDataSize = cache_data.size();
   cache_info.pInitialData = cache_data.data();
 
-  pipeline_cache_ = c_.GetDevice().createPipelineCache(cache_info);
-  c_.SetDbgName((uint64_t)(VkPipelineCache)pipeline_cache_,
-                vk::ObjectType::ePipelineCache, "pipeline_cache");
+  pipeline_cache_ = ctx_.GetDevice().createPipelineCache(cache_info);
+  ctx_.SetDbgName((uint64_t)(VkPipelineCache)pipeline_cache_,
+                  vk::ObjectType::ePipelineCache, "pipeline_cache");
 }
 
 PipelineCache::~PipelineCache() {
   if (pipeline_cache_) {
     Save();
-    c_.GetDevice().destroyPipelineCache(pipeline_cache_);
+    ctx_.GetDevice().destroyPipelineCache(pipeline_cache_);
   }
 }
 
@@ -36,7 +36,7 @@ uint64_t PipelineCache::ComputeHash(const void* data, size_t size) {
 
 bool PipelineCache::IsValidHeader(const PipelineCachePrefixHeader& header,
                                   const std::vector<uint8_t>& cache_data) {
-  auto device_props = c_.GetProperties();
+  auto device_props = ctx_.GetProperties();
   if (header.magic_num != kPipelineCacheMagic ||
       header.vendor_id != device_props.vendorID ||
       header.device_id != device_props.deviceID ||
@@ -96,7 +96,7 @@ std::vector<uint8_t> PipelineCache::Load() {
 
 PipelineCachePrefixHeader PipelineCache::CreateHeader(
     const std::vector<uint8_t>& cache_data) {
-  auto device_props = c_.GetProperties();
+  auto device_props = ctx_.GetProperties();
 
   PipelineCachePrefixHeader header{};
   header.magic_num = kPipelineCacheMagic;
@@ -114,7 +114,7 @@ PipelineCachePrefixHeader PipelineCache::CreateHeader(
 
 void PipelineCache::Save() {
   try {
-    auto cache_data = c_.GetDevice().getPipelineCacheData(pipeline_cache_);
+    auto cache_data = ctx_.GetDevice().getPipelineCacheData(pipeline_cache_);
     if (cache_data.empty()) {
       INFO("no pipeline data to cache");
       return;

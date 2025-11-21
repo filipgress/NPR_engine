@@ -1,7 +1,7 @@
 #ifndef PIPELINE_H_
 #define PIPELINE_H_
 
-#include "vulkan_context.h"
+#include "context.h"
 #include "descriptor_pool.h"
 #include "pipeline_cache.h"
 #include "render_pass.h"
@@ -42,10 +42,10 @@ struct PipelineData {
 
 class Pipeline : public npr_core::NonCopyable {
  public:
-  Pipeline(const VulkanContext& context, const PipelineCache& cache,
+  Pipeline(const Context& ctx, const PipelineCache& cache,
            const BasePass& render_pass, VertexShader& vert_shader,
            FragmentShader& frag_shader)
-      : c_{context},
+      : ctx_{ctx},
         cache_{cache},
         render_pass_{render_pass},
         vert_shader_{vert_shader},
@@ -99,7 +99,7 @@ class Pipeline : public npr_core::NonCopyable {
   }
 
  protected:
-  const VulkanContext& c_;
+  const Context& ctx_;
   const PipelineCache& cache_;
 
   const BasePass& render_pass_;
@@ -119,15 +119,15 @@ class Pipeline : public npr_core::NonCopyable {
 
 class GBuffPipe : public Pipeline {
  public:
-  GBuffPipe(const VulkanContext& context, const PipelineCache& cache,
+  GBuffPipe(const Context& ctx, const PipelineCache& cache,
             const GBuffPass& render_pass, VertexShader& vert_shader,
             FragmentShader& frag_shader, vk::SampleCountFlagBits samples,
             const DescriptorPool& desc_pool)
-      : Pipeline(context, cache, render_pass, vert_shader, frag_shader) {
-    CreateLayout(
-        {desc_pool.GetCameraSets().GetLayout(), TextureArraySet(c_).GetLayout(),
-         desc_pool.GetMaterialSets().GetLayout()},
-        {});
+      : Pipeline(ctx, cache, render_pass, vert_shader, frag_shader) {
+    CreateLayout({desc_pool.GetCameraSets().GetLayout(),
+                  TextureArraySet(ctx_).GetLayout(),
+                  desc_pool.GetMaterialSets().GetLayout()},
+                 {});
 
     data_.use_vbo = true;
     data_.samples = samples;
@@ -161,11 +161,11 @@ class GBuffPipe : public Pipeline {
 
 class AOGenPipe : public Pipeline {
  public:
-  AOGenPipe(const VulkanContext& context, const PipelineCache& cache,
+  AOGenPipe(const Context& ctx, const PipelineCache& cache,
             const AOGenPass& render_pass, VertexShader& vert_shader,
             FragmentShader& frag_shader, vk::SampleCountFlagBits samples,
             const DescriptorPool& desc_pool)
-      : Pipeline(context, cache, render_pass, vert_shader, frag_shader) {
+      : Pipeline(ctx, cache, render_pass, vert_shader, frag_shader) {
     CreateLayout({desc_pool.GetCameraSets().GetLayout(),
                   desc_pool.GetGBuffSets().GetLayout(),
                   desc_pool.GetAOSet().GetLayout()},
@@ -194,10 +194,10 @@ class AOGenPipe : public Pipeline {
 
 class AOBlurPipe : public Pipeline {
  public:
-  AOBlurPipe(const VulkanContext& context, const PipelineCache& cache,
+  AOBlurPipe(const Context& ctx, const PipelineCache& cache,
              const BlurPass& render_pass, VertexShader& vert_shader,
              FragmentShader& frag_shader, const DescriptorPool& desc_pool)
-      : Pipeline(context, cache, render_pass, vert_shader, frag_shader) {
+      : Pipeline(ctx, cache, render_pass, vert_shader, frag_shader) {
     CreateLayout(
         {desc_pool.GetAOResSets().GetLayout()},
         {MakePushConst<BlurPushConst>(vk::ShaderStageFlagBits::eFragment)});
@@ -222,15 +222,15 @@ class AOBlurPipe : public Pipeline {
 
 class ABuffFillPipe : public Pipeline {
  public:
-  ABuffFillPipe(const VulkanContext& context, const PipelineCache& cache,
+  ABuffFillPipe(const Context& ctx, const PipelineCache& cache,
                 const ABuffPass& render_pass, VertexShader& vert_shader,
                 FragmentShader& frag_shader, vk::SampleCountFlagBits samples,
                 const DescriptorPool& desc_pool)
-      : Pipeline(context, cache, render_pass, vert_shader, frag_shader) {
+      : Pipeline(ctx, cache, render_pass, vert_shader, frag_shader) {
     CreateLayout(
         {
             desc_pool.GetCameraSets().GetLayout(),
-            TextureArraySet(c_).GetLayout(),
+            TextureArraySet(ctx_).GetLayout(),
             desc_pool.GetABufferSets().GetLayout(),
             desc_pool.GetMaterialSets().GetLayout(),
         },
@@ -255,11 +255,11 @@ class ABuffFillPipe : public Pipeline {
 
 class ABuffResolvePipe : public Pipeline {
  public:
-  ABuffResolvePipe(const VulkanContext& context, const PipelineCache& cache,
+  ABuffResolvePipe(const Context& ctx, const PipelineCache& cache,
                    const ABuffPass& render_pass, VertexShader& vert_shader,
                    FragmentShader& frag_shader, vk::SampleCountFlagBits samples,
                    const DescriptorPool& desc_pool)
-      : Pipeline(context, cache, render_pass, vert_shader, frag_shader),
+      : Pipeline(ctx, cache, render_pass, vert_shader, frag_shader),
         samples_{samples} {
     CreateLayout({desc_pool.GetABufferSets().GetLayout()},
                  {MakePushConst<uint32_t>(vk::ShaderStageFlagBits::eFragment)});
@@ -298,15 +298,15 @@ class ABuffResolvePipe : public Pipeline {
 
 class WBoitAccPipe : public Pipeline {
  public:
-  WBoitAccPipe(const VulkanContext& context, const PipelineCache& cache,
+  WBoitAccPipe(const Context& ctx, const PipelineCache& cache,
                const WBoitPass& render_pass, VertexShader& vert_shader,
                FragmentShader& frag_shader, vk::SampleCountFlagBits samples,
                const DescriptorPool& desc_pool)
-      : Pipeline(context, cache, render_pass, vert_shader, frag_shader) {
+      : Pipeline(ctx, cache, render_pass, vert_shader, frag_shader) {
     CreateLayout(
         {
             desc_pool.GetCameraSets().GetLayout(),
-            TextureArraySet(c_).GetLayout(),
+            TextureArraySet(ctx_).GetLayout(),
             desc_pool.GetMaterialSets().GetLayout(),
         },
         {MakePushConst<ABuffFillPushConst>(
@@ -357,10 +357,10 @@ class WBoitAccPipe : public Pipeline {
 
 class WBoitComposePipe : public Pipeline {
  public:
-  WBoitComposePipe(const VulkanContext& context, const PipelineCache& cache,
+  WBoitComposePipe(const Context& ctx, const PipelineCache& cache,
                    const WBoitPass& render_pass, VertexShader& vert_shader,
                    FragmentShader& frag_shader, const DescriptorPool& desc_pool)
-      : Pipeline(context, cache, render_pass, vert_shader, frag_shader) {
+      : Pipeline(ctx, cache, render_pass, vert_shader, frag_shader) {
     CreateLayout({desc_pool.GetWBoitInputSets().GetLayout()}, {});
 
     // present_color
@@ -391,10 +391,10 @@ class WBoitComposePipe : public Pipeline {
 
 class SwapPipe : public Pipeline {
  public:
-  SwapPipe(const VulkanContext& context, const PipelineCache& cache,
+  SwapPipe(const Context& ctx, const PipelineCache& cache,
            const SwapPass& render_pass, VertexShader& vert_shader,
            FragmentShader& frag_shader, const DescriptorPool& desc_pool)
-      : Pipeline(context, cache, render_pass, vert_shader, frag_shader) {
+      : Pipeline(ctx, cache, render_pass, vert_shader, frag_shader) {
     CreateLayout(
         {desc_pool.GetAOResSets().GetLayout()},
         // {desc_pool.GetPresentSets().GetLayout()},

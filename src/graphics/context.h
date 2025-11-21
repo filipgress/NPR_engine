@@ -1,5 +1,5 @@
-#ifndef VULKAN_CONTEXT_H_
-#define VULKAN_CONTEXT_H_
+#ifndef CONTEXT_H_
+#define CONTEXT_H_
 
 #include "window/window.h"
 
@@ -24,10 +24,10 @@ struct QFamilies {
   }
 };
 
-class VulkanContext : public npr_core::NonCopyable {
+class Context : public npr_core::NonCopyable {
  public:
-  VulkanContext(const npr_window::Window& window);
-  ~VulkanContext();
+  Context(const npr_window::Window& window);
+  ~Context();
 
   uint32_t GetAPIVersion() const { return api_version_; }
   vk::Instance GetInstance() const { return instance_; }
@@ -108,4 +108,4 @@ class VulkanContext : public npr_core::NonCopyable {
 };
 }  // namespace npr_graphics
 
-#endif  // VULKAN_CONTEXT_H_
+#endif  // CONTEXT_H_

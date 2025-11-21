@@ -11,7 +11,7 @@
 
 namespace npr_scene {
 struct GpuResources {
-  const npr_graphics::VulkanContext& context;
+  const npr_graphics::Context& ctx;
 
   npr_graphics::CommandPool cmd_pool;
   vk::CommandBuffer cmd_buff{nullptr};
@@ -22,16 +22,14 @@ struct GpuResources {
   std::vector<npr_graphics::VertexBuffer> vbos;
   std::vector<npr_graphics::Texture> textures;
 
-  GpuResources(const npr_graphics::VulkanContext& context,
-               const std::string& dbg_name)
-      : context{context},
-        cmd_pool{context, 1,
+  GpuResources(const npr_graphics::Context& ctx, const std::string& dbg_name)
+      : ctx{ctx},
+        cmd_pool{ctx, 1,
                  vk::CommandPoolCreateFlagBits::eTransient |
                      vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-                 context.GetQFamilies().graphics_i.value(),
-                 "cmd_pool_" + dbg_name},
+                 ctx.GetQFamilies().graphics_i.value(), "cmd_pool_" + dbg_name},
         cmd_buff{cmd_pool.GetCmdBuff()},
-        desc_pool{context} {}
+        desc_pool{ctx} {}
 
   void UpdateTextureDescriptors(const npr_graphics::Texture& default_tex) {
     desc_pool.GetTextureSet().Update(textures, default_tex);
@@ -82,8 +80,8 @@ class Scene : npr_core::NonCopyable {
                    const Frustum& frustum) const;
 
  private:
-  void Prepare(const npr_graphics::VulkanContext& context,
-               const std::string& filepath, const std::string& scene_name);
+  void Prepare(const npr_graphics::Context& ctx, const std::string& filepath,
+               const std::string& scene_name);
 
   void WaitForAsync();
 

@@ -2,8 +2,7 @@
 
 namespace npr_graphics {
 
-Swapchain::Swapchain(const VulkanContext& context, glm::ivec2 frame_size)
-    : c_{context} {
+Swapchain::Swapchain(const Context& ctx, glm::ivec2 frame_size) : ctx_{ctx} {
   CreateSwapchain(frame_size);
   CreateImageViews();
 
@@ -28,21 +27,21 @@ Swapchain::Swapchain(const VulkanContext& context, glm::ivec2 frame_size)
 
 Swapchain::~Swapchain() {
   DestroyImageViews();
-  if (swapchain_) c_.GetDevice().destroySwapchainKHR(swapchain_);
+  if (swapchain_) ctx_.GetDevice().destroySwapchainKHR(swapchain_);
 }
 
 void Swapchain::DestroyImageViews() {
   if (image_views_.empty()) return;
 
   for (const auto& image_view : image_views_)
-    c_.GetDevice().destroyImageView(image_view);
+    ctx_.GetDevice().destroyImageView(image_view);
   image_views_.clear();
 }
 
 void Swapchain::CreateSwapchain(glm::ivec2 frame_size,
                                 vk::SwapchainKHR old_swapchain) {
-  auto swap_supp = c_.GetSwapSupp();
-  auto q_families = c_.GetQFamilies();
+  auto swap_supp = ctx_.GetSwapSupp();
+  auto q_families = ctx_.GetQFamilies();
 
   auto [is_HDR, surface_format] = ChooseSurfaceFormat(swap_supp);
   props_.is_HDR = is_HDR;
@@ -52,7 +51,7 @@ void Swapchain::CreateSwapchain(glm::ivec2 frame_size,
 
   vk::SwapchainCreateInfoKHR swapchain_info{};
   swapchain_info.flags = vk::SwapchainCreateFlagsKHR();
-  swapchain_info.surface = c_.GetSurface();
+  swapchain_info.surface = ctx_.GetSurface();
   swapchain_info.minImageCount = props_.min_image_count =
       ChooseMinFrameCount(swap_supp);
   swapchain_info.imageFormat = props_.format;
@@ -80,14 +79,14 @@ void Swapchain::CreateSwapchain(glm::ivec2 frame_size,
   props_.extent = ChooseExtent(swap_supp, frame_size);
   swapchain_info.imageExtent = props_.extent;
 
-  swapchain_ = c_.GetDevice().createSwapchainKHR(swapchain_info);
+  swapchain_ = ctx_.GetDevice().createSwapchainKHR(swapchain_info);
 }
 
 void Swapchain::CreateImageViews() {
   DestroyImageViews();
 
   std::vector<vk::Image> swapchain_images =
-      c_.GetDevice().getSwapchainImagesKHR(swapchain_);
+      ctx_.GetDevice().getSwapchainImagesKHR(swapchain_);
 
   props_.image_count = swapchain_images.size();
   image_views_.resize(props_.image_count);
@@ -104,10 +103,10 @@ void Swapchain::CreateImageViews() {
     image_view_info.subresourceRange = {vk::ImageAspectFlagBits::eColor, 0, 1,
                                         0, 1};
 
-    image_views_[i] = c_.GetDevice().createImageView(image_view_info);
-    c_.SetDbgName((uint64_t)(VkImageView)image_views_[i],
-                  vk::ObjectType::eImageView,
-                  "swap_image_view_" + std::to_string(i));
+    image_views_[i] = ctx_.GetDevice().createImageView(image_view_info);
+    ctx_.SetDbgName((uint64_t)(VkImageView)image_views_[i],
+                    vk::ObjectType::eImageView,
+                    "swap_image_view_" + std::to_string(i));
   }
 }
 
@@ -178,7 +177,7 @@ void Swapchain::Recreate(glm::ivec2 frame_size) {
   CreateSwapchain(frame_size, old_swapchain);
   CreateImageViews();
 
-  if (old_swapchain) c_.GetDevice().destroySwapchainKHR(old_swapchain);
+  if (old_swapchain) ctx_.GetDevice().destroySwapchainKHR(old_swapchain);
 }
 
 }  // namespace npr_graphics

@@ -1,9 +1,9 @@
 #include "shader.h"
 
 namespace npr_graphics {
-Shader::Shader(const VulkanContext& context, vk::ShaderStageFlagBits stage,
+Shader::Shader(const Context& ctx, vk::ShaderStageFlagBits stage,
                const std::string& spirv_path, const std::string& src_path)
-    : c_{context}, stage_{stage}, spirv_path_{spirv_path}, src_path_(src_path) {
+    : ctx_{ctx}, stage_{stage}, spirv_path_{spirv_path}, src_path_(src_path) {
   name_ = std::filesystem::path(spirv_path_).stem().string();
 
   if constexpr (kEnableShaderReload) Compile();
@@ -17,7 +17,7 @@ Shader::~Shader() {
 
 void Shader::DestroyShaderModule() {
   if (module_) {
-    c_.GetDevice().destroyShaderModule(module_);
+    ctx_.GetDevice().destroyShaderModule(module_);
     module_ = nullptr;
   }
 }
@@ -30,9 +30,9 @@ void Shader::CreateShaderModule() {
   createInfo.codeSize = spirv.size();
   createInfo.pCode = reinterpret_cast<const uint32_t*>(spirv.data());
 
-  module_ = c_.GetDevice().createShaderModule(createInfo);
-  c_.SetDbgName((uint64_t)(VkShaderModule)module_,
-                vk::ObjectType::eShaderModule, name_);
+  module_ = ctx_.GetDevice().createShaderModule(createInfo);
+  ctx_.SetDbgName((uint64_t)(VkShaderModule)module_,
+                  vk::ObjectType::eShaderModule, name_);
 
   version_++;
   dirty_ = false;

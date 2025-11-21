@@ -1,9 +1,9 @@
-#include "vulkan_context.h"
+#include "context.h"
 
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 
 namespace npr_graphics {
-VulkanContext::VulkanContext(const npr_window::Window& window) {
+Context::Context(const npr_window::Window& window) {
   vk::detail::defaultDispatchLoaderDynamic.init();
 
   CreateInstance();
@@ -15,7 +15,7 @@ VulkanContext::VulkanContext(const npr_window::Window& window) {
   CreateDevice();
 }
 
-VulkanContext::~VulkanContext() {
+Context::~Context() {
   if (device_) device_.destroy();
 
   if (instance_) {
@@ -26,7 +26,7 @@ VulkanContext::~VulkanContext() {
   }
 }
 
-void VulkanContext::CreateInstance() {
+void Context::CreateInstance() {
   api_version_ = vk::enumerateInstanceVersion();
   api_version_ &= ~0xFFFU;  // zero out patch number
 
@@ -69,7 +69,7 @@ void VulkanContext::CreateInstance() {
   vk::detail::defaultDispatchLoaderDynamic.init(instance_);
 }
 
-void VulkanContext::CreateDevice() {
+void Context::CreateDevice() {
   q_families_ = GetQueueFamilies(phys_device_);
 
   std::set<uint32_t> unique_q_indices{
@@ -112,15 +112,14 @@ void VulkanContext::CreateDevice() {
 /*
  * Set up Vulkan Debug Messenger and Error callback function
  */
-void VulkanContext::CreateDbgMessenger() {
+void Context::CreateDbgMessenger() {
   if (!kEnableDebug) return;
 
   auto debug_info = GetDbgMessengerInfo();
   dbg_messenger_ = instance_.createDebugUtilsMessengerEXT(debug_info);
 }
 
-vk::DebugUtilsMessengerCreateInfoEXT VulkanContext::GetDbgMessengerInfo()
-    const {
+vk::DebugUtilsMessengerCreateInfoEXT Context::GetDbgMessengerInfo() const {
   vk::DebugUtilsMessengerCreateInfoEXT debug_info{};
   debug_info.flags = vk::DebugUtilsMessengerCreateFlagsEXT();
   debug_info.messageSeverity =
@@ -137,7 +136,7 @@ vk::DebugUtilsMessengerCreateInfoEXT VulkanContext::GetDbgMessengerInfo()
   return debug_info;
 }
 
-VKAPI_ATTR uint32_t VKAPI_CALL VulkanContext::VulkanErrorCallback(
+VKAPI_ATTR uint32_t VKAPI_CALL Context::VulkanErrorCallback(
     vk::DebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
     vk::DebugUtilsMessageTypeFlagsEXT messageType,
     const vk::DebugUtilsMessengerCallbackDataEXT* pCallbackData,
@@ -151,7 +150,7 @@ VKAPI_ATTR uint32_t VKAPI_CALL VulkanContext::VulkanErrorCallback(
 /*
  * Select best physical device
  */
-void VulkanContext::PickPhysDevice() {
+void Context::PickPhysDevice() {
   // required device features
   device_feats_.independentBlend = VK_TRUE;          // WBOIT
   device_feats_.sampleRateShading = VK_TRUE;         // MSAA
@@ -174,7 +173,7 @@ void VulkanContext::PickPhysDevice() {
   phys_device_ = candidates.rbegin()->second;
 }
 
-int VulkanContext::RateDevice(vk::PhysicalDevice device) const {
+int Context::RateDevice(vk::PhysicalDevice device) const {
   int score{1};
 
   if (!DeviceExtsSupported(device) || !DeviceFeatsSupported(device)) return 0;
@@ -194,7 +193,7 @@ int VulkanContext::RateDevice(vk::PhysicalDevice device) const {
 /*
  * Check for extension/layer/features support
  */
-bool VulkanContext::LayersSupported() const {
+bool Context::LayersSupported() const {
   std::unordered_set<std::string> required_layers{layers_.begin(),
                                                   layers_.end()};
 
@@ -208,7 +207,7 @@ bool VulkanContext::LayersSupported() const {
   return false;
 }
 
-bool VulkanContext::ExtsSupported() const {
+bool Context::ExtsSupported() const {
   std::unordered_set<std::string> required_exts{exts_.begin(), exts_.end()};
 
   for (const auto& extension : vk::enumerateInstanceExtensionProperties())
@@ -221,7 +220,7 @@ bool VulkanContext::ExtsSupported() const {
   return false;
 }
 
-bool VulkanContext::DeviceExtsSupported(vk::PhysicalDevice device) const {
+bool Context::DeviceExtsSupported(vk::PhysicalDevice device) const {
   std::unordered_set<std::string> required_exts{device_exts_.begin(),
                                                 device_exts_.end()};
   for (const auto& extension : device.enumerateDeviceExtensionProperties())
@@ -233,7 +232,7 @@ bool VulkanContext::DeviceExtsSupported(vk::PhysicalDevice device) const {
 #define CHECK_DEVICE_FEATURE(FEATURE) \
   if (device_feats_.FEATURE && !supported.FEATURE) return false;
 
-bool VulkanContext::DeviceFeatsSupported(vk::PhysicalDevice device) const {
+bool Context::DeviceFeatsSupported(vk::PhysicalDevice device) const {
   vk::PhysicalDeviceFeatures supported = device.getFeatures();
 
   CHECK_DEVICE_FEATURE(robustBufferAccess)
@@ -298,7 +297,7 @@ bool VulkanContext::DeviceFeatsSupported(vk::PhysicalDevice device) const {
 /*
  * Query physical device attributes
  */
-SwapSupport VulkanContext::GetSwapSupport(vk::PhysicalDevice device) const {
+SwapSupport Context::GetSwapSupport(vk::PhysicalDevice device) const {
   SwapSupport swap_supp;
   swap_supp.capabilities = device.getSurfaceCapabilitiesKHR(surface_);
   swap_supp.formats = device.getSurfaceFormatsKHR(surface_);
@@ -307,7 +306,7 @@ SwapSupport VulkanContext::GetSwapSupport(vk::PhysicalDevice device) const {
   return swap_supp;
 }
 
-QFamilies VulkanContext::GetQueueFamilies(vk::PhysicalDevice device) const {
+QFamilies Context::GetQueueFamilies(vk::PhysicalDevice device) const {
   QFamilies q_families;
 
   uint32_t i{0};
@@ -329,8 +328,8 @@ QFamilies VulkanContext::GetQueueFamilies(vk::PhysicalDevice device) const {
   return q_families;
 }
 
-uint32_t VulkanContext::FindMemTypeIdx(
-    uint32_t type_bits, vk::MemoryPropertyFlags properties) const {
+uint32_t Context::FindMemTypeIdx(uint32_t type_bits,
+                                 vk::MemoryPropertyFlags properties) const {
   auto mem_props = phys_device_.getMemoryProperties();
 
   for (uint32_t i = 0; i < mem_props.memoryTypeCount; i++)
@@ -341,9 +340,9 @@ uint32_t VulkanContext::FindMemTypeIdx(
   throw std::runtime_error("Failed to find suitable memory type!");
 }
 
-vk::Format VulkanContext::FindFormat(const std::vector<vk::Format>& candidates,
-                                     vk::ImageTiling tiling,
-                                     vk::FormatFeatureFlags features) const {
+vk::Format Context::FindFormat(const std::vector<vk::Format>& candidates,
+                               vk::ImageTiling tiling,
+                               vk::FormatFeatureFlags features) const {
   for (vk::Format format : candidates) {
     vk::FormatProperties props = phys_device_.getFormatProperties(format);
 
@@ -359,9 +358,8 @@ vk::Format VulkanContext::FindFormat(const std::vector<vk::Format>& candidates,
   throw std::runtime_error("failed to find supported format!");
 }
 
-void VulkanContext::SetDbgName(uint64_t object_handle,
-                               vk::ObjectType object_type,
-                               const std::string& name) const {
+void Context::SetDbgName(uint64_t object_handle, vk::ObjectType object_type,
+                         const std::string& name) const {
   if (kEnableDebug) {
     vk::DebugUtilsObjectNameInfoEXT nameInfo{};
     nameInfo.objectType = object_type;

@@ -11,7 +11,7 @@ void BaseDescSets::AllocSets(vk::DescriptorPool pool) {
   alloc_info.descriptorSetCount = count_;
   alloc_info.pSetLayouts = layouts.data();
 
-  sets_ = c_.GetDevice().allocateDescriptorSets(alloc_info);
+  sets_ = ctx_.GetDevice().allocateDescriptorSets(alloc_info);
 }
 
 /*
@@ -28,9 +28,9 @@ void SingleBuffSets::CreateLayout() {
   layout_info.bindingCount = 1;
   layout_info.pBindings = &binding;
 
-  layout_ = c_.GetDevice().createDescriptorSetLayout(layout_info);
-  c_.SetDbgName((uint64_t)(VkDescriptorSetLayout)layout_,
-                vk::ObjectType::eDescriptorSetLayout, "buffer_set_layout");
+  layout_ = ctx_.GetDevice().createDescriptorSetLayout(layout_info);
+  ctx_.SetDbgName((uint64_t)(VkDescriptorSetLayout)layout_,
+                  vk::ObjectType::eDescriptorSetLayout, "buffer_set_layout");
 }
 
 void SingleBuffSets::Update(vk::Buffer buffer, vk::DeviceSize range,
@@ -48,7 +48,7 @@ void SingleBuffSets::Update(vk::Buffer buffer, vk::DeviceSize range,
   desc_write.descriptorCount = 1;
   desc_write.pBufferInfo = &buffer_info;
 
-  c_.GetDevice().updateDescriptorSets(1, &desc_write, 0, nullptr);
+  ctx_.GetDevice().updateDescriptorSets(1, &desc_write, 0, nullptr);
 }
 
 /*
@@ -65,9 +65,9 @@ void SingleTexSets::CreateLayout() {
   layout_info.bindingCount = 1;
   layout_info.pBindings = &binding;
 
-  layout_ = c_.GetDevice().createDescriptorSetLayout(layout_info);
-  c_.SetDbgName((uint64_t)(VkDescriptorSetLayout)layout_,
-                vk::ObjectType::eDescriptorSetLayout, "texture_set_layout");
+  layout_ = ctx_.GetDevice().createDescriptorSetLayout(layout_info);
+  ctx_.SetDbgName((uint64_t)(VkDescriptorSetLayout)layout_,
+                  vk::ObjectType::eDescriptorSetLayout, "texture_set_layout");
 }
 
 void SingleTexSets::Update(const Resources& res) const {
@@ -88,7 +88,7 @@ void SingleTexSets::Update(const Resources& res) const {
     desc_write.descriptorCount = 1;
     desc_write.pImageInfo = &image_info;
 
-    c_.GetDevice().updateDescriptorSets(1, &desc_write, 0, nullptr);
+    ctx_.GetDevice().updateDescriptorSets(1, &desc_write, 0, nullptr);
   }
 }
 
@@ -150,9 +150,9 @@ void GBuffSets::CreateLayout() {
   layout_info.bindingCount = bindings.size();
   layout_info.pBindings = bindings.data();
 
-  layout_ = c_.GetDevice().createDescriptorSetLayout(layout_info);
-  c_.SetDbgName((uint64_t)(VkDescriptorSetLayout)layout_,
-                vk::ObjectType::eDescriptorSetLayout, "gbuff_set_layout");
+  layout_ = ctx_.GetDevice().createDescriptorSetLayout(layout_info);
+  ctx_.SetDbgName((uint64_t)(VkDescriptorSetLayout)layout_,
+                  vk::ObjectType::eDescriptorSetLayout, "gbuff_set_layout");
 }
 
 void GBuffSets::Update(const Resources& res) const {
@@ -198,8 +198,8 @@ void GBuffSets::Update(const Resources& res) const {
       desc_writes[j].pImageInfo = &image_infos[j];
     }
 
-    c_.GetDevice().updateDescriptorSets(desc_writes.size(), desc_writes.data(),
-                                        0, nullptr);
+    ctx_.GetDevice().updateDescriptorSets(desc_writes.size(),
+                                          desc_writes.data(), 0, nullptr);
   }
 }
 
@@ -217,10 +217,10 @@ void TextureArraySet::CreateLayout() {
   layout_info.bindingCount = 1;
   layout_info.pBindings = &binding;
 
-  layout_ = c_.GetDevice().createDescriptorSetLayout(layout_info);
-  c_.SetDbgName((uint64_t)(VkDescriptorSetLayout)layout_,
-                vk::ObjectType::eDescriptorSetLayout,
-                "texture_array_set_layout");
+  layout_ = ctx_.GetDevice().createDescriptorSetLayout(layout_info);
+  ctx_.SetDbgName((uint64_t)(VkDescriptorSetLayout)layout_,
+                  vk::ObjectType::eDescriptorSetLayout,
+                  "texture_array_set_layout");
 }
 
 void TextureArraySet::Update(const std::vector<npr_graphics::Texture>& textures,
@@ -250,7 +250,7 @@ void TextureArraySet::Update(const std::vector<npr_graphics::Texture>& textures,
   desc_write.descriptorCount = MAX_TEXTURES;
   desc_write.pImageInfo = image_infos.data();
 
-  c_.GetDevice().updateDescriptorSets(1, &desc_write, 0, nullptr);
+  ctx_.GetDevice().updateDescriptorSets(1, &desc_write, 0, nullptr);
 }
 
 void TextureArraySet::Update(uint idx,
@@ -270,7 +270,7 @@ void TextureArraySet::Update(uint idx,
   descWrite.descriptorCount = 1;
   descWrite.pImageInfo = &imageInfo;
 
-  c_.GetDevice().updateDescriptorSets(1, &descWrite, 0, nullptr);
+  ctx_.GetDevice().updateDescriptorSets(1, &descWrite, 0, nullptr);
 }
 
 /*
@@ -295,9 +295,9 @@ void AOSet::CreateLayout() {
   layout_info.bindingCount = bindings.size();
   layout_info.pBindings = bindings.data();
 
-  layout_ = c_.GetDevice().createDescriptorSetLayout(layout_info);
-  c_.SetDbgName((uint64_t)(VkDescriptorSetLayout)layout_,
-                vk::ObjectType::eDescriptorSetLayout, "ao_set_layout");
+  layout_ = ctx_.GetDevice().createDescriptorSetLayout(layout_info);
+  ctx_.SetDbgName((uint64_t)(VkDescriptorSetLayout)layout_,
+                  vk::ObjectType::eDescriptorSetLayout, "ao_set_layout");
 }
 
 void AOSet::Update(const Resources& res) const {
@@ -332,8 +332,8 @@ void AOSet::Update(const Resources& res) const {
   desc_writes[1].descriptorCount = 1;
   desc_writes[1].pImageInfo = &noise_info;
 
-  c_.GetDevice().updateDescriptorSets(desc_writes.size(), desc_writes.data(), 0,
-                                      nullptr);
+  ctx_.GetDevice().updateDescriptorSets(desc_writes.size(), desc_writes.data(),
+                                        0, nullptr);
 }
 
 /*
@@ -364,9 +364,9 @@ void ABufferSets::CreateLayout() {
   layout_info.bindingCount = bindings.size();
   layout_info.pBindings = bindings.data();
 
-  layout_ = c_.GetDevice().createDescriptorSetLayout(layout_info);
-  c_.SetDbgName((uint64_t)(VkDescriptorSetLayout)layout_,
-                vk::ObjectType::eDescriptorSetLayout, "abuffer_set_layout");
+  layout_ = ctx_.GetDevice().createDescriptorSetLayout(layout_info);
+  ctx_.SetDbgName((uint64_t)(VkDescriptorSetLayout)layout_,
+                  vk::ObjectType::eDescriptorSetLayout, "abuffer_set_layout");
 }
 
 void ABufferSets::Update(const Resources& res) const {
@@ -401,8 +401,8 @@ void ABufferSets::Update(const Resources& res) const {
       desc_writes[j].pBufferInfo = &buffer_infos[j];
     }
 
-    c_.GetDevice().updateDescriptorSets(desc_writes.size(), desc_writes.data(),
-                                        0, nullptr);
+    ctx_.GetDevice().updateDescriptorSets(desc_writes.size(),
+                                          desc_writes.data(), 0, nullptr);
   }
 }
 
@@ -428,9 +428,10 @@ void WBoitInputSets::CreateLayout() {
   layout_info.bindingCount = bindings.size();
   layout_info.pBindings = bindings.data();
 
-  layout_ = c_.GetDevice().createDescriptorSetLayout(layout_info);
-  c_.SetDbgName((uint64_t)(VkDescriptorSetLayout)layout_,
-                vk::ObjectType::eDescriptorSetLayout, "wboit_input_set_layout");
+  layout_ = ctx_.GetDevice().createDescriptorSetLayout(layout_info);
+  ctx_.SetDbgName((uint64_t)(VkDescriptorSetLayout)layout_,
+                  vk::ObjectType::eDescriptorSetLayout,
+                  "wboit_input_set_layout");
 }
 
 void WBoitInputSets::Update(const Resources& res) const {
@@ -461,8 +462,8 @@ void WBoitInputSets::Update(const Resources& res) const {
       desc_writes[j].pImageInfo = &image_infos[j];
     }
 
-    c_.GetDevice().updateDescriptorSets(desc_writes.size(), desc_writes.data(),
-                                        0, nullptr);
+    ctx_.GetDevice().updateDescriptorSets(desc_writes.size(),
+                                          desc_writes.data(), 0, nullptr);
   }
 }
 

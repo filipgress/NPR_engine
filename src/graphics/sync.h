@@ -1,7 +1,7 @@
 #ifndef SYNC_H_
 #define SYNC_H_
 
-#include "vulkan_context.h"
+#include "context.h"
 
 namespace npr_graphics {
 
@@ -12,7 +12,7 @@ struct PerFrameSync {
 
 class Sync : public npr_core::NonCopyable {
  public:
-  Sync(const VulkanContext& context, uint image_count);
+  Sync(const Context& ctx, uint image_count);
   ~Sync();
 
   PerFrameSync GetFrameSyncObjs() const { return frame_sync_objs_[frame_idx_]; }
@@ -26,7 +26,7 @@ class Sync : public npr_core::NonCopyable {
   void Increment() { frame_idx_ = (frame_idx_ + 1) % frame_count_; }
 
  private:
-  const VulkanContext& c_;
+  const Context& ctx_;
 
   std::vector<PerFrameSync> frame_sync_objs_;
   std::vector<vk::Semaphore> render_finished_semaphores_;

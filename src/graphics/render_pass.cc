@@ -3,14 +3,14 @@
 namespace npr_graphics {
 BasePass::~BasePass() {
   DestroyFramebuffers();
-  if (render_pass_) c_.GetDevice().destroyRenderPass(render_pass_);
+  if (render_pass_) ctx_.GetDevice().destroyRenderPass(render_pass_);
 }
 
 void BasePass::DestroyFramebuffers() {
   if (framebuffers_.empty()) return;
 
   for (const auto& framebuffer : framebuffers_)
-    c_.GetDevice().destroyFramebuffer(framebuffer);
+    ctx_.GetDevice().destroyFramebuffer(framebuffer);
   framebuffers_.clear();
 }
 
@@ -41,9 +41,9 @@ void BasePass::CreateRenderPass() {
   render_pass_info.dependencyCount = dependencies.size();
   render_pass_info.pDependencies = dependencies.data();
 
-  render_pass_ = c_.GetDevice().createRenderPass(render_pass_info);
-  c_.SetDbgName((uint64_t)(VkRenderPass)render_pass_,
-                vk::ObjectType::eRenderPass, GetDbgName());
+  render_pass_ = ctx_.GetDevice().createRenderPass(render_pass_info);
+  ctx_.SetDbgName((uint64_t)(VkRenderPass)render_pass_,
+                  vk::ObjectType::eRenderPass, GetDbgName());
 }
 
 void RenderPass::CreateFramebuffers() {
@@ -62,7 +62,7 @@ void RenderPass::CreateFramebuffers() {
     framebuff_info.height = extent.height;
     framebuff_info.layers = 1;
 
-    framebuffers_.push_back(c_.GetDevice().createFramebuffer(framebuff_info));
+    framebuffers_.push_back(ctx_.GetDevice().createFramebuffer(framebuff_info));
   }
 }
 
@@ -945,10 +945,10 @@ void SwapPass::CreateFramebuffers() {
     framebuff_info.height = swap_props.extent.height;
     framebuff_info.layers = 1;
 
-    framebuffers_[i] = c_.GetDevice().createFramebuffer(framebuff_info);
-    c_.SetDbgName((uint64_t)(VkFramebuffer)framebuffers_[i],
-                  vk::ObjectType::eFramebuffer,
-                  GetDbgName() + "_framebuffer_" + std::to_string(i));
+    framebuffers_[i] = ctx_.GetDevice().createFramebuffer(framebuff_info);
+    ctx_.SetDbgName((uint64_t)(VkFramebuffer)framebuffers_[i],
+                    vk::ObjectType::eFramebuffer,
+                    GetDbgName() + "_framebuffer_" + std::to_string(i));
   }
 }
 

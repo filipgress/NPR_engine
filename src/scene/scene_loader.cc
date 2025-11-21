@@ -309,7 +309,7 @@ void SceneLoader::AddMeshComp(Scene& scene, flecs::entity ent,
       bb_comp.max_pos = glm::max(bb_comp.max_pos, vertices[i].pos);
     }
 
-    scene.gpu_res_->vbos.emplace_back(scene.gpu_res_->context,
+    scene.gpu_res_->vbos.emplace_back(scene.gpu_res_->ctx,
                                       scene.gpu_res_->cmd_buff, vertices,
                                       "vbo_" + std::string(ent.name().c_str()));
     mesh_comp.vbo_idx = scene.gpu_res_->vbos.size() - 1;
@@ -342,7 +342,7 @@ void SceneLoader::AddMeshComp(Scene& scene, flecs::entity ent,
                                  std::to_string(acc.componentType));
     }
 
-    scene.gpu_res_->ibos.emplace_back(scene.gpu_res_->context,
+    scene.gpu_res_->ibos.emplace_back(scene.gpu_res_->ctx,
                                       scene.gpu_res_->cmd_buff, indices,
                                       "ibo_" + std::string(ent.name().c_str()));
     mesh_comp.ibo_idx = scene.gpu_res_->ibos.size() - 1;
@@ -453,7 +453,7 @@ int SceneLoader::LoadTexture(Scene& scene, const tinygltf::Model& model,
   tex_data.height = image.height;
   tex_data.width = image.width;
 
-  Texture tex{scene.gpu_res_->context, tex_data, LoadSampler(model, texture)};
+  Texture tex{scene.gpu_res_->ctx, tex_data, LoadSampler(model, texture)};
   tex.Write(scene.gpu_res_->cmd_buff, *data);
 
   scene.gpu_res_->textures.push_back(std::move(tex));

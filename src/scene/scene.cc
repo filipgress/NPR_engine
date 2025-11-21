@@ -26,24 +26,24 @@ bool Scene::IsLoading() {
   return false;
 }
 
-void Scene::Prepare(const npr_graphics::VulkanContext& context,
+void Scene::Prepare(const npr_graphics::Context& ctx,
                     const std::string& filepath,
                     const std::string& scene_name) {
   filename_ = npr_core::GetFilename(filepath);
   scene_name_ = scene_name.empty() ? "default" : scene_name;
 
   world_.Reset();
-  if (gpu_res_ && gpu_res_->context.GetDevice() == context.GetDevice())
+  if (gpu_res_ && gpu_res_->ctx.GetDevice() == ctx.GetDevice())
     gpu_res_->Reset();
   else
-    gpu_res_ = std::make_unique<GpuResources>(context, "scene_" + scene_name_);
+    gpu_res_ = std::make_unique<GpuResources>(ctx, "scene_" + scene_name_);
 }
 
 void Scene::InitGPU(npr_core::TaskManager& tasks,
                     std::function<void()> on_complete) {
   if (!IsValid() || gpu_init_) return;
 
-  auto device = gpu_res_->context.GetDevice();
+  auto device = gpu_res_->ctx.GetDevice();
   auto cmd_buff = gpu_res_->cmd_pool.GetCmdBuff();
 
   vk::SubmitInfo submit_info{};
@@ -51,7 +51,7 @@ void Scene::InitGPU(npr_core::TaskManager& tasks,
   submit_info.pCommandBuffers = &cmd_buff;
 
   vk::Fence fence = device.createFence({});
-  gpu_res_->context.GetGraphicsQ().submit(submit_info, fence);
+  gpu_res_->ctx.GetGraphicsQ().submit(submit_info, fence);
 
   tasks.Add([this, on_complete, device, fence]() {
     auto status = device.getFenceStatus(fence);

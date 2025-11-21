@@ -2,10 +2,10 @@
 
 namespace npr_graphics {
 
-Buffer::Buffer(const VulkanContext& context, vk::BufferUsageFlags usage,
+Buffer::Buffer(const Context& ctx, vk::BufferUsageFlags usage,
                vk::MemoryPropertyFlags mem_props, vk::SharingMode sharing_mode,
                uint32_t size, const std::string& dbg_name)
-    : c_{context},
+    : ctx_{ctx},
       mem_props_{mem_props},
       usage_{usage},
       size_{size},
@@ -17,7 +17,7 @@ Buffer::Buffer(const VulkanContext& context, vk::BufferUsageFlags usage,
 }
 
 Buffer::Buffer(Buffer&& other) noexcept
-    : c_(other.c_),
+    : ctx_(other.ctx_),
       buff_(std::move(other.buff_)),
       buff_mem_(std::move(other.buff_mem_)),
       mem_props_(other.mem_props_),
@@ -35,7 +35,7 @@ Buffer::Buffer(Buffer&& other) noexcept
 Buffer::~Buffer() {
   UnmapMemory();
 
-  auto device = c_.GetDevice();
+  auto device = ctx_.GetDevice();
   if (buff_mem_) device.freeMemory(buff_mem_);
   if (buff_) device.destroyBuffer(buff_);
 }
@@ -45,7 +45,7 @@ void Buffer::CreateBuffer(vk::SharingMode sharing_mode) {
   buffer_info.size = size_;
   buffer_info.usage = usage_;
 
-  auto q_families = c_.GetQFamilies();
+  auto q_families = ctx_.GetQFamilies();
   if (sharing_mode == vk::SharingMode::eConcurrent &&
       mem_props_ & vk::MemoryPropertyFlagBits::eDeviceLocal &&
       q_families.graphics_i.value() != q_families.transfer_i.value()) {
@@ -59,25 +59,26 @@ void Buffer::CreateBuffer(vk::SharingMode sharing_mode) {
     buffer_info.sharingMode = vk::SharingMode::eExclusive;
   }
 
-  buff_ = c_.GetDevice().createBuffer(buffer_info);
-  c_.SetDbgName((uint64_t)(VkBuffer)buff_, vk::ObjectType::eBuffer, dbg_name_);
+  buff_ = ctx_.GetDevice().createBuffer(buffer_info);
+  ctx_.SetDbgName((uint64_t)(VkBuffer)buff_, vk::ObjectType::eBuffer,
+                  dbg_name_);
 }
 
 void Buffer::AllocMem() {
-  auto device = c_.GetDevice();
+  auto device = ctx_.GetDevice();
 
   vk::MemoryRequirements mem_req = device.getBufferMemoryRequirements(buff_);
   vk::MemoryAllocateInfo allocInfo{};
   allocInfo.allocationSize = mem_req.size;
   allocInfo.memoryTypeIndex =
-      c_.FindMemTypeIdx(mem_req.memoryTypeBits, mem_props_);
+      ctx_.FindMemTypeIdx(mem_req.memoryTypeBits, mem_props_);
 
   buff_mem_ = device.allocateMemory(allocInfo);
   device.bindBufferMemory(buff_, buff_mem_, 0);
 }
 
 void Buffer::Write(vk::CommandBuffer cmd_buff, const void* data) {
-  auto device = c_.GetDevice();
+  auto device = ctx_.GetDevice();
 
   if (mem_props_ & vk::MemoryPropertyFlagBits::eHostVisible) {
     if (!mapped_mem_) mapped_mem_ = device.mapMemory(buff_mem_, 0, size_);
@@ -124,7 +125,7 @@ void Buffer::Write(vk::CommandBuffer cmd_buff, const void* data) {
                              &pre_copy_barrier, 0, nullptr);
 
     if (!staging_buff_)
-      staging_buff_ = std::make_unique<StagingBuffer>(c_, size_);
+      staging_buff_ = std::make_unique<StagingBuffer>(ctx_, size_);
     staging_buff_->Write(nullptr, data);
 
     vk::BufferCopy region{0, 0, size_};

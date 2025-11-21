@@ -1,7 +1,7 @@
 #ifndef RESOURCES_H_
 #define RESOURCES_H_
 
-#include "vulkan_context.h"
+#include "context.h"
 #include "command_pool.h"
 #include "image.h"
 
@@ -184,7 +184,7 @@ class Resources : public npr_core::NonCopyable {
   friend class Renderer;
 
  public:
-  Resources(const VulkanContext& context, const CommandPool& cmd_pool,
+  Resources(const Context& ctx, const CommandPool& cmd_pool,
             vk::Extent2D extent, uint frame_count);
 
   uint GetFrameCount() const { return frame_count_; }
@@ -215,7 +215,7 @@ class Resources : public npr_core::NonCopyable {
   vk::SampleCountFlagBits GetMaxSamples();
 
  private:
-  const VulkanContext& c_;
+  const Context& ctx_;
 
   FrameProps frame_props_;
   std::vector<FrameResources> frame_resources_;

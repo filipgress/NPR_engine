@@ -1,7 +1,7 @@
 #ifndef GUI_MANAGER_H_
 #define GUI_MANAGER_H_
 
-#include "vulkan_context.h"
+#include "context.h"
 #include "swapchain.h"
 #include "render_pass.h"
 #include "pipeline_cache.h"
@@ -21,7 +21,7 @@ struct VulkanHandles {
 
 class GuiManager : public npr_core::NonCopyable {
  public:
-  GuiManager(const npr_window::Window& window, const VulkanContext& context,
+  GuiManager(const npr_window::Window& window, const Context& ctx,
              const Swapchain& swapchain, const SwapPass& swap_pass,
              const PipelineCache& pipeline_cache);
   ~GuiManager();

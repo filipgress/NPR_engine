@@ -50,20 +50,22 @@ void World::UpdateTransforms() {
   entities_.each([](TransformComp& tf) {
     if (!tf.dirty) return;
 
-    glm::mat4 trans_mat = glm::translate(glm::mat4(1.0f), tf.pos);
-    glm::mat4 rot_mat = glm::mat4_cast(tf.rot);
-    glm::mat4 scale_mat = glm::scale(glm::mat4(1.0f), tf.scale);
+    glm::mat3 rot3 = glm::mat3_cast(tf.rot);
 
-    tf.local_mat = trans_mat * rot_mat * scale_mat;
+    tf.local_mat[0] = glm::vec4(rot3[0] * tf.scale.x, 0.0f);
+    tf.local_mat[1] = glm::vec4(rot3[1] * tf.scale.y, 0.0f);
+    tf.local_mat[2] = glm::vec4(rot3[2] * tf.scale.z, 0.0f);
+    tf.local_mat[3] = glm::vec4(tf.pos, 1.0f);
+
     tf.dirty = false;
   });
 
   transform_query_.each(
       [](TransformComp& out_tf, const TransformComp* parent_tf) {
         if (parent_tf)
-          out_tf.global_mat = parent_tf->global_mat * out_tf.local_mat;
+          out_tf.glob_mat = parent_tf->glob_mat * out_tf.local_mat;
         else
-          out_tf.global_mat = out_tf.local_mat;
+          out_tf.glob_mat = out_tf.local_mat;
       });
 }
 
@@ -74,7 +76,7 @@ void World::UpdateBoundingBoxes() {
     glm::vec3 local_center = (bb.min_pos + bb.max_pos) * 0.5f;
     glm::vec3 local_extent = (bb.max_pos - bb.min_pos) * 0.5f;
 
-    glm::mat3 model3 = glm::mat3(tf.global_mat);
+    glm::mat3 model3 = glm::mat3(tf.glob_mat);
     glm::vec3 scale;
 
     scale.x = glm::length(model3[0]);
@@ -85,7 +87,7 @@ void World::UpdateBoundingBoxes() {
     model3[1] = glm::normalize(model3[1]);
     model3[2] = glm::normalize(model3[2]);
 
-    bb.center = tf.global_mat * glm::vec4(local_center, 1.0f);
+    bb.center = tf.glob_mat * glm::vec4(local_center, 1.0f);
     bb.extent = local_extent * scale;
     bb.inv_rot = glm::transpose(model3);
   });
@@ -137,8 +139,8 @@ void World::Record(vk::CommandBuffer cmd_buff, vk::PipelineLayout layout,
     for (const auto& [tf, bb] : instances) {
       if (!frustum.IsVisible(bb)) continue;
       visible_instances.push_back(
-          {.model = tf.global_mat,
-           .normal = glm::transpose(glm::inverse(tf.global_mat))});
+          {.model = tf.glob_mat,
+           .normal = glm::transpose(glm::inverse(tf.glob_mat))});
     }
 
     if (visible_instances.empty()) continue;

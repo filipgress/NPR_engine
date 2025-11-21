@@ -1,7 +1,7 @@
 #ifndef SWAPCHAIN_H_
 #define SWAPCHAIN_H_
 
-#include "vulkan_context.h"
+#include "context.h"
 
 namespace npr_graphics {
 struct SwapProps {
@@ -19,7 +19,7 @@ struct SwapProps {
 
 class Swapchain : public npr_core::NonCopyable {
  public:
-  Swapchain(const VulkanContext& context, glm::ivec2 frame_size);
+  Swapchain(const Context& ctx, glm::ivec2 frame_size);
   ~Swapchain();
 
   void Recreate(glm::ivec2 frame_size);
@@ -45,7 +45,7 @@ class Swapchain : public npr_core::NonCopyable {
       const SwapSupport& swap_supp) const;
 
  private:
-  const VulkanContext& c_;
+  const Context& ctx_;
 
   vk::SwapchainKHR swapchain_{nullptr};
   SwapProps props_{};

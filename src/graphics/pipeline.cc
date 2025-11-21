@@ -5,12 +5,12 @@ namespace npr_graphics {
 
 Pipeline::~Pipeline() {
   DestroyPipeline();
-  if (layout_) c_.GetDevice().destroyPipelineLayout(layout_);
+  if (layout_) ctx_.GetDevice().destroyPipelineLayout(layout_);
 }
 
 void Pipeline::DestroyPipeline() {
   if (pipeline_) {
-    c_.GetDevice().destroyPipeline(pipeline_);
+    ctx_.GetDevice().destroyPipeline(pipeline_);
     pipeline_ = nullptr;
   }
 }
@@ -42,9 +42,9 @@ void Pipeline::CreateLayout(
   pipeline_layout_info.pushConstantRangeCount = push_constant_ranges.size();
   pipeline_layout_info.pPushConstantRanges = push_constant_ranges.data();
 
-  layout_ = c_.GetDevice().createPipelineLayout(pipeline_layout_info);
-  c_.SetDbgName((uint64_t)(VkPipelineLayout)layout_,
-                vk::ObjectType::ePipelineLayout, GetDbgName() + "_layout");
+  layout_ = ctx_.GetDevice().createPipelineLayout(pipeline_layout_info);
+  ctx_.SetDbgName((uint64_t)(VkPipelineLayout)layout_,
+                  vk::ObjectType::ePipelineLayout, GetDbgName() + "_layout");
 }
 
 void Pipeline::CreatePipeline(size_t subpass, const std::string& vert_entry,
@@ -77,11 +77,11 @@ void Pipeline::CreatePipeline(size_t subpass, const std::string& vert_entry,
   pipeline_info.renderPass = render_pass_.GetRenderPass();
   pipeline_info.subpass = subpass;
 
-  pipeline_ = c_.GetDevice()
+  pipeline_ = ctx_.GetDevice()
                   .createGraphicsPipeline(cache_.GetCache(), pipeline_info)
                   .value;
-  c_.SetDbgName((uint64_t)(VkPipeline)pipeline_, vk::ObjectType::ePipeline,
-                GetDbgName());
+  ctx_.SetDbgName((uint64_t)(VkPipeline)pipeline_, vk::ObjectType::ePipeline,
+                  GetDbgName());
 }
 
 std::array<vk::PipelineShaderStageCreateInfo, 2> Pipeline::GetShaderStages(

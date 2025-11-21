@@ -1,7 +1,7 @@
 #ifndef PIPELINE_CACHE_H_
 #define PIPELINE_CACHE_H_
 
-#include "vulkan_context.h"
+#include "context.h"
 
 namespace npr_graphics {
 
@@ -24,7 +24,7 @@ struct PipelineCachePrefixHeader {
 
 class PipelineCache : public npr_core::NonCopyable {
  public:
-  PipelineCache(const VulkanContext& context);
+  PipelineCache(const Context& ctx);
   ~PipelineCache();
 
   vk::PipelineCache GetCache() const { return pipeline_cache_; }
@@ -40,7 +40,7 @@ class PipelineCache : public npr_core::NonCopyable {
                      const std::vector<uint8_t>& cache_data);
 
  private:
-  const VulkanContext& c_;
+  const Context& ctx_;
   vk::PipelineCache pipeline_cache_{nullptr};
 
   const std::string kFilePath_ = "pipeline.cache";

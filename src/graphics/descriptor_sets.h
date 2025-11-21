@@ -1,17 +1,16 @@
 #ifndef DESCRIPTOR_SETS_H_
 #define DESCRIPTOR_SETS_H_
 
-#include "vulkan_context.h"
+#include "context.h"
 #include "resources.h"
 #include "image.h"
 
 namespace npr_graphics {
 class BaseDescSets : public npr_core::NonCopyable {
  public:
-  BaseDescSets(const VulkanContext& context, uint count)
-      : c_{context}, count_{count} {}
+  BaseDescSets(const Context& ctx, uint count) : ctx_{ctx}, count_{count} {}
   virtual ~BaseDescSets() {
-    if (layout_) c_.GetDevice().destroyDescriptorSetLayout(layout_);
+    if (layout_) ctx_.GetDevice().destroyDescriptorSetLayout(layout_);
   }
 
   uint GetCount() const { return count_; }
@@ -25,7 +24,7 @@ class BaseDescSets : public npr_core::NonCopyable {
   virtual void CreateLayout() = 0;
 
  protected:
-  const VulkanContext& c_;
+  const Context& ctx_;
 
   vk::DescriptorSetLayout layout_{nullptr};
   std::vector<vk::DescriptorSet> sets_;
@@ -37,8 +36,7 @@ class BaseDescSets : public npr_core::NonCopyable {
  */
 class SingleTexSets : public BaseDescSets {
  public:
-  SingleTexSets(const VulkanContext& context, uint count)
-      : BaseDescSets{context, count} {
+  SingleTexSets(const Context& ctx, uint count) : BaseDescSets{ctx, count} {
     CreateLayout();
   }
   virtual ~SingleTexSets() = default;
@@ -56,8 +54,7 @@ class SingleTexSets : public BaseDescSets {
 
 class PresentSets : public SingleTexSets {
  public:
-  PresentSets(const VulkanContext& context, uint count)
-      : SingleTexSets{context, count} {}
+  PresentSets(const Context& ctx, uint count) : SingleTexSets{ctx, count} {}
 
   const Texture* GetAttach(const Resources& res, int frame_idx) const override {
     return res.GetResources()[frame_idx].present_color.get();
@@ -66,8 +63,7 @@ class PresentSets : public SingleTexSets {
 
 class AOResSets : public SingleTexSets {
  public:
-  AOResSets(const VulkanContext& context, uint count)
-      : SingleTexSets{context, count} {}
+  AOResSets(const Context& ctx, uint count) : SingleTexSets{ctx, count} {}
 
   const Texture* GetAttach(const Resources& res, int frame_idx) const override {
     return res.GetResources()[frame_idx].ao_res.get();
@@ -76,8 +72,7 @@ class AOResSets : public SingleTexSets {
 
 class AOTempSets : public SingleTexSets {
  public:
-  AOTempSets(const VulkanContext& context, uint count)
-      : SingleTexSets{context, count} {}
+  AOTempSets(const Context& ctx, uint count) : SingleTexSets{ctx, count} {}
 
   const Texture* GetAttach(const Resources& res, int frame_idx) const override {
     return res.GetResources()[frame_idx].ao_temp.get();
@@ -88,11 +83,9 @@ class AOTempSets : public SingleTexSets {
  */
 class SingleBuffSets : public BaseDescSets {
  public:
-  SingleBuffSets(const VulkanContext& context, uint count,
-                 vk::DescriptorType type, vk::ShaderStageFlags stage_flags)
-      : BaseDescSets{context, count},
-        desc_type_{type},
-        stage_flags_{stage_flags} {
+  SingleBuffSets(const Context& ctx, uint count, vk::DescriptorType type,
+                 vk::ShaderStageFlags stage_flags)
+      : BaseDescSets{ctx, count}, desc_type_{type}, stage_flags_{stage_flags} {
     CreateLayout();
   }
   virtual ~SingleBuffSets() = default;
@@ -112,8 +105,8 @@ class SingleBuffSets : public BaseDescSets {
 
 class CameraUnifSets : public SingleBuffSets {
  public:
-  CameraUnifSets(const VulkanContext& context, uint count)
-      : SingleBuffSets{context, count, vk::DescriptorType::eUniformBuffer,
+  CameraUnifSets(const Context& ctx, uint count)
+      : SingleBuffSets{ctx, count, vk::DescriptorType::eUniformBuffer,
                        vk::ShaderStageFlagBits::eVertex |
                            vk::ShaderStageFlagBits::eFragment} {}
 
@@ -122,9 +115,8 @@ class CameraUnifSets : public SingleBuffSets {
 
 class MaterialUnifSets : public SingleBuffSets {
  public:
-  MaterialUnifSets(const VulkanContext& context, uint count)
-      : SingleBuffSets{context, count,
-                       vk::DescriptorType::eUniformBufferDynamic,
+  MaterialUnifSets(const Context& ctx, uint count)
+      : SingleBuffSets{ctx, count, vk::DescriptorType::eUniformBufferDynamic,
                        vk::ShaderStageFlagBits::eFragment} {}
 
   void Update(const Resources& res) const;
@@ -135,8 +127,7 @@ class MaterialUnifSets : public SingleBuffSets {
  */
 class GBuffSets : public BaseDescSets {
  public:
-  GBuffSets(const VulkanContext& context, uint count)
-      : BaseDescSets{context, count} {
+  GBuffSets(const Context& ctx, uint count) : BaseDescSets{ctx, count} {
     CreateLayout();
   }
 
@@ -154,9 +145,7 @@ class GBuffSets : public BaseDescSets {
  */
 class TextureArraySet : public BaseDescSets {
  public:
-  TextureArraySet(const VulkanContext& context) : BaseDescSets{context, 1} {
-    CreateLayout();
-  }
+  TextureArraySet(const Context& ctx) : BaseDescSets{ctx, 1} { CreateLayout(); }
 
   void Update(const std::vector<npr_graphics::Texture>& textures,
               const npr_graphics::Texture& default_tex) const;
@@ -174,9 +163,7 @@ class TextureArraySet : public BaseDescSets {
  */
 class AOSet : public BaseDescSets {
  public:
-  AOSet(const VulkanContext& context) : BaseDescSets{context, 1} {
-    CreateLayout();
-  }
+  AOSet(const Context& ctx) : BaseDescSets{ctx, 1} { CreateLayout(); }
 
   void Update(const Resources& res) const;
   std::vector<vk::DescriptorPoolSize> GetPoolSizes() const override {
@@ -193,8 +180,7 @@ class AOSet : public BaseDescSets {
  */
 class ABufferSets : public BaseDescSets {
  public:
-  ABufferSets(const VulkanContext& context, uint count)
-      : BaseDescSets{context, count} {
+  ABufferSets(const Context& ctx, uint count) : BaseDescSets{ctx, count} {
     CreateLayout();
   }
 
@@ -212,8 +198,7 @@ class ABufferSets : public BaseDescSets {
  */
 class WBoitInputSets : public BaseDescSets {
  public:
-  WBoitInputSets(const VulkanContext& context, uint count)
-      : BaseDescSets{context, count} {
+  WBoitInputSets(const Context& ctx, uint count) : BaseDescSets{ctx, count} {
     CreateLayout();
   }
 

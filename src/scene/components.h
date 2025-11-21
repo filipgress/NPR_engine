@@ -44,7 +44,7 @@ struct TransformComp {
   glm::vec3 scale{1.0f};
 
   glm::mat4 local_mat;
-  glm::mat4 global_mat;
+  glm::mat4 glob_mat;
 
   bool dirty{true};
 };
