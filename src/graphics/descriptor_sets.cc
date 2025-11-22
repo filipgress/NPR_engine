@@ -110,6 +110,33 @@ void MaterialUnifSets::Update(const Resources& resrc) const {
                            per_frame_resrc[i].material_ubo->GetElemSize(), i);
 }
 
+void DirLightUnifSets::Update(const Resources& resrc) const {
+  const auto& per_frame_res = resrc.GetResrc();
+  assert(count_ == per_frame_res.size());
+
+  for (size_t i = 0; i < per_frame_res.size(); i++)
+    SingleBuffSets::Update(per_frame_res[i].dir_light_ubo->GetBuffer(),
+                           VK_WHOLE_SIZE, i);
+}
+
+void PointLightUnifSets::Update(const Resources& resrc) const {
+  const auto& per_frame_res = resrc.GetResrc();
+  assert(count_ == per_frame_res.size());
+
+  for (size_t i = 0; i < per_frame_res.size(); i++)
+    SingleBuffSets::Update(per_frame_res[i].point_light_ubo->GetBuffer(),
+                           per_frame_res[i].point_light_ubo->GetElemSize(), i);
+}
+
+void SpotLightUnifSets::Update(const Resources& resrc) const {
+  const auto& per_frame_res = resrc.GetResrc();
+  assert(count_ == per_frame_res.size());
+
+  for (size_t i = 0; i < per_frame_res.size(); i++)
+    SingleBuffSets::Update(per_frame_res[i].spot_light_ubo->GetBuffer(),
+                           per_frame_res[i].spot_light_ubo->GetElemSize(), i);
+}
+
 /*
  * GBuffSets
  */

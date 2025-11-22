@@ -6,7 +6,6 @@
 
 namespace npr_graphics {
 
-class Resources;
 class DescriptorPool : public npr_core::NonCopyable {
  public:
   DescriptorPool(const Context& ctx, const Resources& resrc);
@@ -17,12 +16,21 @@ class DescriptorPool : public npr_core::NonCopyable {
   const GBuffSets& GetGBuffSets() const { return gbuff_sets_; }
   const CameraUnifSets& GetCameraSets() const { return camera_sets_; }
   const MaterialUnifSets& GetMaterialSets() const { return material_sets_; }
+
+  const DirLightUnifSets& GetDirLightSets() const { return dir_light_sets_; }
+  const SpotLightUnifSets& GetSpotLightSets() const { return spot_light_sets_; }
+  const PointLightUnifSets& GetPointLightSets() const {
+    return point_light_sets_;
+  }
+
   const AOSet& GetAOSet() const { return ao_set_; }
   const AOResSets& GetAOResSets() const { return ao_res_sets_; }
   const AOTempSets& GetAOTempSets() const { return ao_temp_sets_; }
+
   const ABufferSets& GetABufferSets() const { return abuff_sets_; }
   const WBoitInputSets& GetWBoitInputSets() const { return wboit_input_sets_; }
-  const PresentSets& GetPresentSets() const { return present_sets_; }
+
+  const ColorSets& GetColorSets() const { return color_sets_; }
 
  private:
   void CreateDescriptorPool();
@@ -36,13 +44,18 @@ class DescriptorPool : public npr_core::NonCopyable {
   CameraUnifSets camera_sets_;
   MaterialUnifSets material_sets_;
 
+  DirLightUnifSets dir_light_sets_;
+  PointLightUnifSets point_light_sets_;
+  SpotLightUnifSets spot_light_sets_;
+
   AOSet ao_set_;
   AOResSets ao_res_sets_;
   AOTempSets ao_temp_sets_;
 
   ABufferSets abuff_sets_;
   WBoitInputSets wboit_input_sets_;
-  PresentSets present_sets_;
+
+  ColorSets color_sets_;
 };
 
 class TexDescriptorPool : public npr_core::NonCopyable {

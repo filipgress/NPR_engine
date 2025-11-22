@@ -52,13 +52,13 @@ class SingleTexSets : public BaseDescSets {
                                    int frame_idx) const = 0;
 };
 
-class PresentSets : public SingleTexSets {
+class ColorSets : public SingleTexSets {
  public:
-  PresentSets(const Context& ctx, uint count) : SingleTexSets{ctx, count} {}
+  ColorSets(const Context& ctx, uint count) : SingleTexSets{ctx, count} {}
 
   const Texture* GetAttach(const Resources& resrc,
                            int frame_idx) const override {
-    return resrc.GetResrc()[frame_idx].present_color.get();
+    return resrc.GetResrc()[frame_idx].color_res.get();
   }
 };
 
@@ -119,6 +119,33 @@ class CameraUnifSets : public SingleBuffSets {
 class MaterialUnifSets : public SingleBuffSets {
  public:
   MaterialUnifSets(const Context& ctx, uint count)
+      : SingleBuffSets{ctx, count, vk::DescriptorType::eUniformBufferDynamic,
+                       vk::ShaderStageFlagBits::eFragment} {}
+
+  void Update(const Resources& resrc) const;
+};
+
+class DirLightUnifSets : public SingleBuffSets {
+ public:
+  DirLightUnifSets(const Context& ctx, uint count)
+      : SingleBuffSets{ctx, count, vk::DescriptorType::eUniformBuffer,
+                       vk::ShaderStageFlagBits::eFragment} {}
+
+  void Update(const Resources& resrc) const;
+};
+
+class PointLightUnifSets : public SingleBuffSets {
+ public:
+  PointLightUnifSets(const Context& ctx, uint count)
+      : SingleBuffSets{ctx, count, vk::DescriptorType::eUniformBufferDynamic,
+                       vk::ShaderStageFlagBits::eFragment} {}
+
+  void Update(const Resources& resrc) const;
+};
+
+class SpotLightUnifSets : public SingleBuffSets {
+ public:
+  SpotLightUnifSets(const Context& ctx, uint count)
       : SingleBuffSets{ctx, count, vk::DescriptorType::eUniformBufferDynamic,
                        vk::ShaderStageFlagBits::eFragment} {}
 

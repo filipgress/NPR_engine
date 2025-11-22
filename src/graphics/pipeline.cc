@@ -125,6 +125,8 @@ vk::PipelineVertexInputStateCreateInfo Pipeline::GetVertexInputState() {
   vk::PipelineVertexInputStateCreateInfo vertex_input{};
 
   if (data_.use_vbo) {
+    data_.binding_descs.resize(2);
+
     // Vertex binding
     data_.binding_descs[0].binding = 0;
     data_.binding_descs[0].stride = sizeof(Vertex);
@@ -291,6 +293,7 @@ vk::PipelineDepthStencilStateCreateInfo AOGenPipe::GetDepthStencilState()
   depth_stencil.depthBoundsTestEnable = VK_FALSE;
   depth_stencil.stencilTestEnable = VK_TRUE;
 
+  // stencil test
   depth_stencil.front.failOp = vk::StencilOp::eKeep;
   depth_stencil.front.passOp = vk::StencilOp::eKeep;
   depth_stencil.front.depthFailOp = vk::StencilOp::eKeep;
@@ -298,6 +301,112 @@ vk::PipelineDepthStencilStateCreateInfo AOGenPipe::GetDepthStencilState()
   depth_stencil.front.compareMask = BIT(1);
   depth_stencil.front.writeMask = 0;
   depth_stencil.front.reference = BIT(1);
+
+  depth_stencil.back = depth_stencil.front;
+
+  return depth_stencil;
+}
+
+/*
+ * LightPipe
+ */
+vk::PipelineVertexInputStateCreateInfo LightPipe::GetVertexInputState() {
+  vk::PipelineVertexInputStateCreateInfo vertex_input{};
+
+  data_.binding_descs.resize(1);
+  data_.attr_descs.resize(1);
+
+  // LightVertex
+  data_.binding_descs[0].binding = 0;
+  data_.binding_descs[0].stride = sizeof(LightVertex);
+  data_.binding_descs[0].inputRate = vk::VertexInputRate::eVertex;
+
+  // position
+  data_.attr_descs[0].binding = 0;
+  data_.attr_descs[0].location = 0;
+  data_.attr_descs[0].format = vk::Format::eR32G32B32Sfloat;
+  data_.attr_descs[0].offset = offsetof(LightVertex, pos);
+
+  vertex_input.vertexBindingDescriptionCount = data_.binding_descs.size();
+  vertex_input.pVertexBindingDescriptions = data_.binding_descs.data();
+  vertex_input.vertexAttributeDescriptionCount = data_.attr_descs.size();
+  vertex_input.pVertexAttributeDescriptions = data_.attr_descs.data();
+
+  return vertex_input;
+}
+
+/*
+ * DirLightPipe
+ */
+vk::PipelineDepthStencilStateCreateInfo DirLightPipe::GetDepthStencilState()
+    const {
+  vk::PipelineDepthStencilStateCreateInfo depth_stencil{};
+  depth_stencil.depthTestEnable = VK_FALSE;
+  depth_stencil.depthWriteEnable = VK_FALSE;
+  depth_stencil.depthCompareOp = vk::CompareOp::eAlways;
+  depth_stencil.depthBoundsTestEnable = VK_FALSE;
+  depth_stencil.stencilTestEnable = VK_TRUE;
+
+  // stencil test
+  depth_stencil.front.failOp = vk::StencilOp::eKeep;
+  depth_stencil.front.passOp = vk::StencilOp::eKeep;
+  depth_stencil.front.depthFailOp = vk::StencilOp::eKeep;
+  depth_stencil.front.compareOp = vk::CompareOp::eEqual;
+  depth_stencil.front.compareMask = BIT(1);
+  depth_stencil.front.writeMask = 0;
+  depth_stencil.front.reference = BIT(1);
+
+  depth_stencil.back = depth_stencil.front;
+
+  return depth_stencil;
+}
+
+/*
+ * LightStencilPipe
+ */
+vk::PipelineDepthStencilStateCreateInfo LightStencilPipe::GetDepthStencilState()
+    const {
+  vk::PipelineDepthStencilStateCreateInfo depth_stencil{};
+  depth_stencil.depthTestEnable = VK_TRUE;
+  depth_stencil.depthWriteEnable = VK_FALSE;
+  depth_stencil.depthCompareOp = vk::CompareOp::eLessOrEqual;
+  depth_stencil.depthBoundsTestEnable = VK_FALSE;
+  depth_stencil.stencilTestEnable = VK_TRUE;
+
+  // stencil test
+  depth_stencil.front.failOp = vk::StencilOp::eKeep;
+  depth_stencil.front.passOp = vk::StencilOp::eKeep;
+  depth_stencil.front.depthFailOp = vk::StencilOp::eReplace;
+  depth_stencil.front.compareOp = vk::CompareOp::eAlways;
+  depth_stencil.front.compareMask = BIT(1);
+  depth_stencil.front.writeMask = BIT(1);
+  depth_stencil.front.reference = BIT(1);
+
+  depth_stencil.back = depth_stencil.front;
+
+  return depth_stencil;
+}
+
+/*
+ * LightVolPipe
+ */
+vk::PipelineDepthStencilStateCreateInfo LightVolPipe::GetDepthStencilState()
+    const {
+  vk::PipelineDepthStencilStateCreateInfo depth_stencil{};
+  depth_stencil.depthTestEnable = VK_TRUE;
+  depth_stencil.depthWriteEnable = VK_FALSE;
+  depth_stencil.depthCompareOp = vk::CompareOp::eGreaterOrEqual;
+  depth_stencil.depthBoundsTestEnable = VK_FALSE;
+  depth_stencil.stencilTestEnable = VK_TRUE;
+
+  // stencil test
+  depth_stencil.front.failOp = vk::StencilOp::eKeep;
+  depth_stencil.front.passOp = vk::StencilOp::eKeep;
+  depth_stencil.front.depthFailOp = vk::StencilOp::eKeep;
+  depth_stencil.front.compareOp = vk::CompareOp::eEqual;
+  depth_stencil.front.compareMask = BIT(1);
+  depth_stencil.front.writeMask = 0;
+  depth_stencil.front.reference = 0;
 
   depth_stencil.back = depth_stencil.front;
 

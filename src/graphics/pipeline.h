@@ -26,7 +26,7 @@ struct PipelineData {
   std::vector<uint8_t> specialization_data;
   vk::SpecializationInfo specialization_info;
 
-  std::array<vk::VertexInputBindingDescription, 2> binding_descs;
+  std::vector<vk::VertexInputBindingDescription> binding_descs;
   std::vector<vk::VertexInputAttributeDescription> attr_descs;
 
   std::vector<vk::PipelineColorBlendAttachmentState> color_attachments{};
@@ -77,7 +77,7 @@ class Pipeline : public npr_core::NonCopyable {
   std::array<vk::PipelineShaderStageCreateInfo, 2> GetShaderStages(
       const std::string& vert_entry, const std::string& frag_entry,
       const std::vector<SpecConstInfo>& specialization_consts = {});
-  vk::PipelineVertexInputStateCreateInfo GetVertexInputState();
+  virtual vk::PipelineVertexInputStateCreateInfo GetVertexInputState();
 
   virtual vk::PipelineInputAssemblyStateCreateInfo GetInputAssemblyState()
       const;
@@ -218,6 +218,130 @@ class AOBlurPipe : public Pipeline {
 
  private:
   const std::string GetDbgName() const override { return "ao_blur_pipe"; }
+};
+
+class LightPipe : public Pipeline {
+ public:
+  LightPipe(const Context& ctx, const PipelineCache& cache,
+            const BasePass& render_pass, VertexShader& vert_shader,
+            FragmentShader& frag_shader)
+      : Pipeline(ctx, cache, render_pass, vert_shader, frag_shader) {}
+
+ private:
+  vk::PipelineVertexInputStateCreateInfo GetVertexInputState() override;
+};
+
+class DirLightPipe : public LightPipe {
+ public:
+  DirLightPipe(const Context& ctx, const PipelineCache& cache,
+               const DirLightPass& render_pass, VertexShader& vert_shader,
+               FragmentShader& frag_shader, vk::SampleCountFlagBits samples,
+               const DescriptorPool& desc_pool)
+      : LightPipe(ctx, cache, render_pass, vert_shader, frag_shader) {
+    CreateLayout({desc_pool.GetAOResSets().GetLayout(),
+                  desc_pool.GetGBuffSets().GetLayout(),
+                  desc_pool.GetDirLightSets().GetLayout()},
+                 {});
+
+    data_.samples = samples;
+
+    // color_ms
+    data_.color_attachments.resize(1);
+    data_.color_attachments[0].blendEnable = VK_FALSE;
+    data_.color_attachments[0].colorWriteMask =
+        vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+        vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+
+    Recreate();
+  }
+
+  void Recreate() override {
+    CreatePipeline(0, "main", "main",
+                   {MakeSpecConst(0, static_cast<uint32_t>(data_.samples)),
+                    MakeSpecConst(1, static_cast<uint32_t>(MAX_DIR_LIGHTS))});
+  }
+
+ private:
+  const std::string GetDbgName() const override { return "dir_light_pipe"; }
+  vk::PipelineDepthStencilStateCreateInfo GetDepthStencilState() const override;
+};
+
+class LightStencilPipe : public LightPipe {
+ public:
+  LightStencilPipe(const Context& ctx, const PipelineCache& cache,
+                   const LightVolPass& render_pass, VertexShader& vert_shader,
+                   FragmentShader& frag_shader, vk::SampleCountFlagBits samples,
+                   const DescriptorPool& desc_pool)
+      : LightPipe(ctx, cache, render_pass, vert_shader, frag_shader) {
+    CreateLayout(
+        {desc_pool.GetCameraSets().GetLayout()},
+        {MakePushConst<LightPushConst>(vk::ShaderStageFlagBits::eVertex)});
+
+    data_.use_vbo = true;
+    data_.samples = samples;
+    data_.cull_mode = vk::CullModeFlagBits::eBack;
+
+    Recreate();
+  }
+
+  void Recreate() override { CreatePipeline(0, "main", "main"); }
+
+ private:
+  const std::string GetDbgName() const override { return "light_stencil_pipe"; }
+  vk::PipelineDepthStencilStateCreateInfo GetDepthStencilState() const override;
+};
+
+class LightVolPipe : public LightPipe {
+ public:
+  LightVolPipe(const Context& ctx, const PipelineCache& cache,
+               const LightVolPass& render_pass, VertexShader& vert_shader,
+               FragmentShader& frag_shader, vk::SampleCountFlagBits samples,
+               const DescriptorPool& desc_pool, bool is_point_light)
+      : LightPipe(ctx, cache, render_pass, vert_shader, frag_shader),
+        is_point_light_{is_point_light} {
+    CreateLayout(
+        {desc_pool.GetCameraSets().GetLayout(),
+         desc_pool.GetGBuffSets().GetLayout(),
+         is_point_light ? desc_pool.GetPointLightSets().GetLayout()
+                        : desc_pool.GetSpotLightSets().GetLayout()},
+        {MakePushConst<LightPushConst>(vk::ShaderStageFlagBits::eVertex)});
+
+    data_.use_vbo = true;
+    data_.samples = samples;
+    data_.cull_mode = vk::CullModeFlagBits::eFront;
+
+    // color_ms with blending
+    data_.color_attachments.resize(1);
+    data_.color_attachments[0].blendEnable = VK_TRUE;
+    data_.color_attachments[0].colorWriteMask =
+        vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+        vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+
+    // Additive blending for volumetric lights
+    data_.color_attachments[0].srcColorBlendFactor = vk::BlendFactor::eOne;
+    data_.color_attachments[0].dstColorBlendFactor = vk::BlendFactor::eOne;
+    data_.color_attachments[0].colorBlendOp = vk::BlendOp::eAdd;
+
+    data_.color_attachments[0].srcAlphaBlendFactor = vk::BlendFactor::eOne;
+    data_.color_attachments[0].dstAlphaBlendFactor = vk::BlendFactor::eOne;
+    data_.color_attachments[0].alphaBlendOp = vk::BlendOp::eAdd;
+
+    Recreate();
+  }
+
+  void Recreate() override {
+    CreatePipeline(1, "main", "main",
+                   {MakeSpecConst(0, static_cast<uint32_t>(data_.samples))});
+  }
+
+ private:
+  const std::string GetDbgName() const override {
+    return is_point_light_ ? "point_light_pipe" : "spot_light_pipe";
+  }
+  vk::PipelineDepthStencilStateCreateInfo GetDepthStencilState() const override;
+
+ private:
+  bool is_point_light_;
 };
 
 class ABuffFillPipe : public Pipeline {
@@ -396,9 +520,8 @@ class SwapPipe : public Pipeline {
            FragmentShader& frag_shader, const DescriptorPool& desc_pool)
       : Pipeline(ctx, cache, render_pass, vert_shader, frag_shader) {
     CreateLayout(
-        {desc_pool.GetAOResSets().GetLayout()},
-        // {desc_pool.GetPresentSets().GetLayout()},
-        // {desc_pool.GetGBuffSets().GetLayout()},
+        {desc_pool.GetColorSets().GetLayout()},
+        // {desc_pool.GetAOResSets().GetLayout()},
         {MakePushConst<LoadPushConst>(vk::ShaderStageFlagBits::eFragment)});
 
     data_.color_attachments.resize(1);
