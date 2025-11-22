@@ -61,15 +61,20 @@ struct Vertex {
   glm::vec4 tangent{1.0f};
 };
 
+struct LightVertex {
+  glm::vec3 pos;
+};
+
+template <typename T>
 class VertexBuffer : public Buffer {
  public:
   VertexBuffer(const Context& ctx, vk::CommandBuffer cmd_buff,
-               const std::vector<Vertex>& vertices, const std::string& dbg_name)
+               const std::vector<T>& vertices, const std::string& dbg_name)
       : Buffer(ctx,
                vk::BufferUsageFlagBits::eVertexBuffer |
                    vk::BufferUsageFlagBits::eTransferDst,
                vk::MemoryPropertyFlagBits::eDeviceLocal,
-               vk::SharingMode::eExclusive, vertices.size() * sizeof(Vertex),
+               vk::SharingMode::eExclusive, vertices.size() * sizeof(T),
                dbg_name),
         count_{vertices.size()} {
     Write(cmd_buff, vertices.data());
@@ -146,14 +151,14 @@ class UniformBuffer : public Buffer {
 template <typename T>
 class DynamicUniformBuffer : public Buffer {
  public:
-  DynamicUniformBuffer(const Context& ctx, uint32_t obj_count,
+  DynamicUniformBuffer(const Context& ctx, uint32_t elem_count,
                        const std::string& dbg_name)
       : Buffer{ctx,
                vk::BufferUsageFlagBits::eUniformBuffer,
                vk::MemoryPropertyFlagBits::eHostVisible |
                    vk::MemoryPropertyFlagBits::eHostCoherent,
                vk::SharingMode::eExclusive,
-               CalcBufferSize(ctx, obj_count),
+               CalcBufferSize(ctx, elem_count),
                dbg_name} {}
 
   uint32_t GetElemSize() const { return aligned_size_; }
@@ -187,12 +192,13 @@ class DynamicUniformBuffer : public Buffer {
 template <typename T>
 class StorageBuffer : public Buffer {
  public:
-  StorageBuffer(const Context& ctx, const std::string& dbg_name)
+  StorageBuffer(const Context& ctx, uint32_t elem_count,
+                const std::string& dbg_name)
       : Buffer(ctx,
                vk::BufferUsageFlagBits::eStorageBuffer |
                    vk::BufferUsageFlagBits::eTransferDst,
                vk::MemoryPropertyFlagBits::eDeviceLocal,
-               vk::SharingMode::eExclusive, sizeof(T), dbg_name) {}
+               vk::SharingMode::eExclusive, elem_count * sizeof(T), dbg_name) {}
   void Write(vk::CommandBuffer cmd_buff, const T& data) {
     Buffer::Write(cmd_buff, &data);
   }

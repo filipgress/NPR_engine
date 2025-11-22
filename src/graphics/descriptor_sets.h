@@ -58,7 +58,7 @@ class PresentSets : public SingleTexSets {
 
   const Texture* GetAttach(const Resources& resrc,
                            int frame_idx) const override {
-    return resrc.GetResources()[frame_idx].present_color.get();
+    return resrc.GetResrc()[frame_idx].present_color.get();
   }
 };
 
@@ -68,7 +68,7 @@ class AOResSets : public SingleTexSets {
 
   const Texture* GetAttach(const Resources& resrc,
                            int frame_idx) const override {
-    return resrc.GetResources()[frame_idx].ao_res.get();
+    return resrc.GetResrc()[frame_idx].ao_res.get();
   }
 };
 
@@ -78,7 +78,7 @@ class AOTempSets : public SingleTexSets {
 
   const Texture* GetAttach(const Resources& resrc,
                            int frame_idx) const override {
-    return resrc.GetResources()[frame_idx].ao_temp.get();
+    return resrc.GetResrc()[frame_idx].ao_temp.get();
   }
 };
 /*

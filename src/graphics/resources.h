@@ -32,71 +32,75 @@ enum MaterialFlags : uint32_t {
   kMask = BIT(3)
 };
 
-struct alignas(16) MaterialUnif {
-  glm::ivec4 maps;
+struct MaterialUnif {
+  glm::ivec4 maps;  // x=albedo, y=normal, z=metallic_roughness, w=emissive
 
-  glm::vec4 color_factor;
-  glm::vec3 emissive_factor;
+  glm::vec4 color_factor;     // rgb = albedo, a = alpha
+  glm::vec4 emissive_factor;  // rgb = emissive, a = unused
+
   float metallic_factor;
   float roughness_factor;
-
   float alpha_cutoff;
   uint32_t flags;
 };
 
-struct alignas(16) CameraUnif {
+struct CameraUnif {
   glm::mat4 view;
   glm::mat4 proj;
   glm::mat4 proj_view;
 };
 
-struct DirLightStorage {
-  glm::vec4 direction;  // xyz = normalized direction, w = unused
-  glm::vec4 color;      // rgb = color, a = intensity
+struct DirLight {
+  glm::vec4 dir;  // xyz = normalized view-space direction to light, w = unused
+  glm::vec4 color;  // rgb = color * intensity, a = unused
 };
 
-struct PointLightStorage {
-  glm::vec4 position;  // xyz = position, w = radius
-  glm::vec4 color;     // rgb = color, a = intensity
+struct DirLightUnif {
+  glm::vec4 ambient;  // rgb = color * intensity, a = intensity
+  glm::vec4 rim;      // rgb = color * intensity, a = intensity
+
+  float diff_int;
+  float spec_int;
+  float rim_power;
+  uint32_t inv_rim;  // 0 or 1
+
+  glm::uvec4 count;  // x = count, yzw = unused
+
+  DirLight dir_lights[MAX_DIR_LIGHTS];
 };
 
-struct SpotLightStorage {
-  glm::vec4 position;   // xyz = position, w = radius
-  glm::vec4 direction;  // xyz = direction, w = unused
-  glm::vec4 color;      // rgb = color, a = intensity
-  glm::vec4 params;     // x = angle_scale, y = angle_offset, zw = unused
+struct PointLightUnif {
+  glm::vec4 pos;    // xyz = view-space position, w = radius
+  glm::vec4 color;  // rgb = color, a = intensity
 };
 
-struct LightStorage {
-  glm::vec4 ambient_color;
-  glm::ivec4 counts;  // xyz = dir, point & spot count, w = unused
-
-  DirLightStorage dir_lights[MAX_DIR_LIGHTS];
-  PointLightStorage point_lights[MAX_POINT_LIGHTS];
-  SpotLightStorage spot_lights[MAX_SPOT_LIGHTS];
+struct SpotLightUnif {
+  glm::vec4 pos;     // xyz = view-space position, w = radius
+  glm::vec4 dir;     // xyz = normalized direction, w = unused
+  glm::vec4 color;   // rgb = color, a = intensity
+  glm::vec4 params;  // x = angle_scale, y = angle_offset, zw = unused
 };
 
-struct alignas(16) FragmentNode {
+struct ABuffNode {
   glm::vec4 color;
+
   float depth;
   uint32_t next;
+  uint32_t _padding[2];
 };
 
-struct alignas(16) ABuffFillPushConst {
-  uint32_t width{0};
+struct LightPushConst {
+  glm::mat4 model;
+};
+
+struct ABuffFillPushConst {
+  uint32_t width;
   uint32_t max_nodes;
 
   uint32_t _padding[2];
 };
 
-struct alignas(16) ABuffResolvePushConst {
-  uint32_t width{0};
-  uint32_t max_sorted_nodes{4};
-
-  uint32_t _padding[2];
-};
-
-struct alignas(16) BlurPushConst {
+struct BlurPushConst {
   glm::ivec4 flags;  // x = horizontal(1) / vertical(0), y = radius, zw = unused
   float weights[MAX_GAUSSIAN_RADIUS + 1];  // weights[0] to weights[radius]
 };
@@ -111,9 +115,8 @@ struct FrameProps {
   vk::SampleCountFlagBits samples;
   vk::Extent2D extent;
 
-  // for HDR use vk::Format::eR16G16B16A16Sfloat
-  vk::Format color_format = vk::Format::eR8G8B8A8Srgb;
-  vk::Format depth_stencil_format;
+  vk::Format color_format = vk::Format::eR16G16B16A16Sfloat;
+  vk::Format ds_format;
 
   // gbuffer layout
   // albedo: xyz = albedo, w = metallic
@@ -126,7 +129,7 @@ struct FrameProps {
 
   // ao
   const vk::Format ao_noise_format = vk::Format::eR16G16Sfloat;
-  const vk::Format ao_format = vk::Format::eR8Unorm;
+  const vk::Format ao_format = vk::Format::eR16Unorm;
 
   // wboit layout
   const vk::Format acc_color_format = vk::Format::eR16G16B16A16Sfloat;
@@ -137,7 +140,10 @@ struct FrameResources {
   std::unique_ptr<InstanceBuffer> instance_buff;
   std::unique_ptr<UniformBuffer<CameraUnif>> camera_ubo;
   std::unique_ptr<DynamicUniformBuffer<MaterialUnif>> material_ubo;
-  std::unique_ptr<StorageBuffer<LightStorage>> light_storage;
+
+  std::unique_ptr<UniformBuffer<DirLightUnif>> dir_light_ubo;
+  std::unique_ptr<DynamicUniformBuffer<PointLightUnif>> point_light_ubo;
+  std::unique_ptr<DynamicUniformBuffer<SpotLightUnif>> spot_light_ubo;
 
   // gpass
   std::unique_ptr<Texture> albedo_metallic_ms;
@@ -148,17 +154,17 @@ struct FrameResources {
   std::unique_ptr<Image> coverage_ms;
   std::unique_ptr<Texture> coverage_res;
 
-  std::unique_ptr<Texture> depth_stencil_ms;
+  std::unique_ptr<Texture> ds_ms;  // depth-stencil
 
   // ao
   std::unique_ptr<Image> ao_ms;
   std::unique_ptr<Texture> ao_res;
   std::unique_ptr<Texture> ao_temp;  // for separable blur
 
-  // abuff transparency
-  std::unique_ptr<Buffer> abuff_heads;
-  std::unique_ptr<Buffer> abuff_nodes;
-  std::unique_ptr<Buffer> abuff_counter;
+  // abuff
+  std::unique_ptr<StorageBuffer<uint32_t>> abuff_heads;
+  std::unique_ptr<StorageBuffer<ABuffNode>> abuff_nodes;
+  std::unique_ptr<StorageBuffer<uint32_t>> abuff_counter;
 
   // wboit
   std::unique_ptr<Image> acc_color_ms;
@@ -167,16 +173,22 @@ struct FrameResources {
   std::unique_ptr<Image> acc_weight_ms;
   std::unique_ptr<Image> acc_weight_res;
 
-  // swap pass
+  // color targets
+  std::unique_ptr<Image> color_ms;
+  std::unique_ptr<Texture> color_res;
+
+  std::unique_ptr<Texture> temp_color;
+  std::unique_ptr<Texture> bright_color;
   std::unique_ptr<Texture> present_color;
 };
 
-struct Mesh {
-  VertexBuffer vbo;
+struct LightMesh {
+  VertexBuffer<LightVertex> vbo;
   IndexBuffer ibo;
   npr_scene::BoundingBoxComp bb;
 
-  Mesh(VertexBuffer&& v, IndexBuffer&& i, const npr_scene::BoundingBoxComp& b)
+  LightMesh(VertexBuffer<LightVertex>&& v, IndexBuffer&& i,
+            const npr_scene::BoundingBoxComp& b)
       : vbo(std::move(v)), ibo(std::move(i)), bb{b} {}
 };
 
@@ -194,7 +206,7 @@ class Resources : public npr_core::NonCopyable {
   const Texture& GetAONoiseTex() const { return *ao_noise_tex_; }
   const UniformBuffer<AOKernel>& GetAOKernel() const { return *ao_kernel_; }
 
-  const std::vector<FrameResources>& GetResources() const {
+  const std::vector<FrameResources>& GetResrc() const {
     return frame_resources_;
   }
 
@@ -202,7 +214,6 @@ class Resources : public npr_core::NonCopyable {
   void CreateImages();
   void CreateBuffers();
   void CreateABuffers();
-  BlurPushConst CreateGaussianKernel(int radius);
 
   void CreateAONoiseTex(vk::CommandBuffer cmd_buff);
   void CreateAOKernel();
@@ -211,6 +222,7 @@ class Resources : public npr_core::NonCopyable {
   void CreateConeMesh(vk::CommandBuffer cmd_buff);
 
   void CreateDefaultColorTex(vk::CommandBuffer cmd_buff);
+  BlurPushConst CreateGaussianKernel(int radius);
 
   vk::SampleCountFlagBits GetMaxSamples();
 
@@ -230,8 +242,8 @@ class Resources : public npr_core::NonCopyable {
   BlurPushConst ssao_blur_;
 
   // primitive meshes / light volumes
-  std::unique_ptr<Mesh> cone_mesh_;
-  std::unique_ptr<Mesh> sphere_mesh_;
+  std::unique_ptr<LightMesh> cone_mesh_;
+  std::unique_ptr<LightMesh> sphere_mesh_;
 };
 
 }  // namespace npr_graphics

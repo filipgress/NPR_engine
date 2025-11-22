@@ -8,7 +8,7 @@ Resources::Resources(const Context& ctx, const CommandPool& cmd_pool,
     : ctx_{ctx}, frame_count_{frame_count} {
   frame_props_.extent = extent;
   frame_props_.samples = std::min(vk::SampleCountFlagBits::e4, GetMaxSamples());
-  frame_props_.depth_stencil_format = ctx.FindFormat(
+  frame_props_.ds_format = ctx_.FindFormat(
       {vk::Format::eD24UnormS8Uint, vk::Format::eD32SfloatS8Uint},
       vk::ImageTiling::eOptimal,
       vk::FormatFeatureFlagBits::eDepthStencilAttachment);
@@ -83,8 +83,8 @@ void Resources::CreateImages() {
         vk::ImageAspectFlagBits::eColor, vk::SampleCountFlagBits::e1,
         "coverage_res" + std::to_string(idx));
 
-    resrc.depth_stencil_ms = std::make_unique<Texture>(
-        ctx_, frame_props_.depth_stencil_format, frame_props_.extent,
+    resrc.ds_ms = std::make_unique<Texture>(
+        ctx_, frame_props_.ds_format, frame_props_.extent,
         vk::ImageUsageFlagBits::eDepthStencilAttachment |
             vk::ImageUsageFlagBits::eSampled,
         vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil,
@@ -144,9 +144,37 @@ void Resources::CreateImages() {
         vk::SampleCountFlagBits::e1, 1,
         "acc_weight_res_" + std::to_string(idx));
 
-    // swap pass
+    // color targets
+    resrc.color_ms = std::make_unique<Image>(
+        ctx_, frame_props_.color_format, frame_props_.extent,
+        vk::ImageUsageFlagBits::eColorAttachment |
+            vk::ImageUsageFlagBits::eTransientAttachment,
+        vk::ImageAspectFlagBits::eColor, vk::SharingMode::eExclusive,
+        frame_props_.samples, 1, "color_ms_" + std::to_string(idx));
+
+    resrc.color_res = std::make_unique<Texture>(
+        ctx_, frame_props_.color_format, frame_props_.extent,
+        vk::ImageUsageFlagBits::eColorAttachment |
+            vk::ImageUsageFlagBits::eSampled,
+        vk::ImageAspectFlagBits::eColor, vk::SampleCountFlagBits::e1,
+        "color_res_" + std::to_string(idx));
+
+    resrc.temp_color = std::make_unique<Texture>(
+        ctx_, frame_props_.color_format, frame_props_.extent,
+        vk::ImageUsageFlagBits::eColorAttachment |
+            vk::ImageUsageFlagBits::eSampled,
+        vk::ImageAspectFlagBits::eColor, vk::SampleCountFlagBits::e1,
+        "temp_color_" + std::to_string(idx));
+
+    resrc.bright_color = std::make_unique<Texture>(
+        ctx_, frame_props_.color_format, frame_props_.extent,
+        vk::ImageUsageFlagBits::eColorAttachment |
+            vk::ImageUsageFlagBits::eSampled,
+        vk::ImageAspectFlagBits::eColor, vk::SampleCountFlagBits::e1,
+        "bright_color_" + std::to_string(idx));
+
     resrc.present_color = std::make_unique<Texture>(
-        ctx_, frame_props_.albedo_format, frame_props_.extent,
+        ctx_, frame_props_.color_format, frame_props_.extent,
         vk::ImageUsageFlagBits::eColorAttachment |
             vk::ImageUsageFlagBits::eSampled,
         vk::ImageAspectFlagBits::eColor, vk::SampleCountFlagBits::e1,
@@ -159,15 +187,25 @@ void Resources::CreateImages() {
 void Resources::CreateBuffers() {
   int idx{0};
   for (auto& resrc : frame_resources_) {
+    resrc.instance_buff = std::make_unique<InstanceBuffer>(
+        ctx_, MAX_INSTANCES, "instance_buff" + std::to_string(idx));
     resrc.camera_ubo = std::make_unique<UniformBuffer<CameraUnif>>(
         ctx_, "camera_unif_buff" + std::to_string(idx));
     resrc.material_ubo = std::make_unique<DynamicUniformBuffer<MaterialUnif>>(
         ctx_, MAX_MATERIALS,
         "material_dynamic_unif_buff" + std::to_string(idx));
-    resrc.instance_buff = std::make_unique<InstanceBuffer>(
-        ctx_, MAX_INSTANCES, "instance_buff" + std::to_string(idx));
-    resrc.light_storage = std::make_unique<StorageBuffer<LightStorage>>(
-        ctx_, "light_storage_buff" + std::to_string(idx));
+
+    resrc.dir_light_ubo = std::make_unique<UniformBuffer<DirLightUnif>>(
+        ctx_, "dir_light_unif_buff" + std::to_string(idx));
+    resrc.point_light_ubo =
+        std::make_unique<DynamicUniformBuffer<PointLightUnif>>(
+            ctx_, MAX_POINT_LIGHTS,
+            "point_light_dynamic_unif_buff" + std::to_string(idx));
+    resrc.spot_light_ubo =
+        std::make_unique<DynamicUniformBuffer<SpotLightUnif>>(
+            ctx_, MAX_SPOT_LIGHTS,
+            "spot_light_dynamic_unif_buff" + std::to_string(idx));
+
     idx++;
   }
 }
@@ -188,26 +226,12 @@ void Resources::CreateABuffers() {
   uint32_t max_nodes = total_samples * ABUFF_INIT_SIZE;
 
   for (auto& resrc : frame_resources_) {
-    resrc.abuff_nodes = std::make_unique<Buffer>(
-        ctx_,
-        vk::BufferUsageFlagBits::eStorageBuffer |
-            vk::BufferUsageFlagBits::eTransferDst,
-        vk::MemoryPropertyFlagBits::eDeviceLocal, vk::SharingMode::eExclusive,
-        max_nodes * sizeof(FragmentNode), "abuff_nodes");
-
-    resrc.abuff_heads = std::make_unique<Buffer>(
-        ctx_,
-        vk::BufferUsageFlagBits::eStorageBuffer |
-            vk::BufferUsageFlagBits::eTransferDst,
-        vk::MemoryPropertyFlagBits::eDeviceLocal, vk::SharingMode::eExclusive,
-        total_samples * sizeof(uint32_t), "abuff_heads");
-
-    resrc.abuff_counter = std::make_unique<Buffer>(
-        ctx_,
-        vk::BufferUsageFlagBits::eStorageBuffer |
-            vk::BufferUsageFlagBits::eTransferDst,
-        vk::MemoryPropertyFlagBits::eDeviceLocal, vk::SharingMode::eExclusive,
-        sizeof(uint32_t), "abuff_counter");
+    resrc.abuff_nodes = std::make_unique<StorageBuffer<ABuffNode>>(
+        ctx_, max_nodes, "abuff_nodes");
+    resrc.abuff_heads = std::make_unique<StorageBuffer<uint32_t>>(
+        ctx_, total_samples, "abuff_heads");
+    resrc.abuff_counter =
+        std::make_unique<StorageBuffer<uint32_t>>(ctx_, 1, "abuff_counter");
   }
 }
 
@@ -313,7 +337,7 @@ void Resources::CreateSphereMesh(vk::CommandBuffer cmd_buff) {
   const int segments = 16;
   const int rings = 16;
 
-  std::vector<Vertex> vertices;
+  std::vector<LightVertex> vertices;
   std::vector<uint32_t> indices;
   npr_scene::BoundingBoxComp bb;
 
@@ -331,9 +355,8 @@ void Resources::CreateSphereMesh(vk::CommandBuffer cmd_buff) {
       float cos_phi = std::cos(phi);
 
       glm::vec3 pos(sin_theta * cos_phi, sin_theta * sin_phi, cos_theta);
-      glm::vec3 normal = glm::normalize(pos);
 
-      vertices.push_back({pos, {}, normal, {}});
+      vertices.push_back({pos});
       bb.min_pos = glm::min(bb.min_pos, pos);
       bb.max_pos = glm::max(bb.max_pos, pos);
     }
@@ -357,7 +380,7 @@ void Resources::CreateSphereMesh(vk::CommandBuffer cmd_buff) {
     }
   }
 
-  sphere_mesh_ = std::make_unique<Mesh>(
+  sphere_mesh_ = std::make_unique<LightMesh>(
       VertexBuffer{ctx_, cmd_buff, vertices, "sphere_mesh_vbo"},
       IndexBuffer{ctx_, cmd_buff, indices, "sphere_mesh_ibo"}, bb);
 }
@@ -365,21 +388,19 @@ void Resources::CreateSphereMesh(vk::CommandBuffer cmd_buff) {
 void Resources::CreateConeMesh(vk::CommandBuffer cmd_buff) {
   const int segments = 32;
 
-  std::vector<Vertex> vertices;
+  std::vector<LightVertex> vertices;
   std::vector<uint32_t> indices;
   npr_scene::BoundingBoxComp bb;
 
   // tip vertex
-  vertices.push_back({glm::vec3(0, 0, 0), {}, glm::vec3(0, 0, 1), {}});
-
   glm::vec3 tip_pos(0, 0, 0);
-  vertices.push_back({tip_pos, {}, glm::vec3(0, 0, 1), {}});
+  vertices.emplace_back(tip_pos);
   bb.min_pos = glm::min(bb.min_pos, tip_pos);
   bb.max_pos = glm::max(bb.max_pos, tip_pos);
   int tip_idx = 0;
 
   glm::vec3 base_center_pos(0, 0, -1);
-  vertices.push_back({base_center_pos, {}, glm::vec3(0, 0, -1), {}});
+  vertices.emplace_back(base_center_pos);
   bb.min_pos = glm::min(bb.min_pos, base_center_pos);
   bb.max_pos = glm::max(bb.max_pos, base_center_pos);
   int base_center_idx = 1;
@@ -391,7 +412,7 @@ void Resources::CreateConeMesh(vk::CommandBuffer cmd_buff) {
     float y = std::sin(angle);
 
     glm::vec3 pos(x, y, -1);
-    vertices.push_back({pos, {}, glm::normalize(glm::vec3(x, y, 0.5f)), {}});
+    vertices.emplace_back(pos);
     bb.min_pos = glm::min(bb.min_pos, pos);
     bb.max_pos = glm::max(bb.max_pos, pos);
   }
@@ -418,7 +439,7 @@ void Resources::CreateConeMesh(vk::CommandBuffer cmd_buff) {
     indices.push_back(v2);
   }
 
-  cone_mesh_ = std::make_unique<Mesh>(
+  cone_mesh_ = std::make_unique<LightMesh>(
       VertexBuffer{ctx_, cmd_buff, vertices, "cone_mesh_vbo"},
       IndexBuffer{ctx_, cmd_buff, indices, "cone_mesh_ibo"}, bb);
 }

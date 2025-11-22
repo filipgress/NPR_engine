@@ -104,7 +104,7 @@ class Renderer : public npr_core::NonCopyable {
   AOBlurHPass ao_blur_h_pass_{ctx_, resrc_};
   AOBlurVPass ao_blur_v_pass_{ctx_, resrc_};
 
-  LightPass light_pass_{ctx_, resrc_};
+  DirLightPass light_pass_{ctx_, resrc_};
 
   ABuffPass abuff_pass_{ctx_, resrc_};
   WBoitPass wboit_pass_{ctx_, resrc_};

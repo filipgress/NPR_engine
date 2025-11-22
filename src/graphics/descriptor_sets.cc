@@ -71,7 +71,7 @@ void SingleTexSets::CreateLayout() {
 }
 
 void SingleTexSets::Update(const Resources& resrc) const {
-  for (size_t i = 0; i < resrc.GetResources().size(); i++) {
+  for (size_t i = 0; i < resrc.GetResrc().size(); i++) {
     auto* tex = GetAttach(resrc, i);
 
     vk::DescriptorImageInfo image_info{};
@@ -93,7 +93,7 @@ void SingleTexSets::Update(const Resources& resrc) const {
 }
 
 void CameraUnifSets::Update(const Resources& resrc) const {
-  const auto& per_frame_resrc = resrc.GetResources();
+  const auto& per_frame_resrc = resrc.GetResrc();
   assert(count_ == per_frame_resrc.size());
 
   for (size_t i = 0; i < per_frame_resrc.size(); i++)
@@ -102,7 +102,7 @@ void CameraUnifSets::Update(const Resources& resrc) const {
 }
 
 void MaterialUnifSets::Update(const Resources& resrc) const {
-  const auto& per_frame_resrc = resrc.GetResources();
+  const auto& per_frame_resrc = resrc.GetResrc();
   assert(count_ == per_frame_resrc.size());
 
   for (size_t i = 0; i < per_frame_resrc.size(); i++)
@@ -156,7 +156,7 @@ void GBuffSets::CreateLayout() {
 }
 
 void GBuffSets::Update(const Resources& resrc) const {
-  const auto& per_frame_resrc = resrc.GetResources();
+  const auto& per_frame_resrc = resrc.GetResrc();
   assert(count_ == per_frame_resrc.size());
 
   for (size_t i = 0; i < per_frame_resrc.size(); ++i) {
@@ -371,7 +371,7 @@ void ABufferSets::CreateLayout() {
 }
 
 void ABufferSets::Update(const Resources& resrc) const {
-  const auto& per_frame_resrc = resrc.GetResources();
+  const auto& per_frame_resrc = resrc.GetResrc();
   assert(count_ == per_frame_resrc.size());
 
   for (size_t i = 0; i < per_frame_resrc.size(); ++i) {
@@ -436,7 +436,7 @@ void WBoitInputSets::CreateLayout() {
 }
 
 void WBoitInputSets::Update(const Resources& resrc) const {
-  const auto& per_frame_resrc = resrc.GetResources();
+  const auto& per_frame_resrc = resrc.GetResrc();
   assert(count_ == per_frame_resrc.size());
 
   for (size_t i = 0; i < per_frame_resrc.size(); ++i) {

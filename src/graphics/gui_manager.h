@@ -8,6 +8,7 @@
 #include "descriptor_pool.h"
 
 #include "window/window.h"
+
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_vulkan.h>
@@ -27,7 +28,7 @@ class GuiManager : public npr_core::NonCopyable {
   ~GuiManager();
 
   void NewFrame();
-  void Render(vk::CommandBuffer cmd) {
+  void RecordUI(vk::CommandBuffer cmd) {
     ImGui::Render();
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
   }

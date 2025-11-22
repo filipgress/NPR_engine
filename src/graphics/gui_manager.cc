@@ -38,17 +38,17 @@ GuiManager::GuiManager(const npr_window::Window& window, const Context& ctx,
   ImGui::StyleColorsDark();
 
   VulkanHandles handles{ctx.GetInstance(), ctx.GetDevice()};
-  ImGui_ImplVulkan_LoadFunctions(ctx.GetAPIVersion(),
-                                 GuiManager::VulkanLoaderFn, &handles);
+  ImGui_ImplVulkan_LoadFunctions(ctx.GetAPIVer(), GuiManager::VulkanLoaderFn,
+                                 &handles);
 
   // init glfw backend
   ImGui_ImplGlfw_InitForVulkan(window.GetNative(), true);
 
   // init vulkan backend
   ImGui_ImplVulkan_InitInfo init_info{};
-  init_info.ApiVersion = ctx.GetAPIVersion();
+  init_info.ApiVersion = ctx.GetAPIVer();
   init_info.Instance = ctx.GetInstance();
-  init_info.PhysicalDevice = ctx.GetPhysicalDevice();
+  init_info.PhysicalDevice = ctx.GetPhysDevice();
   init_info.Device = ctx.GetDevice();
   init_info.QueueFamily = ctx.GetQFamilies().graphics_i.value();
   init_info.Queue = ctx.GetGraphicsQ();

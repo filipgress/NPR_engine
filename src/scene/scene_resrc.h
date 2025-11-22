@@ -33,7 +33,7 @@ struct SceneResrc {
   npr_graphics::TexDescriptorPool desc_pool;
 
   std::vector<npr_graphics::IndexBuffer> ibos;
-  std::vector<npr_graphics::VertexBuffer> vbos;
+  std::vector<npr_graphics::VertexBuffer<npr_graphics::Vertex>> vbos;
   std::vector<npr_graphics::Texture> textures;
 
   bool init_{false};

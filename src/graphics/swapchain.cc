@@ -110,7 +110,7 @@ void Swapchain::CreateImageViews() {
   }
 }
 
-uint32_t Swapchain::ChooseMinFrameCount(const SwapSupport& swap_supp,
+uint32_t Swapchain::ChooseMinFrameCount(const SwapSupp& swap_supp,
                                         uint preferred) const {
   uint32_t desired = std::max(preferred, swap_supp.capabilities.minImageCount);
   if (swap_supp.capabilities.maxImageCount > 0)
@@ -119,7 +119,7 @@ uint32_t Swapchain::ChooseMinFrameCount(const SwapSupport& swap_supp,
 }
 
 vk::PresentModeKHR Swapchain::ChoosePresentMode(
-    const SwapSupport& swap_supp) const {
+    const SwapSupp& swap_supp) const {
   const auto& modes = swap_supp.present_modes;
   for (auto pref :
        {vk::PresentModeKHR::eMailbox, vk::PresentModeKHR::eFifoRelaxed})
@@ -129,7 +129,7 @@ vk::PresentModeKHR Swapchain::ChoosePresentMode(
   return vk::PresentModeKHR::eFifo;
 }
 
-vk::Extent2D Swapchain::ChooseExtent(const SwapSupport& swap_supp,
+vk::Extent2D Swapchain::ChooseExtent(const SwapSupp& swap_supp,
                                      glm::ivec2 frame_size) const {
   if (swap_supp.capabilities.currentExtent.width !=
       std::numeric_limits<uint32_t>::max())
@@ -153,7 +153,7 @@ const std::set<vk::SurfaceFormatKHR> Swapchain::kSDRFormats{
 };
 
 std::pair<bool, vk::SurfaceFormatKHR> Swapchain::ChooseSurfaceFormat(
-    const SwapSupport& swap_supp) const {
+    const SwapSupp& swap_supp) const {
   const auto& available_formats = swap_supp.formats;
   if (available_formats.empty())
     throw std::runtime_error("No available surface formats!");

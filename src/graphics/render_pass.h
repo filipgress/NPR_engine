@@ -140,15 +140,15 @@ class AOBlurVPass : public BlurPass {
   const std::string GetDbgName() const override { return "ao_blur_v_pass"; }
 };
 
-class LightPass : public RenderPass {
+class DirLightPass : public RenderPass {
  public:
-  LightPass(const Context& ctx, const Resources& resrc)
+  DirLightPass(const Context& ctx, const Resources& resrc)
       : RenderPass{ctx, resrc} {
     Init();
   }
 
  private:
-  const std::string GetDbgName() const override { return "light_pass"; }
+  const std::string GetDbgName() const override { return "dir_light_pass"; }
   void SetClearValues() override;
 
   std::vector<vk::AttachmentDescription> GetAttachments() const override;
@@ -158,6 +158,28 @@ class LightPass : public RenderPass {
 
  private:
   vk::AttachmentReference color_ref_{};
+  vk::AttachmentReference ds_ref_{};
+};
+
+class LightVolPass : public RenderPass {
+ public:
+  LightVolPass(const Context& ctx, const Resources& resrc)
+      : RenderPass{ctx, resrc} {
+    Init();
+  }
+
+ private:
+  const std::string GetDbgName() const override { return "volume_light_pass"; }
+  void SetClearValues() override;
+
+  std::vector<vk::AttachmentDescription> GetAttachments() const override;
+  std::vector<vk::SubpassDependency> GetDependencies() const override;
+  std::vector<vk::SubpassDescription> GetSubpasses() override;
+  std::vector<vk::ImageView> GetAttachmentViews(int frame_idx) const override;
+
+ private:
+  vk::AttachmentReference color_ref_{};
+  vk::AttachmentReference ds_ref_{};
 };
 
 class ABuffPass : public RenderPass {

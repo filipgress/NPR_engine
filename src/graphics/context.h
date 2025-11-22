@@ -5,7 +5,7 @@
 
 namespace npr_graphics {
 
-struct SwapSupport {
+struct SwapSupp {
   vk::SurfaceCapabilitiesKHR capabilities;
   std::vector<vk::SurfaceFormatKHR> formats;
   std::vector<vk::PresentModeKHR> present_modes;
@@ -29,9 +29,9 @@ class Context : public npr_core::NonCopyable {
   Context(const npr_window::Window& window);
   ~Context();
 
-  uint32_t GetAPIVersion() const { return api_version_; }
+  uint32_t GetAPIVer() const { return api_ver_; }
   vk::Instance GetInstance() const { return instance_; }
-  vk::PhysicalDevice GetPhysicalDevice() const { return phys_device_; }
+  vk::PhysicalDevice GetPhysDevice() const { return phys_device_; }
   vk::Device GetDevice() const { return device_; }
   vk::SurfaceKHR GetSurface() const { return surface_; }
 
@@ -39,7 +39,7 @@ class Context : public npr_core::NonCopyable {
   vk::Queue GetPresentQ() const { return present_q_; }
   vk::Queue GetTransferQ() const { return transfer_q_; }
 
-  SwapSupport GetSwapSupp() const { return GetSwapSupport(phys_device_); }
+  SwapSupp GetSwapSupp() const { return GetSwapSupp(phys_device_); }
   QFamilies GetQFamilies() const { return q_families_; }
 
   vk::PhysicalDeviceProperties GetProperties() const {
@@ -81,11 +81,11 @@ class Context : public npr_core::NonCopyable {
   bool DeviceExtsSupported(vk::PhysicalDevice device) const;
   bool DeviceFeatsSupported(vk::PhysicalDevice device) const;
 
-  SwapSupport GetSwapSupport(vk::PhysicalDevice device) const;
-  QFamilies GetQueueFamilies(vk::PhysicalDevice device) const;
+  SwapSupp GetSwapSupp(vk::PhysicalDevice device) const;
+  QFamilies GetQFamilies(vk::PhysicalDevice device) const;
 
  private:
-  uint32_t api_version_{0};
+  uint32_t api_ver_{0};
 
   vk::Instance instance_{nullptr};
   vk::SurfaceKHR surface_{nullptr};

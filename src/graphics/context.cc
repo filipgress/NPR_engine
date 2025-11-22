@@ -27,19 +27,19 @@ Context::~Context() {
 }
 
 void Context::CreateInstance() {
-  api_version_ = vk::enumerateInstanceVersion();
-  api_version_ &= ~0xFFFU;  // zero out patch number
+  api_ver_ = vk::enumerateInstanceVersion();
+  api_ver_ &= ~0xFFFU;  // zero out patch number
 
   INFO(PROJECT_NAME, " version: ", PROJECT_VERSION_MAJOR, ".",
        PROJECT_VERSION_MINOR);
-  INFO("vulkan version: ", VK_API_VERSION_MAJOR(api_version_), ".",
-       VK_API_VERSION_MINOR(api_version_));
+  INFO("vulkan version: ", VK_API_VERSION_MAJOR(api_ver_), ".",
+       VK_API_VERSION_MINOR(api_ver_));
 
   vk::ApplicationInfo app_info{};
   app_info.pApplicationName = PROJECT_NAME;
   app_info.applicationVersion =
       VK_MAKE_VERSION(PROJECT_VERSION_MAJOR, PROJECT_VERSION_MINOR, 0);
-  app_info.apiVersion = api_version_;
+  app_info.apiVersion = api_ver_;
 
   uint32_t exts_count{0};
   const char** req_exts = glfwGetRequiredInstanceExtensions(&exts_count);
@@ -70,7 +70,7 @@ void Context::CreateInstance() {
 }
 
 void Context::CreateDevice() {
-  q_families_ = GetQueueFamilies(phys_device_);
+  q_families_ = GetQFamilies(phys_device_);
 
   std::set<uint32_t> unique_q_indices{
       q_families_.graphics_i.value(),
@@ -178,8 +178,8 @@ int Context::RateDevice(vk::PhysicalDevice device) const {
 
   if (!DeviceExtsSupported(device) || !DeviceFeatsSupported(device)) return 0;
 
-  auto swap_supp = GetSwapSupport(device);
-  auto q_families = GetQueueFamilies(device);
+  auto swap_supp = GetSwapSupp(device);
+  auto q_families = GetQFamilies(device);
 
   if (!swap_supp.IsAdequate() || !q_families.IsComplete()) return 0;
 
@@ -297,8 +297,8 @@ bool Context::DeviceFeatsSupported(vk::PhysicalDevice device) const {
 /*
  * Query physical device attributes
  */
-SwapSupport Context::GetSwapSupport(vk::PhysicalDevice device) const {
-  SwapSupport swap_supp;
+SwapSupp Context::GetSwapSupp(vk::PhysicalDevice device) const {
+  SwapSupp swap_supp;
   swap_supp.capabilities = device.getSurfaceCapabilitiesKHR(surface_);
   swap_supp.formats = device.getSurfaceFormatsKHR(surface_);
   swap_supp.present_modes = device.getSurfacePresentModesKHR(surface_);
@@ -306,7 +306,7 @@ SwapSupport Context::GetSwapSupport(vk::PhysicalDevice device) const {
   return swap_supp;
 }
 
-QFamilies Context::GetQueueFamilies(vk::PhysicalDevice device) const {
+QFamilies Context::GetQFamilies(vk::PhysicalDevice device) const {
   QFamilies q_families;
 
   uint32_t i{0};

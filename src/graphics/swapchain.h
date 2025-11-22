@@ -36,13 +36,13 @@ class Swapchain : public npr_core::NonCopyable {
   void CreateImageViews();
   void DestroyImageViews();
 
-  uint32_t ChooseMinFrameCount(const SwapSupport& swap_supp,
+  uint32_t ChooseMinFrameCount(const SwapSupp& swap_supp,
                                uint preferred = 3) const;
-  vk::PresentModeKHR ChoosePresentMode(const SwapSupport& swap_supp) const;
-  vk::Extent2D ChooseExtent(const SwapSupport& swap_supp,
+  vk::PresentModeKHR ChoosePresentMode(const SwapSupp& swap_supp) const;
+  vk::Extent2D ChooseExtent(const SwapSupp& swap_supp,
                             glm::ivec2 frame_size) const;
   std::pair<bool, vk::SurfaceFormatKHR> ChooseSurfaceFormat(
-      const SwapSupport& swap_supp) const;
+      const SwapSupp& swap_supp) const;
 
  private:
   const Context& ctx_;

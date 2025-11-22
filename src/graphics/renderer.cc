@@ -90,7 +90,7 @@ vk::CommandBuffer Renderer::Record(uint image_idx, const Camera& camera,
   auto frame_idx = sync_.GetFrameIdx();
   auto cmd_buff = cmd_pool_.GetCmdBuff(frame_idx);
 
-  const auto& frame_resrc = resrc_.GetResources()[frame_idx];
+  const auto& frame_resrc = resrc_.GetResrc()[frame_idx];
   auto resrc_extent = resrc_.GetProps().extent;
 
   frame_resrc.camera_ubo->Write(camera.GetCameraUnif());
@@ -178,7 +178,7 @@ void Renderer::RecordOpaque(vk::CommandBuffer cmd_buff, uint frame_idx,
         MaterialUnif{{mat.color_map_idx, mat.normal_map_idx,
                       mat.metallic_roughness_map_idx, mat.emissive_map_idx},
                      mat.color_factor,
-                     mat.emissive_factor,
+                     glm::vec4(mat.emissive_factor, 0.0f),
                      mat.metallic_factor,
                      mat.roughness_factor,
                      mat.alpha_cutoff,
@@ -423,7 +423,7 @@ void Renderer::RecordTrans(vk::CommandBuffer cmd_buff, uint frame_idx,
         MaterialUnif{{mat.color_map_idx, mat.normal_map_idx,
                       mat.metallic_roughness_map_idx, mat.emissive_map_idx},
                      mat.color_factor,
-                     mat.emissive_factor,
+                     glm::vec4(mat.emissive_factor, 0.0f),
                      mat.metallic_factor,
                      mat.roughness_factor,
                      mat.alpha_cutoff,
@@ -502,7 +502,7 @@ void Renderer::RecordSwapPass(vk::CommandBuffer cmd_buff, uint image_idx,
   cmd_buff.draw(3, 1, 0, 0);
   cmd_buff.nextSubpass(vk::SubpassContents::eInline);
 
-  gui_manager_.Render(cmd_buff);
+  gui_manager_.RecordUI(cmd_buff);
 
   cmd_buff.endRenderPass();
 }
