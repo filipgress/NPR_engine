@@ -66,6 +66,9 @@ class SceneLoader {
       const tinygltf::Model& model, const tinygltf::Texture& texture);
 
   // helpers
+  static void PrepareScene(Scene& scene, const npr_graphics::Context& ctx,
+                           const std::string& filepath,
+                           const std::string& scene_name);
   static int GetSceneIdx(const tinygltf::Model& model,
                          const std::string& scene_name);
   static int GetLightIdx(const tinygltf::Node& node, const LoaderCache& cache);

@@ -44,6 +44,10 @@ inline uint32_t Align(uint32_t size, uint32_t alignment) {
   return (size + alignment - 1) & ~(alignment - 1);
 }
 
+inline void HashCombine(std::size_t& seed, std::size_t value) {
+  seed ^= value + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+}
+
 class NonCopyable {
  protected:
   NonCopyable() = default;

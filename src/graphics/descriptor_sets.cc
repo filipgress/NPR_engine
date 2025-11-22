@@ -70,9 +70,9 @@ void SingleTexSets::CreateLayout() {
                   vk::ObjectType::eDescriptorSetLayout, "texture_set_layout");
 }
 
-void SingleTexSets::Update(const Resources& res) const {
-  for (size_t i = 0; i < res.GetResources().size(); i++) {
-    auto* tex = GetAttach(res, i);
+void SingleTexSets::Update(const Resources& resrc) const {
+  for (size_t i = 0; i < resrc.GetResources().size(); i++) {
+    auto* tex = GetAttach(resrc, i);
 
     vk::DescriptorImageInfo image_info{};
     image_info.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
@@ -92,22 +92,22 @@ void SingleTexSets::Update(const Resources& res) const {
   }
 }
 
-void CameraUnifSets::Update(const Resources& res) const {
-  const auto& per_frame_res = res.GetResources();
-  assert(count_ == per_frame_res.size());
+void CameraUnifSets::Update(const Resources& resrc) const {
+  const auto& per_frame_resrc = resrc.GetResources();
+  assert(count_ == per_frame_resrc.size());
 
-  for (size_t i = 0; i < per_frame_res.size(); i++)
-    SingleBuffSets::Update(per_frame_res[i].camera_ubo->GetBuffer(),
+  for (size_t i = 0; i < per_frame_resrc.size(); i++)
+    SingleBuffSets::Update(per_frame_resrc[i].camera_ubo->GetBuffer(),
                            VK_WHOLE_SIZE, i);
 }
 
-void MaterialUnifSets::Update(const Resources& res) const {
-  const auto& per_frame_res = res.GetResources();
-  assert(count_ == per_frame_res.size());
+void MaterialUnifSets::Update(const Resources& resrc) const {
+  const auto& per_frame_resrc = resrc.GetResources();
+  assert(count_ == per_frame_resrc.size());
 
-  for (size_t i = 0; i < per_frame_res.size(); i++)
-    SingleBuffSets::Update(per_frame_res[i].material_ubo->GetBuffer(),
-                           per_frame_res[i].material_ubo->GetElemSize(), i);
+  for (size_t i = 0; i < per_frame_resrc.size(); i++)
+    SingleBuffSets::Update(per_frame_resrc[i].material_ubo->GetBuffer(),
+                           per_frame_resrc[i].material_ubo->GetElemSize(), i);
 }
 
 /*
@@ -155,38 +155,39 @@ void GBuffSets::CreateLayout() {
                   vk::ObjectType::eDescriptorSetLayout, "gbuff_set_layout");
 }
 
-void GBuffSets::Update(const Resources& res) const {
-  const auto& per_frame_res = res.GetResources();
-  assert(count_ == per_frame_res.size());
+void GBuffSets::Update(const Resources& resrc) const {
+  const auto& per_frame_resrc = resrc.GetResources();
+  assert(count_ == per_frame_resrc.size());
 
-  for (size_t i = 0; i < per_frame_res.size(); ++i) {
-    const auto& frame_res = per_frame_res[i];
+  for (size_t i = 0; i < per_frame_resrc.size(); ++i) {
+    const auto& frame_resrc = per_frame_resrc[i];
     std::array<vk::DescriptorImageInfo, 5> image_infos;
 
     // albedo
     image_infos[0].imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
-    image_infos[0].imageView = frame_res.albedo_metallic_ms->GetImageView();
-    image_infos[0].sampler = frame_res.albedo_metallic_ms->GetSampler();
+    image_infos[0].imageView = frame_resrc.albedo_metallic_ms->GetImageView();
+    image_infos[0].sampler = frame_resrc.albedo_metallic_ms->GetSampler();
 
     // emissive
     image_infos[1].imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
-    image_infos[1].imageView = frame_res.emissive_roughness_ms->GetImageView();
-    image_infos[1].sampler = frame_res.emissive_roughness_ms->GetSampler();
+    image_infos[1].imageView =
+        frame_resrc.emissive_roughness_ms->GetImageView();
+    image_infos[1].sampler = frame_resrc.emissive_roughness_ms->GetSampler();
 
     // position
     image_infos[2].imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
-    image_infos[2].imageView = frame_res.position_ms->GetImageView();
-    image_infos[2].sampler = frame_res.position_ms->GetSampler();
+    image_infos[2].imageView = frame_resrc.position_ms->GetImageView();
+    image_infos[2].sampler = frame_resrc.position_ms->GetSampler();
 
     // normal
     image_infos[3].imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
-    image_infos[3].imageView = frame_res.normal_ms->GetImageView();
-    image_infos[3].sampler = frame_res.normal_ms->GetSampler();
+    image_infos[3].imageView = frame_resrc.normal_ms->GetImageView();
+    image_infos[3].sampler = frame_resrc.normal_ms->GetSampler();
 
     // coverage
     image_infos[4].imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
-    image_infos[4].imageView = frame_res.coverage_res->GetImageView();
-    image_infos[4].sampler = frame_res.coverage_res->GetSampler();
+    image_infos[4].imageView = frame_resrc.coverage_res->GetImageView();
+    image_infos[4].sampler = frame_resrc.coverage_res->GetSampler();
 
     std::array<vk::WriteDescriptorSet, 5> desc_writes;
     for (size_t j = 0; j < 5; ++j) {
@@ -300,15 +301,15 @@ void AOSet::CreateLayout() {
                   vk::ObjectType::eDescriptorSetLayout, "ao_set_layout");
 }
 
-void AOSet::Update(const Resources& res) const {
+void AOSet::Update(const Resources& resrc) const {
   // ao_kernel
   vk::DescriptorBufferInfo kernel_info{};
-  kernel_info.buffer = res.GetAOKernel().GetBuffer();
+  kernel_info.buffer = resrc.GetAOKernel().GetBuffer();
   kernel_info.offset = 0;
   kernel_info.range = VK_WHOLE_SIZE;
 
   // ao_noise_tex
-  const auto& noise_tex = res.GetAONoiseTex();
+  const auto& noise_tex = resrc.GetAONoiseTex();
   vk::DescriptorImageInfo noise_info{};
   noise_info.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
   noise_info.imageView = noise_tex.GetImageView();
@@ -369,25 +370,25 @@ void ABufferSets::CreateLayout() {
                   vk::ObjectType::eDescriptorSetLayout, "abuffer_set_layout");
 }
 
-void ABufferSets::Update(const Resources& res) const {
-  const auto& per_frame_res = res.GetResources();
-  assert(count_ == per_frame_res.size());
+void ABufferSets::Update(const Resources& resrc) const {
+  const auto& per_frame_resrc = resrc.GetResources();
+  assert(count_ == per_frame_resrc.size());
 
-  for (size_t i = 0; i < per_frame_res.size(); ++i) {
+  for (size_t i = 0; i < per_frame_resrc.size(); ++i) {
     std::array<vk::DescriptorBufferInfo, 3> buffer_infos;
 
     // abuff_nodes
-    buffer_infos[0].buffer = per_frame_res[i].abuff_nodes->GetBuffer();
+    buffer_infos[0].buffer = per_frame_resrc[i].abuff_nodes->GetBuffer();
     buffer_infos[0].offset = 0;
     buffer_infos[0].range = VK_WHOLE_SIZE;
 
     // abuff_heads
-    buffer_infos[1].buffer = per_frame_res[i].abuff_heads->GetBuffer();
+    buffer_infos[1].buffer = per_frame_resrc[i].abuff_heads->GetBuffer();
     buffer_infos[1].offset = 0;
     buffer_infos[1].range = VK_WHOLE_SIZE;
 
     // abuff_counter
-    buffer_infos[2].buffer = per_frame_res[i].abuff_counter->GetBuffer();
+    buffer_infos[2].buffer = per_frame_resrc[i].abuff_counter->GetBuffer();
     buffer_infos[2].offset = 0;
     buffer_infos[2].range = VK_WHOLE_SIZE;
 
@@ -434,22 +435,22 @@ void WBoitInputSets::CreateLayout() {
                   "wboit_input_set_layout");
 }
 
-void WBoitInputSets::Update(const Resources& res) const {
-  const auto& per_frame_res = res.GetResources();
-  assert(count_ == per_frame_res.size());
+void WBoitInputSets::Update(const Resources& resrc) const {
+  const auto& per_frame_resrc = resrc.GetResources();
+  assert(count_ == per_frame_resrc.size());
 
-  for (size_t i = 0; i < per_frame_res.size(); ++i) {
-    const auto& frame_res = per_frame_res[i];
+  for (size_t i = 0; i < per_frame_resrc.size(); ++i) {
+    const auto& frame_resrc = per_frame_resrc[i];
     std::array<vk::DescriptorImageInfo, 2> image_infos;
 
     // acc_color_res
     image_infos[0].imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
-    image_infos[0].imageView = frame_res.acc_color_res->GetImageView();
+    image_infos[0].imageView = frame_resrc.acc_color_res->GetImageView();
     image_infos[0].sampler = VK_NULL_HANDLE;
 
     // acc_weight_res
     image_infos[1].imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
-    image_infos[1].imageView = frame_res.acc_weight_res->GetImageView();
+    image_infos[1].imageView = frame_resrc.acc_weight_res->GetImageView();
     image_infos[1].sampler = VK_NULL_HANDLE;
 
     std::array<vk::WriteDescriptorSet, 2> desc_writes;

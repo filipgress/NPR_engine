@@ -9,7 +9,7 @@ namespace npr_graphics {
 class Resources;
 class DescriptorPool : public npr_core::NonCopyable {
  public:
-  DescriptorPool(const Context& ctx, const Resources& res);
+  DescriptorPool(const Context& ctx, const Resources& resrc);
   ~DescriptorPool() {
     if (pool_) ctx_.GetDevice().destroyDescriptorPool(pool_);
   }
@@ -47,15 +47,12 @@ class DescriptorPool : public npr_core::NonCopyable {
 
 class TexDescriptorPool : public npr_core::NonCopyable {
  public:
-  TexDescriptorPool(const Context& ctx);
+  TexDescriptorPool(const Context& ctx, const std::string& dbg_name);
   ~TexDescriptorPool() {
     if (pool_) ctx_.GetDevice().destroyDescriptorPool(pool_);
   }
 
   const TextureArraySet& GetTextureSet() const { return tex_set_; }
-
- private:
-  void CreateDescriptorPool();
 
  private:
   const Context& ctx_;

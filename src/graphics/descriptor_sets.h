@@ -41,14 +41,14 @@ class SingleTexSets : public BaseDescSets {
   }
   virtual ~SingleTexSets() = default;
 
-  void Update(const Resources& res) const;
+  void Update(const Resources& resrc) const;
   std::vector<vk::DescriptorPoolSize> GetPoolSizes() const override {
     return {{vk::DescriptorType::eCombinedImageSampler, count_}};
   }
 
  protected:
   void CreateLayout() override;
-  virtual const Texture* GetAttach(const Resources& res,
+  virtual const Texture* GetAttach(const Resources& resrc,
                                    int frame_idx) const = 0;
 };
 
@@ -56,8 +56,9 @@ class PresentSets : public SingleTexSets {
  public:
   PresentSets(const Context& ctx, uint count) : SingleTexSets{ctx, count} {}
 
-  const Texture* GetAttach(const Resources& res, int frame_idx) const override {
-    return res.GetResources()[frame_idx].present_color.get();
+  const Texture* GetAttach(const Resources& resrc,
+                           int frame_idx) const override {
+    return resrc.GetResources()[frame_idx].present_color.get();
   }
 };
 
@@ -65,8 +66,9 @@ class AOResSets : public SingleTexSets {
  public:
   AOResSets(const Context& ctx, uint count) : SingleTexSets{ctx, count} {}
 
-  const Texture* GetAttach(const Resources& res, int frame_idx) const override {
-    return res.GetResources()[frame_idx].ao_res.get();
+  const Texture* GetAttach(const Resources& resrc,
+                           int frame_idx) const override {
+    return resrc.GetResources()[frame_idx].ao_res.get();
   }
 };
 
@@ -74,8 +76,9 @@ class AOTempSets : public SingleTexSets {
  public:
   AOTempSets(const Context& ctx, uint count) : SingleTexSets{ctx, count} {}
 
-  const Texture* GetAttach(const Resources& res, int frame_idx) const override {
-    return res.GetResources()[frame_idx].ao_temp.get();
+  const Texture* GetAttach(const Resources& resrc,
+                           int frame_idx) const override {
+    return resrc.GetResources()[frame_idx].ao_temp.get();
   }
 };
 /*
@@ -110,7 +113,7 @@ class CameraUnifSets : public SingleBuffSets {
                        vk::ShaderStageFlagBits::eVertex |
                            vk::ShaderStageFlagBits::eFragment} {}
 
-  void Update(const Resources& res) const;
+  void Update(const Resources& resrc) const;
 };
 
 class MaterialUnifSets : public SingleBuffSets {
@@ -119,7 +122,7 @@ class MaterialUnifSets : public SingleBuffSets {
       : SingleBuffSets{ctx, count, vk::DescriptorType::eUniformBufferDynamic,
                        vk::ShaderStageFlagBits::eFragment} {}
 
-  void Update(const Resources& res) const;
+  void Update(const Resources& resrc) const;
 };
 
 /*
@@ -131,7 +134,7 @@ class GBuffSets : public BaseDescSets {
     CreateLayout();
   }
 
-  void Update(const Resources& res) const;
+  void Update(const Resources& resrc) const;
   std::vector<vk::DescriptorPoolSize> GetPoolSizes() const override {
     return {{vk::DescriptorType::eCombinedImageSampler, 5 * count_}};
   }
@@ -165,7 +168,7 @@ class AOSet : public BaseDescSets {
  public:
   AOSet(const Context& ctx) : BaseDescSets{ctx, 1} { CreateLayout(); }
 
-  void Update(const Resources& res) const;
+  void Update(const Resources& resrc) const;
   std::vector<vk::DescriptorPoolSize> GetPoolSizes() const override {
     return {{vk::DescriptorType::eUniformBuffer, 1},
             {vk::DescriptorType::eCombinedImageSampler, 1}};
@@ -184,7 +187,7 @@ class ABufferSets : public BaseDescSets {
     CreateLayout();
   }
 
-  void Update(const Resources& res) const;
+  void Update(const Resources& resrc) const;
   std::vector<vk::DescriptorPoolSize> GetPoolSizes() const override {
     return {{vk::DescriptorType::eStorageBuffer, 3 * count_}};
   }
@@ -202,7 +205,7 @@ class WBoitInputSets : public BaseDescSets {
     CreateLayout();
   }
 
-  void Update(const Resources& res) const;
+  void Update(const Resources& resrc) const;
   std::vector<vk::DescriptorPoolSize> GetPoolSizes() const override {
     return {{vk::DescriptorType::eInputAttachment, 2 * count_}};
   }

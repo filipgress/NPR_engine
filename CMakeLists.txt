@@ -106,7 +106,9 @@ set(HEADER_FILES
     ./src/core/task_manager.h
     # scene
     ./src/scene/scene.h
+    ./src/scene/scene_resrc.h
     ./src/scene/scene_loader.h
+    ./src/scene/instance_map.h
     ./src/scene/world.h
     ./src/scene/components.h
     ./src/scene/camera.h
@@ -143,6 +145,7 @@ set(SOURCE_FILES
     ./src/core/input_handler.cc
     # scene
     ./src/scene/scene.cc
+    ./src/scene/scene_resrc.cc
     ./src/scene/scene_loader.cc
     ./src/scene/world.cc
     ./src/scene/camera.cc

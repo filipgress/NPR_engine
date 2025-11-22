@@ -30,13 +30,14 @@ class CommandPool : public npr_core::NonCopyable {
 
 class GraphicsCommandPool : public CommandPool {
  public:
-  GraphicsCommandPool(const Context& ctx, uint frame_count)
+  GraphicsCommandPool(const Context& ctx, uint frame_count,
+                      const std::string& dbg_name)
       : CommandPool{ctx,
                     frame_count,
                     {vk::CommandPoolCreateFlagBits::eTransient |
                      vk::CommandPoolCreateFlagBits::eResetCommandBuffer},
                     ctx.GetQFamilies().graphics_i.value(),
-                    "graphics_cmd_pool"} {}
+                    "graphics_cmd_pool_" + dbg_name} {}
 };
 
 }  // namespace npr_graphics

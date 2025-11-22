@@ -3,45 +3,45 @@
 
 namespace npr_graphics {
 
-DescriptorPool::DescriptorPool(const Context& ctx, const Resources& res)
+DescriptorPool::DescriptorPool(const Context& ctx, const Resources& resrc)
     : ctx_{ctx},
-      gbuff_sets_{ctx, res.GetFrameCount()},
-      camera_sets_{ctx, res.GetFrameCount()},
-      material_sets_{ctx, res.GetFrameCount()},
+      gbuff_sets_{ctx, resrc.GetFrameCount()},
+      camera_sets_{ctx, resrc.GetFrameCount()},
+      material_sets_{ctx, resrc.GetFrameCount()},
       ao_set_{ctx},
-      ao_res_sets_{ctx, res.GetFrameCount()},
-      ao_temp_sets_{ctx, res.GetFrameCount()},
-      abuff_sets_{ctx, res.GetFrameCount()},
-      wboit_input_sets_{ctx, res.GetFrameCount()},
-      present_sets_{ctx, res.GetFrameCount()} {
+      ao_res_sets_{ctx, resrc.GetFrameCount()},
+      ao_temp_sets_{ctx, resrc.GetFrameCount()},
+      abuff_sets_{ctx, resrc.GetFrameCount()},
+      wboit_input_sets_{ctx, resrc.GetFrameCount()},
+      present_sets_{ctx, resrc.GetFrameCount()} {
   CreateDescriptorPool();
 
   gbuff_sets_.AllocSets(pool_);
-  gbuff_sets_.Update(res);
+  gbuff_sets_.Update(resrc);
 
   camera_sets_.AllocSets(pool_);
-  camera_sets_.Update(res);
+  camera_sets_.Update(resrc);
 
   material_sets_.AllocSets(pool_);
-  material_sets_.Update(res);
+  material_sets_.Update(resrc);
 
   ao_set_.AllocSets(pool_);
-  ao_set_.Update(res);
+  ao_set_.Update(resrc);
 
   ao_res_sets_.AllocSets(pool_);
-  ao_res_sets_.Update(res);
+  ao_res_sets_.Update(resrc);
 
   ao_temp_sets_.AllocSets(pool_);
-  ao_temp_sets_.Update(res);
+  ao_temp_sets_.Update(resrc);
 
   abuff_sets_.AllocSets(pool_);
-  abuff_sets_.Update(res);
+  abuff_sets_.Update(resrc);
 
   wboit_input_sets_.AllocSets(pool_);
-  wboit_input_sets_.Update(res);
+  wboit_input_sets_.Update(resrc);
 
   present_sets_.AllocSets(pool_);
-  present_sets_.Update(res);
+  present_sets_.Update(resrc);
 };
 
 void DescriptorPool::CreateDescriptorPool() {
@@ -90,19 +90,15 @@ void DescriptorPool::CreateDescriptorPool() {
 
   pool_ = ctx_.GetDevice().createDescriptorPool(poolInfo);
   ctx_.SetDbgName((uint64_t)(VkDescriptorPool)pool_,
-                  vk::ObjectType::eDescriptorPool, "main_descriptor_pool");
+                  vk::ObjectType::eDescriptorPool, "main_desc_pool");
 }
 
 /*
  * TexDescriptorPool
  */
-TexDescriptorPool::TexDescriptorPool(const Context& ctx)
+TexDescriptorPool::TexDescriptorPool(const Context& ctx,
+                                     const std::string& dbg_name)
     : ctx_{ctx}, tex_set_{ctx} {
-  CreateDescriptorPool();
-  tex_set_.AllocSets(pool_);
-}
-
-void TexDescriptorPool::CreateDescriptorPool() {
   const auto& tex_sizes = tex_set_.GetPoolSizes();
 
   vk::DescriptorPoolCreateInfo poolInfo{};
@@ -112,7 +108,9 @@ void TexDescriptorPool::CreateDescriptorPool() {
 
   pool_ = ctx_.GetDevice().createDescriptorPool(poolInfo);
   ctx_.SetDbgName((uint64_t)(VkDescriptorPool)pool_,
-                  vk::ObjectType::eDescriptorPool, "tex_descriptor_pool");
+                  vk::ObjectType::eDescriptorPool, "tex_desc_pool_" + dbg_name);
+
+  tex_set_.AllocSets(pool_);
 }
 
 /*
@@ -140,7 +138,7 @@ ImGuiDescriptorPool::ImGuiDescriptorPool(const Context& ctx) : ctx_{ctx} {
 
   pool_ = ctx_.GetDevice().createDescriptorPool(pool_info);
   ctx_.SetDbgName((uint64_t)(VkDescriptorPool)pool_,
-                  vk::ObjectType::eDescriptorPool, "gui_descriptor_pool");
+                  vk::ObjectType::eDescriptorPool, "gui_desc_pool");
 }
 
 }  // namespace npr_graphics

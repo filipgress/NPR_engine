@@ -38,37 +38,37 @@ Resources::Resources(const Context& ctx, const CommandPool& cmd_pool,
 
 void Resources::CreateImages() {
   uint idx{0};
-  for (auto& res : frame_resources_) {
+  for (auto& resrc : frame_resources_) {
     // gbuff pass
-    res.albedo_metallic_ms = std::make_unique<Texture>(
+    resrc.albedo_metallic_ms = std::make_unique<Texture>(
         ctx_, frame_props_.albedo_format, frame_props_.extent,
         vk::ImageUsageFlagBits::eColorAttachment |
             vk::ImageUsageFlagBits::eSampled,
         vk::ImageAspectFlagBits::eColor, frame_props_.samples,
         "albedo_metallic_ms_" + std::to_string(idx));
 
-    res.emissive_roughness_ms = std::make_unique<Texture>(
+    resrc.emissive_roughness_ms = std::make_unique<Texture>(
         ctx_, frame_props_.emissive_format, frame_props_.extent,
         vk::ImageUsageFlagBits::eColorAttachment |
             vk::ImageUsageFlagBits::eSampled,
         vk::ImageAspectFlagBits::eColor, frame_props_.samples,
         "emissive_roughness_ms_" + std::to_string(idx));
 
-    res.position_ms = std::make_unique<Texture>(
+    resrc.position_ms = std::make_unique<Texture>(
         ctx_, frame_props_.position_format, frame_props_.extent,
         vk::ImageUsageFlagBits::eColorAttachment |
             vk::ImageUsageFlagBits::eSampled,
         vk::ImageAspectFlagBits::eColor, frame_props_.samples,
         "position_ms" + std::to_string(idx));
 
-    res.normal_ms = std::make_unique<Texture>(
+    resrc.normal_ms = std::make_unique<Texture>(
         ctx_, frame_props_.normal_format, frame_props_.extent,
         vk::ImageUsageFlagBits::eColorAttachment |
             vk::ImageUsageFlagBits::eSampled,
         vk::ImageAspectFlagBits::eColor, frame_props_.samples,
         "normal_ms" + std::to_string(idx));
 
-    res.coverage_ms = std::make_unique<Image>(
+    resrc.coverage_ms = std::make_unique<Image>(
         ctx_, frame_props_.coverage_format, frame_props_.extent,
         vk::ImageUsageFlagBits::eColorAttachment |
             vk::ImageUsageFlagBits::eTransientAttachment |
@@ -76,14 +76,14 @@ void Resources::CreateImages() {
         vk::ImageAspectFlagBits::eColor, vk::SharingMode::eExclusive,
         frame_props_.samples, 1, "coverage_ms" + std::to_string(idx));
 
-    res.coverage_res = std::make_unique<Texture>(
+    resrc.coverage_res = std::make_unique<Texture>(
         ctx_, frame_props_.coverage_format, frame_props_.extent,
         vk::ImageUsageFlagBits::eColorAttachment |
             vk::ImageUsageFlagBits::eSampled,
         vk::ImageAspectFlagBits::eColor, vk::SampleCountFlagBits::e1,
         "coverage_res" + std::to_string(idx));
 
-    res.depth_stencil_ms = std::make_unique<Texture>(
+    resrc.depth_stencil_ms = std::make_unique<Texture>(
         ctx_, frame_props_.depth_stencil_format, frame_props_.extent,
         vk::ImageUsageFlagBits::eDepthStencilAttachment |
             vk::ImageUsageFlagBits::eSampled,
@@ -91,21 +91,21 @@ void Resources::CreateImages() {
         frame_props_.samples, "depth_stencil_ms" + std::to_string(idx));
 
     // ao pass
-    res.ao_ms = std::make_unique<Image>(
+    resrc.ao_ms = std::make_unique<Image>(
         ctx_, frame_props_.ao_format, frame_props_.extent,
         vk::ImageUsageFlagBits::eColorAttachment |
             vk::ImageUsageFlagBits::eTransientAttachment,
         vk::ImageAspectFlagBits::eColor, vk::SharingMode::eExclusive,
         frame_props_.samples, 1, "ao_ms_" + std::to_string(idx));
 
-    res.ao_res = std::make_unique<Texture>(
+    resrc.ao_res = std::make_unique<Texture>(
         ctx_, frame_props_.ao_format, frame_props_.extent,
         vk::ImageUsageFlagBits::eColorAttachment |
             vk::ImageUsageFlagBits::eSampled,
         vk::ImageAspectFlagBits::eColor, vk::SampleCountFlagBits::e1,
         "ao_res_" + std::to_string(idx));
 
-    res.ao_temp = std::make_unique<Texture>(
+    resrc.ao_temp = std::make_unique<Texture>(
         ctx_, frame_props_.ao_format, frame_props_.extent,
         vk::ImageUsageFlagBits::eColorAttachment |
             vk::ImageUsageFlagBits::eSampled,
@@ -113,14 +113,14 @@ void Resources::CreateImages() {
         "ao_temp_" + std::to_string(idx));
 
     // wboit pass
-    res.acc_color_ms = std::make_unique<Image>(
+    resrc.acc_color_ms = std::make_unique<Image>(
         ctx_, frame_props_.acc_color_format, frame_props_.extent,
         vk::ImageUsageFlagBits::eColorAttachment |
             vk::ImageUsageFlagBits::eTransientAttachment,
         vk::ImageAspectFlagBits::eColor, vk::SharingMode::eExclusive,
         frame_props_.samples, 1, "acc_color_ms_" + std::to_string(idx));
 
-    res.acc_color_res = std::make_unique<Image>(
+    resrc.acc_color_res = std::make_unique<Image>(
         ctx_, frame_props_.acc_color_format, frame_props_.extent,
         vk::ImageUsageFlagBits::eColorAttachment |
             vk::ImageUsageFlagBits::eTransientAttachment |
@@ -128,14 +128,14 @@ void Resources::CreateImages() {
         vk::ImageAspectFlagBits::eColor, vk::SharingMode::eExclusive,
         vk::SampleCountFlagBits::e1, 1, "acc_color_res_" + std::to_string(idx));
 
-    res.acc_weight_ms = std::make_unique<Image>(
+    resrc.acc_weight_ms = std::make_unique<Image>(
         ctx_, frame_props_.acc_weight_format, frame_props_.extent,
         vk::ImageUsageFlagBits::eColorAttachment |
             vk::ImageUsageFlagBits::eTransientAttachment,
         vk::ImageAspectFlagBits::eColor, vk::SharingMode::eExclusive,
         frame_props_.samples, 1, "acc_weight_ms_" + std::to_string(idx));
 
-    res.acc_weight_res = std::make_unique<Image>(
+    resrc.acc_weight_res = std::make_unique<Image>(
         ctx_, frame_props_.acc_weight_format, frame_props_.extent,
         vk::ImageUsageFlagBits::eColorAttachment |
             vk::ImageUsageFlagBits::eTransientAttachment |
@@ -145,7 +145,7 @@ void Resources::CreateImages() {
         "acc_weight_res_" + std::to_string(idx));
 
     // swap pass
-    res.present_color = std::make_unique<Texture>(
+    resrc.present_color = std::make_unique<Texture>(
         ctx_, frame_props_.albedo_format, frame_props_.extent,
         vk::ImageUsageFlagBits::eColorAttachment |
             vk::ImageUsageFlagBits::eSampled,
@@ -158,15 +158,15 @@ void Resources::CreateImages() {
 
 void Resources::CreateBuffers() {
   int idx{0};
-  for (auto& res : frame_resources_) {
-    res.camera_ubo = std::make_unique<UniformBuffer<CameraUnif>>(
+  for (auto& resrc : frame_resources_) {
+    resrc.camera_ubo = std::make_unique<UniformBuffer<CameraUnif>>(
         ctx_, "camera_unif_buff" + std::to_string(idx));
-    res.material_ubo = std::make_unique<DynamicUniformBuffer<MaterialUnif>>(
+    resrc.material_ubo = std::make_unique<DynamicUniformBuffer<MaterialUnif>>(
         ctx_, MAX_MATERIALS,
         "material_dynamic_unif_buff" + std::to_string(idx));
-    res.instance_buff = std::make_unique<InstanceBuffer>(
+    resrc.instance_buff = std::make_unique<InstanceBuffer>(
         ctx_, MAX_INSTANCES, "instance_buff" + std::to_string(idx));
-    res.light_storage = std::make_unique<StorageBuffer<LightStorage>>(
+    resrc.light_storage = std::make_unique<StorageBuffer<LightStorage>>(
         ctx_, "light_storage_buff" + std::to_string(idx));
     idx++;
   }
@@ -175,10 +175,10 @@ void Resources::CreateBuffers() {
 void Resources::CreateABuffers() {
   if (frame_resources_[0].abuff_heads) {
     ctx_.GetDevice().waitIdle();
-    for (auto& res : frame_resources_) {
-      res.abuff_heads.reset();
-      res.abuff_nodes.reset();
-      res.abuff_counter.reset();
+    for (auto& resrc : frame_resources_) {
+      resrc.abuff_heads.reset();
+      resrc.abuff_nodes.reset();
+      resrc.abuff_counter.reset();
     }
   }
 
@@ -187,22 +187,22 @@ void Resources::CreateABuffers() {
                            static_cast<uint32_t>(frame_props_.samples);
   uint32_t max_nodes = total_samples * ABUFF_INIT_SIZE;
 
-  for (auto& res : frame_resources_) {
-    res.abuff_nodes = std::make_unique<Buffer>(
+  for (auto& resrc : frame_resources_) {
+    resrc.abuff_nodes = std::make_unique<Buffer>(
         ctx_,
         vk::BufferUsageFlagBits::eStorageBuffer |
             vk::BufferUsageFlagBits::eTransferDst,
         vk::MemoryPropertyFlagBits::eDeviceLocal, vk::SharingMode::eExclusive,
         max_nodes * sizeof(FragmentNode), "abuff_nodes");
 
-    res.abuff_heads = std::make_unique<Buffer>(
+    resrc.abuff_heads = std::make_unique<Buffer>(
         ctx_,
         vk::BufferUsageFlagBits::eStorageBuffer |
             vk::BufferUsageFlagBits::eTransferDst,
         vk::MemoryPropertyFlagBits::eDeviceLocal, vk::SharingMode::eExclusive,
         total_samples * sizeof(uint32_t), "abuff_heads");
 
-    res.abuff_counter = std::make_unique<Buffer>(
+    resrc.abuff_counter = std::make_unique<Buffer>(
         ctx_,
         vk::BufferUsageFlagBits::eStorageBuffer |
             vk::BufferUsageFlagBits::eTransferDst,

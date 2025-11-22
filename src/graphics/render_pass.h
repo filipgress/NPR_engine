@@ -43,8 +43,8 @@ class BasePass : public npr_core::NonCopyable {
 
 class RenderPass : public BasePass {
  public:
-  RenderPass(const Context& ctx, const Resources& res)
-      : BasePass{ctx}, res_{res} {}
+  RenderPass(const Context& ctx, const Resources& resrc)
+      : BasePass{ctx}, resrc_{resrc} {}
   virtual ~RenderPass() = default;
 
  protected:
@@ -53,12 +53,13 @@ class RenderPass : public BasePass {
       int frame_idx) const = 0;
 
  protected:
-  const Resources& res_;
+  const Resources& resrc_;
 };
 
 class GBuffPass : public RenderPass {
  public:
-  GBuffPass(const Context& ctx, const Resources& res) : RenderPass{ctx, res} {
+  GBuffPass(const Context& ctx, const Resources& resrc)
+      : RenderPass{ctx, resrc} {
     Init();
   }
 
@@ -79,7 +80,8 @@ class GBuffPass : public RenderPass {
 
 class AOGenPass : public RenderPass {
  public:
-  AOGenPass(const Context& ctx, const Resources& res) : RenderPass{ctx, res} {
+  AOGenPass(const Context& ctx, const Resources& resrc)
+      : RenderPass{ctx, resrc} {
     Init();
   }
 
@@ -100,8 +102,8 @@ class AOGenPass : public RenderPass {
 
 class BlurPass : public RenderPass {
  public:
-  BlurPass(const Context& ctx, const Resources& res, vk::Format format)
-      : RenderPass(ctx, res), format_{format} {}
+  BlurPass(const Context& ctx, const Resources& resrc, vk::Format format)
+      : RenderPass(ctx, resrc), format_{format} {}
 
  private:
   void SetClearValues() override;
@@ -116,8 +118,8 @@ class BlurPass : public RenderPass {
 
 class AOBlurHPass : public BlurPass {
  public:
-  AOBlurHPass(const Context& ctx, const Resources& res)
-      : BlurPass(ctx, res, res.GetProps().ao_format) {
+  AOBlurHPass(const Context& ctx, const Resources& resrc)
+      : BlurPass(ctx, resrc, resrc.GetProps().ao_format) {
     Init();
   }
 
@@ -128,8 +130,8 @@ class AOBlurHPass : public BlurPass {
 
 class AOBlurVPass : public BlurPass {
  public:
-  AOBlurVPass(const Context& ctx, const Resources& res)
-      : BlurPass(ctx, res, res.GetProps().ao_format) {
+  AOBlurVPass(const Context& ctx, const Resources& resrc)
+      : BlurPass(ctx, resrc, resrc.GetProps().ao_format) {
     Init();
   }
 
@@ -140,7 +142,8 @@ class AOBlurVPass : public BlurPass {
 
 class LightPass : public RenderPass {
  public:
-  LightPass(const Context& ctx, const Resources& res) : RenderPass{ctx, res} {
+  LightPass(const Context& ctx, const Resources& resrc)
+      : RenderPass{ctx, resrc} {
     Init();
   }
 
@@ -159,7 +162,8 @@ class LightPass : public RenderPass {
 
 class ABuffPass : public RenderPass {
  public:
-  ABuffPass(const Context& ctx, const Resources& res) : RenderPass{ctx, res} {
+  ABuffPass(const Context& ctx, const Resources& resrc)
+      : RenderPass{ctx, resrc} {
     Init();
   }
 
@@ -179,7 +183,8 @@ class ABuffPass : public RenderPass {
 
 class WBoitPass : public RenderPass {
  public:
-  WBoitPass(const Context& ctx, const Resources& res) : RenderPass{ctx, res} {
+  WBoitPass(const Context& ctx, const Resources& resrc)
+      : RenderPass{ctx, resrc} {
     Init();
   }
 

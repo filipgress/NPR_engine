@@ -16,15 +16,22 @@ void SceneLoader::LoadAsync(const npr_graphics::Renderer& renderer,
                             std::function<void()> on_loaded,
                             const std::string& filepath,
                             const std::string& scene_name) {
-  if (scene.handle_.valid()) return;
+  if (scene.handle_.valid()) return;  // skip if already loading
+
+  scene.valid_ = false;
+  scene.stop_async_ = false;
+
   scene.handle_ =
       std::async(std::launch::async, &SceneLoader::LoadScene,
                  std::cref(renderer), std::ref(scene), filepath, scene_name);
 
   tasks.Add([&scene, &tasks, on_loaded]() {
     if (scene.IsLoading()) return false;
+
+    scene.Complete();
     if (!scene.IsValid()) return true;
-    scene.InitGPU(tasks, on_loaded);
+
+    scene.Init(tasks, on_loaded);
     return true;
   });
 }
@@ -32,10 +39,8 @@ void SceneLoader::LoadAsync(const npr_graphics::Renderer& renderer,
 void SceneLoader::Load(const Renderer& renderer, Scene& scene,
                        const std::string& filepath,
                        const std::string& scene_name) {
-  scene.WaitForAsync();
-
+  scene.Complete();
   scene.valid_ = LoadScene(renderer, scene, filepath, scene_name);
-  scene.gpu_init_ = false;
 }
 
 bool SceneLoader::LoadScene(const Renderer& renderer, Scene& scene,
@@ -48,11 +53,13 @@ bool SceneLoader::LoadScene(const Renderer& renderer, Scene& scene,
     std::string err, warn;
     bool ret = loader.LoadASCIIFromFile(&model, &err, &warn, filepath);
 
+    if (scene.stop_async_) return false;
+
     if (!warn.empty()) throw std::runtime_error("gltf warn: " + warn);
     if (!err.empty()) throw std::runtime_error("gltf err: " + err);
     if (!ret) throw std::runtime_error("gltf failed to parse file: " + err);
 
-    scene.Prepare(renderer.GetContext(), filepath, scene_name);
+    PrepareScene(scene, renderer.GetContext(), filepath, scene_name);
     INFO("loading scene: ", scene.filename_, "(", scene.scene_name_, ")");
 
     LoaderCache cache;
@@ -60,16 +67,17 @@ bool SceneLoader::LoadScene(const Renderer& renderer, Scene& scene,
     if (!cache.light_supp) INFO("scene doesn't support lights");
 
     {
-      scene.gpu_res_->cmd_buff.begin(
+      scene.resrc_->cmd_buff.begin(
           {vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
 
       int scene_idx = GetSceneIdx(model, scene_name);
-      for (int node_idx : model.scenes[scene_idx].nodes)
+      for (int node_idx : model.scenes[scene_idx].nodes) {
+        if (scene.stop_async_) return false;
         LoadEntity(scene, flecs::entity::null(), model, node_idx, cache);
+      }
 
-      scene.gpu_res_->UpdateTextureDescriptors(
-          renderer.GetResources().GetDefaultColorTex());
-      scene.gpu_res_->cmd_buff.end();
+      scene.resrc_->UpdateTexDesc(renderer.GetResrc().GetDefaultColorTex());
+      scene.resrc_->cmd_buff.end();
     }
 
   } catch (const std::runtime_error& e) {
@@ -88,6 +96,8 @@ void SceneLoader::LoadEntity(Scene& scene, flecs::entity parent_ent,
   s.push({parent_ent, node_idx});
 
   while (!s.empty()) {
+    if (scene.stop_async_) return;
+
     auto [parent_ent, node_idx] = s.top();
     s.pop();
 
@@ -309,10 +319,10 @@ void SceneLoader::AddMeshComp(Scene& scene, flecs::entity ent,
       bb_comp.max_pos = glm::max(bb_comp.max_pos, vertices[i].pos);
     }
 
-    scene.gpu_res_->vbos.emplace_back(scene.gpu_res_->ctx,
-                                      scene.gpu_res_->cmd_buff, vertices,
-                                      "vbo_" + std::string(ent.name().c_str()));
-    mesh_comp.vbo_idx = scene.gpu_res_->vbos.size() - 1;
+    scene.resrc_->vbos.emplace_back(scene.resrc_->ctx, scene.resrc_->cmd_buff,
+                                    vertices,
+                                    "vbo_" + std::string(ent.name().c_str()));
+    mesh_comp.vbo_idx = scene.resrc_->vbos.size() - 1;
   }
 
   if (prim.indices != -1) {  // load indices
@@ -342,10 +352,10 @@ void SceneLoader::AddMeshComp(Scene& scene, flecs::entity ent,
                                  std::to_string(acc.componentType));
     }
 
-    scene.gpu_res_->ibos.emplace_back(scene.gpu_res_->ctx,
-                                      scene.gpu_res_->cmd_buff, indices,
-                                      "ibo_" + std::string(ent.name().c_str()));
-    mesh_comp.ibo_idx = scene.gpu_res_->ibos.size() - 1;
+    scene.resrc_->ibos.emplace_back(scene.resrc_->ctx, scene.resrc_->cmd_buff,
+                                    indices,
+                                    "ibo_" + std::string(ent.name().c_str()));
+    mesh_comp.ibo_idx = scene.resrc_->ibos.size() - 1;
   }
 
   ent.set<MeshComp>(mesh_comp);
@@ -453,11 +463,11 @@ int SceneLoader::LoadTexture(Scene& scene, const tinygltf::Model& model,
   tex_data.height = image.height;
   tex_data.width = image.width;
 
-  Texture tex{scene.gpu_res_->ctx, tex_data, LoadSampler(model, texture)};
-  tex.Write(scene.gpu_res_->cmd_buff, *data);
+  Texture tex{scene.resrc_->ctx, tex_data, LoadSampler(model, texture)};
+  tex.Write(scene.resrc_->cmd_buff, *data);
 
-  scene.gpu_res_->textures.push_back(std::move(tex));
-  int idx = scene.gpu_res_->textures.size() - 1;
+  scene.resrc_->textures.push_back(std::move(tex));
+  int idx = scene.resrc_->textures.size() - 1;
 
   return idx;
 }
@@ -520,6 +530,20 @@ SamplerProps SceneLoader::LoadSampler(const tinygltf::Model& model,
 /*
  * Helpers
  */
+
+void SceneLoader::PrepareScene(Scene& scene, const npr_graphics::Context& ctx,
+                               const std::string& filepath,
+                               const std::string& scene_name) {
+  scene.filename_ = npr_core::GetFilename(filepath);
+  scene.scene_name_ = scene_name.empty() ? "default" : scene_name;
+
+  scene.world_.Reset();
+  if (scene.resrc_ && scene.resrc_->Compatible(ctx.GetDevice())) {
+    scene.resrc_->Reset();
+  } else {
+    scene.resrc_ = std::make_unique<SceneResrc>(ctx, "scene_" + scene_name);
+  }
+}
 
 int SceneLoader::GetSceneIdx(const tinygltf::Model& model,
                              const std::string& scene_name) {

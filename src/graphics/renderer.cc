@@ -1,7 +1,12 @@
 #include "renderer.h"
 
-namespace npr_graphics {
 using namespace npr_scene;
+
+namespace npr_graphics {
+
+uint Renderer::mat_at{0};
+uint Renderer::inst_at{0};
+
 void Renderer::Render(const Camera& camera, Scene& scene, bool is_loading,
                       float dt) {
   if (!scene.IsValid() || !scene.IsInit()) return;
@@ -39,8 +44,10 @@ void Renderer::Render(const Camera& camera, Scene& scene, bool is_loading,
 
   // record & submit commands
   vk::CommandBuffer cmd_buff;
-  if (scene.IsValid() && scene.IsInit())
+  if (scene.IsValid() && scene.IsInit()) {
+    gui_manager_.NewFrame();
     cmd_buff = Record(image_idx, camera, scene, is_loading, dt);
+  }
 
   auto render_finished = sync_.GetRenderFinished(image_idx);
 
@@ -83,26 +90,27 @@ vk::CommandBuffer Renderer::Record(uint image_idx, const Camera& camera,
   auto frame_idx = sync_.GetFrameIdx();
   auto cmd_buff = cmd_pool_.GetCmdBuff(frame_idx);
 
-  const auto& frame_res = res_.GetResources()[frame_idx];
-  auto res_extent = res_.GetProps().extent;
+  const auto& frame_resrc = resrc_.GetResources()[frame_idx];
+  auto resrc_extent = resrc_.GetProps().extent;
 
-  frame_res.camera_ubo->Write(camera.GetCameraUnif());
+  frame_resrc.camera_ubo->Write(camera.GetCameraUnif());
 
-  gui_manager_.NewFrame();
-
-  vk::Rect2D scissor{{0, 0}, res_extent};
-  vk::Viewport viewport(0, 0, res_extent.width, res_extent.height, 0.0f, 1.0f);
+  vk::Rect2D scissor{{0, 0}, resrc_extent};
+  vk::Viewport viewport(0, 0, resrc_extent.width, resrc_extent.height, 0.0f,
+                        1.0f);
 
   cmd_buff.begin({vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
   cmd_buff.setScissor(0, scissor);
   cmd_buff.setViewport(0, viewport);
 
-  RecordGBufferPass(cmd_buff, frame_idx, frame_res, res_extent, camera, scene);
-  RecordAOPass(cmd_buff, frame_idx, res_extent);
-  // RecordLightPass(cmd_buff, frame_idx, res_extent);
-  // RecordABufferPass(cmd_buff, frame_idx, frame_res, res_extent, camera,
-  // scene);
-  // RecordWBoitPass(cmd_buff, frame_idx, frame_res, res_extent, camera, scene);
+  RecordGBufferPass(cmd_buff, frame_idx, frame_resrc, resrc_extent, camera,
+                    scene);
+  RecordAOPass(cmd_buff, frame_idx, resrc_extent);
+  RecordLightPass(cmd_buff, frame_idx, resrc_extent);
+  // RecordABufferPass(cmd_buff, frame_idx, frame_resrc, resrc_extent, camera,
+  //                   scene);
+  // RecordWBoitPass(cmd_buff, frame_idx, frame_resrc, resrc_extent, camera,
+  //                 scene);
   RecordSwapPass(cmd_buff, image_idx, frame_idx, camera.GetAspect(), is_loading,
                  dt);
 
@@ -112,9 +120,9 @@ vk::CommandBuffer Renderer::Record(uint image_idx, const Camera& camera,
 
 void Renderer::RecordGBufferPass(vk::CommandBuffer cmd_buff, uint frame_idx,
                                  const npr_graphics::FrameResources& frame_res,
-                                 const vk::Extent2D& res_extent,
+                                 const vk::Extent2D& resrc_extent,
                                  const Camera& camera, Scene& scene) {
-  cmd_buff.beginRenderPass(gbuff_pass_.BeginInfo(frame_idx, res_extent),
+  cmd_buff.beginRenderPass(gbuff_pass_.BeginInfo(frame_idx, resrc_extent),
                            vk::SubpassContents::eInline);
 
   cmd_buff.bindPipeline(vk::PipelineBindPoint::eGraphics,
@@ -126,19 +134,89 @@ void Renderer::RecordGBufferPass(vk::CommandBuffer cmd_buff, uint frame_idx,
 
   cmd_buff.bindDescriptorSets(  // textures
       vk::PipelineBindPoint::eGraphics, gbuff_pipe_.GetLayout(), 1,
-      scene.GetGpuResources().desc_pool.GetTextureSet().GetSet(0), {});
+      scene.GetResrc().desc_pool.GetTextureSet().GetSet(0), {});
 
-  scene.RecordOpaque(cmd_buff, gbuff_pipe_.GetLayout(), frame_res, 2,
-                     desc_pool_.GetMaterialSets().GetSet(frame_idx),
-                     camera.GetFrustum());
+  RecordOpaque(cmd_buff, frame_idx, frame_res, scene, camera.GetFrustum());
 
   cmd_buff.nextSubpass(vk::SubpassContents::eInline);  // resolve coverage_ms
   cmd_buff.endRenderPass();
 }
 
+void Renderer::RecordOpaque(vk::CommandBuffer cmd_buff, uint frame_idx,
+                            const npr_graphics::FrameResources& frame_resrc,
+                            const npr_scene::Scene& scene,
+                            const npr_scene::Frustum& frustum) const {
+  const auto& instances = scene.GetInstances();
+  const auto& scene_resrc = scene.GetResrc();
+  const auto& material_set = desc_pool_.GetMaterialSets().GetSet(frame_idx);
+
+  for (const auto& [key, instances] : instances) {
+    const auto& mat = key.mat;
+    if (instances.empty() || (!key.mat.is_mask && !mat.is_opaque)) continue;
+
+    std::vector<InstanceData> visible;
+    visible.reserve(instances.size());
+
+    for (const auto& [tf, bb] : instances) {
+      if (!frustum.IsVisible(bb)) continue;
+      visible.push_back({.model = tf.glob_mat,
+                         .normal = glm::transpose(glm::inverse(tf.glob_mat))});
+    }
+
+    if (visible.empty()) continue;
+    cmd_buff.setCullMode(mat.double_sided ? vk::CullModeFlagBits::eNone
+                                          : vk::CullModeFlagBits::eBack);
+
+    uint32_t flags = MaterialFlags::kNone;
+    if (mat.double_sided) flags |= MaterialFlags::kDoubleSided;
+    if (mat.is_opaque) flags |= MaterialFlags::kOpaque;
+    if (mat.is_mask) flags |= MaterialFlags::kMask;
+
+    auto& material_ubo = *frame_resrc.material_ubo;
+    material_ubo.Write(
+        mat_at,
+        MaterialUnif{{mat.color_map_idx, mat.normal_map_idx,
+                      mat.metallic_roughness_map_idx, mat.emissive_map_idx},
+                     mat.color_factor,
+                     mat.emissive_factor,
+                     mat.metallic_factor,
+                     mat.roughness_factor,
+                     mat.alpha_cutoff,
+                     flags});
+
+    cmd_buff.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                                gbuff_pipe_.GetLayout(), 2, material_set,
+                                material_ubo.GetElemOffset(mat_at));
+
+    if (inst_at + visible.size() >= MAX_INSTANCES) inst_at = 0;
+    frame_resrc.instance_buff->Write(visible, inst_at);
+
+    std::array<vk::DeviceSize, 2> offsets = {0, inst_at * sizeof(InstanceData)};
+    std::array<vk::Buffer, 2> buffers = {
+        scene_resrc.vbos[key.mesh.vbo_idx].GetBuffer(),
+        frame_resrc.instance_buff->GetBuffer()};
+
+    cmd_buff.bindVertexBuffers(0, buffers.size(), buffers.data(),
+                               offsets.data());
+
+    if (key.mesh.ibo_idx != -1) {
+      vk::Buffer ibo = scene_resrc.ibos[key.mesh.ibo_idx].GetBuffer();
+      cmd_buff.bindIndexBuffer(ibo, 0, vk::IndexType::eUint32);
+      uint32_t index_count = scene_resrc.ibos[key.mesh.ibo_idx].GetCount();
+      cmd_buff.drawIndexed(index_count, visible.size(), 0, 0, 0);
+    } else {
+      uint32_t vertex_count = scene_resrc.vbos[key.mesh.vbo_idx].GetCount();
+      cmd_buff.draw(vertex_count, visible.size(), 0, 0);
+    }
+
+    mat_at = (mat_at + 1) % MAX_MATERIALS;
+    inst_at = (inst_at + visible.size()) % MAX_INSTANCES;
+  }
+}
+
 void Renderer::RecordAOPass(vk::CommandBuffer cmd_buff, uint frame_idx,
-                            const vk::Extent2D& res_extent) {
-  cmd_buff.beginRenderPass(ao_pass_.BeginInfo(frame_idx, res_extent),
+                            const vk::Extent2D& resrc_extent) {
+  cmd_buff.beginRenderPass(ao_pass_.BeginInfo(frame_idx, resrc_extent),
                            vk::SubpassContents::eInline);
 
   cmd_buff.bindPipeline(vk::PipelineBindPoint::eGraphics,
@@ -160,7 +238,7 @@ void Renderer::RecordAOPass(vk::CommandBuffer cmd_buff, uint frame_idx,
   cmd_buff.endRenderPass();
 
   // horizontal blur pass
-  cmd_buff.beginRenderPass(ao_blur_h_pass_.BeginInfo(frame_idx, res_extent),
+  cmd_buff.beginRenderPass(ao_blur_h_pass_.BeginInfo(frame_idx, resrc_extent),
                            vk::SubpassContents::eInline);
 
   cmd_buff.bindPipeline(vk::PipelineBindPoint::eGraphics,
@@ -170,7 +248,7 @@ void Renderer::RecordAOPass(vk::CommandBuffer cmd_buff, uint frame_idx,
       vk::PipelineBindPoint::eGraphics, ao_blur_pipe_.GetLayout(), 0,
       desc_pool_.GetAOResSets().GetSet(frame_idx), {});
 
-  auto& blur_pc = res_.GetSSAOBlurPC();
+  auto& blur_pc = resrc_.GetSSAOBlurPC();
   blur_pc.flags.x = 0;  // horizontal
   cmd_buff.pushConstants(ao_blur_pipe_.GetLayout(),
                          vk::ShaderStageFlagBits::eFragment, 0,
@@ -180,7 +258,7 @@ void Renderer::RecordAOPass(vk::CommandBuffer cmd_buff, uint frame_idx,
   cmd_buff.endRenderPass();
 
   // vertical blur pass
-  cmd_buff.beginRenderPass(ao_blur_v_pass_.BeginInfo(frame_idx, res_extent),
+  cmd_buff.beginRenderPass(ao_blur_v_pass_.BeginInfo(frame_idx, resrc_extent),
                            vk::SubpassContents::eInline);
 
   cmd_buff.bindPipeline(vk::PipelineBindPoint::eGraphics,
@@ -200,15 +278,15 @@ void Renderer::RecordAOPass(vk::CommandBuffer cmd_buff, uint frame_idx,
 }
 
 void Renderer::RecordLightPass(vk::CommandBuffer cmd_buff, uint frame_idx,
-                               const vk::Extent2D& res_extent) {
-  cmd_buff.beginRenderPass(light_pass_.BeginInfo(frame_idx, res_extent),
+                               const vk::Extent2D& resrc_extent) {
+  cmd_buff.beginRenderPass(light_pass_.BeginInfo(frame_idx, resrc_extent),
                            vk::SubpassContents::eInline);
   cmd_buff.endRenderPass();
 }
 
 void Renderer::RecordABufferPass(vk::CommandBuffer cmd_buff, uint frame_idx,
                                  const npr_graphics::FrameResources& frame_res,
-                                 const vk::Extent2D& res_extent,
+                                 const vk::Extent2D& resrc_extent,
                                  const npr_scene::Camera& camera,
                                  Scene& scene) {
   // clear abuff before fill pass
@@ -219,7 +297,7 @@ void Renderer::RecordABufferPass(vk::CommandBuffer cmd_buff, uint frame_idx,
   cmd_buff.fillBuffer(frame_res.abuff_counter->GetBuffer(), 0, VK_WHOLE_SIZE,
                       0);
 
-  cmd_buff.beginRenderPass(abuff_pass_.BeginInfo(frame_idx, res_extent),
+  cmd_buff.beginRenderPass(abuff_pass_.BeginInfo(frame_idx, resrc_extent),
                            vk::SubpassContents::eInline);
 
   {  // fill
@@ -232,24 +310,23 @@ void Renderer::RecordABufferPass(vk::CommandBuffer cmd_buff, uint frame_idx,
 
     cmd_buff.bindDescriptorSets(  // textures
         vk::PipelineBindPoint::eGraphics, abuff_fill_pipe_.GetLayout(), 1,
-        scene.GetGpuResources().desc_pool.GetTextureSet().GetSet(0), {});
+        scene.GetResrc().desc_pool.GetTextureSet().GetSet(0), {});
 
     cmd_buff.bindDescriptorSets(  // abuff
         vk::PipelineBindPoint::eGraphics, abuff_fill_pipe_.GetLayout(), 2,
         desc_pool_.GetABufferSets().GetSet(frame_idx), {});
 
     ABuffFillPushConst push_const{
-        res_extent.width,
-        res_extent.width * res_extent.height * ABUFF_INIT_SIZE,
+        resrc_extent.width,
+        resrc_extent.width * resrc_extent.height * ABUFF_INIT_SIZE,
         {}};
 
     cmd_buff.pushConstants(abuff_fill_pipe_.GetLayout(),
                            vk::ShaderStageFlagBits::eFragment, 0,
                            sizeof(push_const), &push_const);
 
-    scene.RecordTrans(cmd_buff, abuff_fill_pipe_.GetLayout(), frame_res, 3,
-                      desc_pool_.GetMaterialSets().GetSet(frame_idx),
-                      camera.GetFrustum());
+    RecordTrans(cmd_buff, frame_idx, frame_res, scene, camera.GetFrustum(),
+                abuff_fill_pipe_.GetLayout(), 3);
   }
 
   cmd_buff.nextSubpass(vk::SubpassContents::eInline);
@@ -264,7 +341,7 @@ void Renderer::RecordABufferPass(vk::CommandBuffer cmd_buff, uint frame_idx,
 
     cmd_buff.pushConstants(abuff_resolve_pipe_.GetLayout(),
                            vk::ShaderStageFlagBits::eFragment, 0,
-                           sizeof(res_extent.width), &res_extent.width);
+                           sizeof(resrc_extent.width), &resrc_extent.width);
 
     cmd_buff.draw(3, 1, 0, 0);
   }
@@ -274,9 +351,9 @@ void Renderer::RecordABufferPass(vk::CommandBuffer cmd_buff, uint frame_idx,
 
 void Renderer::RecordWBoitPass(vk::CommandBuffer cmd_buff, uint frame_idx,
                                const npr_graphics::FrameResources& frame_res,
-                               const vk::Extent2D& res_extent,
+                               const vk::Extent2D& resrc_extent,
                                const npr_scene::Camera& camera, Scene& scene) {
-  cmd_buff.beginRenderPass(wboit_pass_.BeginInfo(frame_idx, res_extent),
+  cmd_buff.beginRenderPass(wboit_pass_.BeginInfo(frame_idx, resrc_extent),
                            vk::SubpassContents::eInline);
 
   {  // acc
@@ -289,11 +366,10 @@ void Renderer::RecordWBoitPass(vk::CommandBuffer cmd_buff, uint frame_idx,
 
     cmd_buff.bindDescriptorSets(  // textures
         vk::PipelineBindPoint::eGraphics, wboit_acc_pipe_.GetLayout(), 1,
-        scene.GetGpuResources().desc_pool.GetTextureSet().GetSet(0), {});
+        scene.GetResrc().desc_pool.GetTextureSet().GetSet(0), {});
 
-    scene.RecordTrans(cmd_buff, wboit_acc_pipe_.GetLayout(), frame_res, 2,
-                      desc_pool_.GetMaterialSets().GetSet(frame_idx),
-                      camera.GetFrustum());
+    RecordTrans(cmd_buff, frame_idx, frame_res, scene, camera.GetFrustum(),
+                wboit_acc_pipe_.GetLayout(), 2);
   }
 
   cmd_buff.nextSubpass(vk::SubpassContents::eInline);
@@ -309,6 +385,78 @@ void Renderer::RecordWBoitPass(vk::CommandBuffer cmd_buff, uint frame_idx,
   }
 
   cmd_buff.endRenderPass();
+}
+
+void Renderer::RecordTrans(vk::CommandBuffer cmd_buff, uint frame_idx,
+                           const npr_graphics::FrameResources& frame_resrc,
+                           const npr_scene::Scene& scene,
+                           const npr_scene::Frustum& frustum,
+                           vk::PipelineLayout layout,
+                           const uint set_idx) const {
+  const auto& instances = scene.GetInstances();
+  const auto& scene_resrc = scene.GetResrc();
+  const auto& material_set = desc_pool_.GetMaterialSets().GetSet(frame_idx);
+
+  for (const auto& [key, instances] : instances) {
+    const auto& mat = key.mat;
+    if (instances.empty() || (key.mat.is_mask || mat.is_opaque)) continue;
+
+    std::vector<InstanceData> visible;
+    visible.reserve(instances.size());
+
+    for (const auto& [tf, bb] : instances) {
+      if (!frustum.IsVisible(bb)) continue;
+      visible.push_back({.model = tf.glob_mat,
+                         .normal = glm::transpose(glm::inverse(tf.glob_mat))});
+    }
+
+    if (visible.empty()) continue;
+
+    uint32_t flags = MaterialFlags::kNone;
+    if (mat.double_sided) flags |= MaterialFlags::kDoubleSided;
+    if (mat.is_opaque) flags |= MaterialFlags::kOpaque;
+    if (mat.is_mask) flags |= MaterialFlags::kMask;
+
+    auto& material_ubo = *frame_resrc.material_ubo;
+    material_ubo.Write(
+        mat_at,
+        MaterialUnif{{mat.color_map_idx, mat.normal_map_idx,
+                      mat.metallic_roughness_map_idx, mat.emissive_map_idx},
+                     mat.color_factor,
+                     mat.emissive_factor,
+                     mat.metallic_factor,
+                     mat.roughness_factor,
+                     mat.alpha_cutoff,
+                     flags});
+
+    cmd_buff.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, layout,
+                                set_idx, material_set,
+                                material_ubo.GetElemOffset(mat_at));
+
+    if (inst_at + visible.size() >= MAX_INSTANCES) inst_at = 0;
+    frame_resrc.instance_buff->Write(visible, inst_at);
+
+    std::array<vk::DeviceSize, 2> offsets = {0, inst_at * sizeof(InstanceData)};
+    std::array<vk::Buffer, 2> buffers = {
+        scene_resrc.vbos[key.mesh.vbo_idx].GetBuffer(),
+        frame_resrc.instance_buff->GetBuffer()};
+
+    cmd_buff.bindVertexBuffers(0, buffers.size(), buffers.data(),
+                               offsets.data());
+
+    if (key.mesh.ibo_idx != -1) {
+      vk::Buffer ibo = scene_resrc.ibos[key.mesh.ibo_idx].GetBuffer();
+      cmd_buff.bindIndexBuffer(ibo, 0, vk::IndexType::eUint32);
+      uint32_t index_count = scene_resrc.ibos[key.mesh.ibo_idx].GetCount();
+      cmd_buff.drawIndexed(index_count, visible.size(), 0, 0, 0);
+    } else {
+      uint32_t vertex_count = scene_resrc.vbos[key.mesh.vbo_idx].GetCount();
+      cmd_buff.draw(vertex_count, visible.size(), 0, 0);
+    }
+
+    mat_at = (mat_at + 1) % MAX_MATERIALS;
+    inst_at = (inst_at + visible.size()) % MAX_INSTANCES;
+  }
 }
 
 void Renderer::RecordSwapPass(vk::CommandBuffer cmd_buff, uint image_idx,

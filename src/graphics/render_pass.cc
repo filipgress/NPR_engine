@@ -47,8 +47,8 @@ void BasePass::CreateRenderPass() {
 }
 
 void RenderPass::CreateFramebuffers() {
-  auto& resources = res_.GetResources();
-  auto extent = res_.GetProps().extent;
+  auto& resources = resrc_.GetResources();
+  auto extent = resrc_.GetProps().extent;
 
   framebuffers_.reserve(resources.size());
   for (size_t i = 0; i < resources.size(); i++) {
@@ -84,7 +84,7 @@ void GBuffPass::SetClearValues() {
 }
 
 std::vector<vk::AttachmentDescription> GBuffPass::GetAttachments() const {
-  auto& props = res_.GetProps();
+  auto& props = resrc_.GetProps();
   std::vector<vk::AttachmentDescription> attachs(7);
 
   // albedo_ms
@@ -235,21 +235,21 @@ std::vector<vk::SubpassDescription> GBuffPass::GetSubpasses() {
 }
 
 std::vector<vk::ImageView> GBuffPass::GetAttachmentViews(int frame_idx) const {
-  auto& res = res_.GetResources()[frame_idx];
+  auto& resrc = resrc_.GetResources()[frame_idx];
 
-  if (!res.albedo_metallic_ms || !res.emissive_roughness_ms ||
-      !res.position_ms || !res.normal_ms || !res.depth_stencil_ms ||
-      !res.coverage_ms || !res.coverage_res) {
+  if (!resrc.albedo_metallic_ms || !resrc.emissive_roughness_ms ||
+      !resrc.position_ms || !resrc.normal_ms || !resrc.depth_stencil_ms ||
+      !resrc.coverage_ms || !resrc.coverage_res) {
     throw std::runtime_error("missing required resources for: " + GetDbgName());
   }
 
-  return {res.albedo_metallic_ms->GetImageView(),
-          res.emissive_roughness_ms->GetImageView(),
-          res.position_ms->GetImageView(),
-          res.normal_ms->GetImageView(),
-          res.depth_stencil_ms->GetImageView(),
-          res.coverage_ms->GetImageView(),
-          res.coverage_res->GetImageView()};
+  return {resrc.albedo_metallic_ms->GetImageView(),
+          resrc.emissive_roughness_ms->GetImageView(),
+          resrc.position_ms->GetImageView(),
+          resrc.normal_ms->GetImageView(),
+          resrc.depth_stencil_ms->GetImageView(),
+          resrc.coverage_ms->GetImageView(),
+          resrc.coverage_res->GetImageView()};
 }
 
 /*
@@ -265,7 +265,7 @@ void AOGenPass::SetClearValues() {
 }
 
 std::vector<vk::AttachmentDescription> AOGenPass::GetAttachments() const {
-  auto& props = res_.GetProps();
+  auto& props = resrc_.GetProps();
   std::vector<vk::AttachmentDescription> attachments(3);
 
   // ao_ms
@@ -361,14 +361,14 @@ std::vector<vk::SubpassDescription> AOGenPass::GetSubpasses() {
 }
 
 std::vector<vk::ImageView> AOGenPass::GetAttachmentViews(int frame_idx) const {
-  auto& res = res_.GetResources()[frame_idx];
+  auto& resrc = resrc_.GetResources()[frame_idx];
 
-  if (!res.ao_ms || !res.ao_res || !res.depth_stencil_ms) {
+  if (!resrc.ao_ms || !resrc.ao_res || !resrc.depth_stencil_ms) {
     throw std::runtime_error("missing required resources for: " + GetDbgName());
   }
 
-  return {res.ao_ms->GetImageView(), res.ao_res->GetImageView(),
-          res.depth_stencil_ms->GetImageView()};
+  return {resrc.ao_ms->GetImageView(), resrc.ao_res->GetImageView(),
+          resrc.depth_stencil_ms->GetImageView()};
 }
 
 /*
@@ -442,22 +442,22 @@ std::vector<vk::SubpassDescription> BlurPass::GetSubpasses() {
 
 std::vector<vk::ImageView> AOBlurHPass::GetAttachmentViews(
     int frame_idx) const {
-  auto& res = res_.GetResources()[frame_idx];
+  auto& resrc = resrc_.GetResources()[frame_idx];
 
-  if (!res.ao_temp)
+  if (!resrc.ao_temp)
     throw std::runtime_error("missing required resources for: " + GetDbgName());
 
-  return {res.ao_temp->GetImageView()};
+  return {resrc.ao_temp->GetImageView()};
 }
 
 std::vector<vk::ImageView> AOBlurVPass::GetAttachmentViews(
     int frame_idx) const {
-  auto& res = res_.GetResources()[frame_idx];
+  auto& resrc = resrc_.GetResources()[frame_idx];
 
-  if (!res.ao_res)
+  if (!resrc.ao_res)
     throw std::runtime_error("missing required resources for: " + GetDbgName());
 
-  return {res.ao_res->GetImageView()};
+  return {resrc.ao_res->GetImageView()};
 }
 
 /*
@@ -471,7 +471,7 @@ void LightPass::SetClearValues() {
 }
 
 std::vector<vk::AttachmentDescription> LightPass::GetAttachments() const {
-  auto& props = res_.GetProps();
+  auto& props = resrc_.GetProps();
   std::vector<vk::AttachmentDescription> attachments(1);
 
   // preset_color
@@ -519,11 +519,11 @@ std::vector<vk::SubpassDescription> LightPass::GetSubpasses() {
 }
 
 std::vector<vk::ImageView> LightPass::GetAttachmentViews(int frame_idx) const {
-  auto& res = res_.GetResources()[frame_idx];
-  if (!res.present_color)
+  auto& resrc = resrc_.GetResources()[frame_idx];
+  if (!resrc.present_color)
     throw std::runtime_error("missing required resources for: " + GetDbgName());
 
-  return {res.present_color->GetImageView()};
+  return {resrc.present_color->GetImageView()};
 }
 
 /*
@@ -536,7 +536,7 @@ void ABuffPass::SetClearValues() {
 }
 
 std::vector<vk::AttachmentDescription> ABuffPass::GetAttachments() const {
-  auto& props = res_.GetProps();
+  auto& props = resrc_.GetProps();
   std::vector<vk::AttachmentDescription> attachments(2);
 
   // depth_stencil_ms
@@ -650,12 +650,12 @@ std::vector<vk::SubpassDescription> ABuffPass::GetSubpasses() {
 }
 
 std::vector<vk::ImageView> ABuffPass::GetAttachmentViews(int frame_idx) const {
-  auto& res = res_.GetResources()[frame_idx];
-  if (!res.depth_stencil_ms || !res.present_color)
+  auto& resrc = resrc_.GetResources()[frame_idx];
+  if (!resrc.depth_stencil_ms || !resrc.present_color)
     throw std::runtime_error("missing required resources for: " + GetDbgName());
 
-  return {res.depth_stencil_ms->GetImageView(),
-          res.present_color->GetImageView()};
+  return {resrc.depth_stencil_ms->GetImageView(),
+          resrc.present_color->GetImageView()};
 }
 
 /*
@@ -676,7 +676,7 @@ void WBoitPass::SetClearValues() {
 }
 
 std::vector<vk::AttachmentDescription> WBoitPass::GetAttachments() const {
-  auto& props = res_.GetProps();
+  auto& props = resrc_.GetProps();
   std::vector<vk::AttachmentDescription> attachments(6);
 
   // acc_color_ms
@@ -834,17 +834,19 @@ std::vector<vk::SubpassDescription> WBoitPass::GetSubpasses() {
 }
 
 std::vector<vk::ImageView> WBoitPass::GetAttachmentViews(int frame_idx) const {
-  auto& res = res_.GetResources()[frame_idx];
+  auto& resrc = resrc_.GetResources()[frame_idx];
 
-  if (!res.depth_stencil_ms || !res.acc_color_ms || !res.acc_weight_ms ||
-      !res.acc_color_res || !res.acc_weight_res || !res.present_color) {
+  if (!resrc.depth_stencil_ms || !resrc.acc_color_ms || !resrc.acc_weight_ms ||
+      !resrc.acc_color_res || !resrc.acc_weight_res || !resrc.present_color) {
     throw std::runtime_error("missing required resources for: " + GetDbgName());
   }
 
-  return {
-      res.acc_color_ms->GetImageView(),     res.acc_weight_ms->GetImageView(),
-      res.acc_color_res->GetImageView(),    res.acc_weight_res->GetImageView(),
-      res.depth_stencil_ms->GetImageView(), res.present_color->GetImageView()};
+  return {resrc.acc_color_ms->GetImageView(),
+          resrc.acc_weight_ms->GetImageView(),
+          resrc.acc_color_res->GetImageView(),
+          resrc.acc_weight_res->GetImageView(),
+          resrc.depth_stencil_ms->GetImageView(),
+          resrc.present_color->GetImageView()};
 }
 
 /*

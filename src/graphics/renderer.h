@@ -27,7 +27,7 @@ class Renderer : public npr_core::NonCopyable {
               bool is_loading, float dt);
 
   const Context& GetContext() const { return ctx_; }
-  const Resources& GetResources() const { return res_; }
+  const Resources& GetResrc() const { return resrc_; }
 
   void Resize() { swapchain_.GetProps().dirty = true; }
   void RecompileShaders();
@@ -39,25 +39,41 @@ class Renderer : public npr_core::NonCopyable {
   vk::CommandBuffer Record(uint image_idx, const npr_scene::Camera& camera,
                            npr_scene::Scene& scene, bool is_loading, float dt);
 
+  // record opaque primitives
   void RecordGBufferPass(vk::CommandBuffer cmd_buff, uint frame_idx,
                          const npr_graphics::FrameResources& frame_res,
-                         const vk::Extent2D& res_extent,
+                         const vk::Extent2D& resrc_extent,
                          const npr_scene::Camera& camera,
                          npr_scene::Scene& scene);
+  void RecordOpaque(vk::CommandBuffer cmd_buff, uint frame_idx,
+                    const npr_graphics::FrameResources& frame_resrc,
+                    const npr_scene::Scene& scene,
+                    const npr_scene::Frustum& frustum) const;
+
+  // record light
   void RecordAOPass(vk::CommandBuffer cmd_buff, uint frame_idx,
-                    const vk::Extent2D& res_extent);
+                    const vk::Extent2D& resrc_extent);
   void RecordLightPass(vk::CommandBuffer cmd_buff, uint frame_idx,
-                       const vk::Extent2D& res_extent);
+                       const vk::Extent2D& resrc_extent);
+
+  // record transparent primitives
   void RecordABufferPass(vk::CommandBuffer cmd_buff, uint frame_idx,
                          const npr_graphics::FrameResources& frame_res,
-                         const vk::Extent2D& res_extent,
+                         const vk::Extent2D& resrc_extent,
                          const npr_scene::Camera& camera,
                          npr_scene::Scene& scene);
   void RecordWBoitPass(vk::CommandBuffer cmd_buff, uint frame_idx,
                        const npr_graphics::FrameResources& frame_res,
-                       const vk::Extent2D& res_extent,
+                       const vk::Extent2D& resrc_extent,
                        const npr_scene::Camera& camera,
                        npr_scene::Scene& scene);
+  void RecordTrans(vk::CommandBuffer cmd_buff, uint frame_idx,
+                   const npr_graphics::FrameResources& frame_resrc,
+                   const npr_scene::Scene& scene,
+                   const npr_scene::Frustum& frustum, vk::PipelineLayout layout,
+                   const uint set_idx) const;
+
+  // final pass to swapchain
   void RecordSwapPass(vk::CommandBuffer cmd_buff, uint image_idx,
                       uint frame_idx, float camera_aspect, bool is_loading,
                       float dt);
@@ -67,26 +83,32 @@ class Renderer : public npr_core::NonCopyable {
       vk::Extent2D swap_extent, float camera_aspect) const;
 
  private:
+  static uint mat_at;   // cycling through material descriptor sets
+  static uint inst_at;  // cycling through instance descriptor sets
+
   const npr_window::Window& window_;
 
   Context ctx_{window_};
   Swapchain swapchain_{ctx_, window_.GetSize()};
 
   Sync sync_{ctx_, swapchain_.GetProps().image_count};
-  GraphicsCommandPool cmd_pool_{ctx_, sync_.GetFrameCount()};
+  GraphicsCommandPool cmd_pool_{ctx_, sync_.GetFrameCount(), "renderer"};
 
-  Resources res_{ctx_, cmd_pool_, {1280, 720}, sync_.GetFrameCount()};
-  DescriptorPool desc_pool_{ctx_, res_};
+  Resources resrc_{ctx_, cmd_pool_, {400, 300}, sync_.GetFrameCount()};
+  DescriptorPool desc_pool_{ctx_, resrc_};
 
-  GBuffPass gbuff_pass_{ctx_, res_};
+  // render passes
+  GBuffPass gbuff_pass_{ctx_, resrc_};
 
-  AOGenPass ao_pass_{ctx_, res_};
-  AOBlurHPass ao_blur_h_pass_{ctx_, res_};
-  AOBlurVPass ao_blur_v_pass_{ctx_, res_};
+  AOGenPass ao_pass_{ctx_, resrc_};
+  AOBlurHPass ao_blur_h_pass_{ctx_, resrc_};
+  AOBlurVPass ao_blur_v_pass_{ctx_, resrc_};
 
-  LightPass light_pass_{ctx_, res_};
-  ABuffPass abuff_pass_{ctx_, res_};
-  WBoitPass wboit_pass_{ctx_, res_};
+  LightPass light_pass_{ctx_, resrc_};
+
+  ABuffPass abuff_pass_{ctx_, resrc_};
+  WBoitPass wboit_pass_{ctx_, resrc_};
+
   SwapPass swap_pass_{ctx_, swapchain_};
 
   std::array<VertexShader, 2> vert_shaders_{
@@ -111,13 +133,14 @@ class Renderer : public npr_core::NonCopyable {
   PipelineCache pipe_cache_{ctx_};
   GuiManager gui_manager_{window_, ctx_, swapchain_, swap_pass_, pipe_cache_};
 
+  // pipelines
   GBuffPipe gbuff_pipe_{
       ctx_,
       pipe_cache_,
       gbuff_pass_,
       vert_shaders_[1],
       frag_shaders_[1],
-      res_.GetProps().samples,
+      resrc_.GetProps().samples,
       desc_pool_,
   };
   AOGenPipe ao_gen_pipe_{
@@ -126,7 +149,7 @@ class Renderer : public npr_core::NonCopyable {
       ao_pass_,
       vert_shaders_[0],
       frag_shaders_[6],
-      res_.GetProps().samples,
+      resrc_.GetProps().samples,
       desc_pool_,
   };
   AOBlurPipe ao_blur_pipe_{
@@ -143,7 +166,7 @@ class Renderer : public npr_core::NonCopyable {
       abuff_pass_,
       vert_shaders_[1],
       frag_shaders_[2],
-      res_.GetProps().samples,
+      resrc_.GetProps().samples,
       desc_pool_,
   };
   ABuffResolvePipe abuff_resolve_pipe_{
@@ -152,7 +175,7 @@ class Renderer : public npr_core::NonCopyable {
       abuff_pass_,
       vert_shaders_[0],
       frag_shaders_[3],
-      res_.GetProps().samples,
+      resrc_.GetProps().samples,
       desc_pool_,
   };
   WBoitAccPipe wboit_acc_pipe_{
@@ -161,7 +184,7 @@ class Renderer : public npr_core::NonCopyable {
       wboit_pass_,
       vert_shaders_[1],
       frag_shaders_[4],
-      res_.GetProps().samples,
+      resrc_.GetProps().samples,
       desc_pool_,
   };
   WBoitComposePipe wboit_compose_pipe_{
