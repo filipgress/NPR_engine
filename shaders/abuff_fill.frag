@@ -7,17 +7,18 @@ layout(location = 0) in vec2 frag_uv;
 layout(location = 1) in vec3 frag_pos;
 layout(location = 2) in mat3 TBN;
 
-struct FragmentNode {
-  float depth;
+struct ABuffNode {
   vec4 color;
+
+  float depth;
   uint next;
-  uint _padding[3];
+  uint _padding[2];
 };
 
 layout(set = 1, binding = 0) uniform sampler2D textures[MAX_TEXTURES];
 
-layout(set = 2, binding = 0) buffer FragmentNodes {
-  FragmentNode nodes[];
+layout(set = 2, binding = 0) buffer ABuffNodes {
+  ABuffNode nodes[];
 };
 layout(set = 2, binding = 1) buffer HeadPointers {
   uint heads[];
@@ -26,10 +27,11 @@ layout(set = 2, binding = 2) buffer NodeCounter {
   uint counter;
 };
 
-layout(set = 3, binding = 0) uniform MaterialUniform {
-  ivec4 maps;
-  vec4 color_factor;
-  vec3 emissive_factor;
+layout(set = 3, binding = 0) uniform MaterialUnif {
+  ivec4 maps; // x=albedo, y=normal, z=metallic_roughness, w=emissive
+  vec4 color_factor; // rgb = albedo, a = alpha
+  vec4 emissive_factor; // rgb = emissive, a = unused
+
   float metallic_factor;
   float roughness_factor;
   float alpha_cutoff;

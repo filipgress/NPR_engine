@@ -10,7 +10,7 @@ struct SwapSupp {
   std::vector<vk::SurfaceFormatKHR> formats;
   std::vector<vk::PresentModeKHR> present_modes;
 
-  bool IsAdequate() { return !formats.empty() && !present_modes.empty(); }
+  bool IsValid() { return !formats.empty() && !present_modes.empty(); }
 };
 
 struct QFamilies {

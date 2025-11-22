@@ -12,7 +12,7 @@ layout(location = 0) out vec2 frag_uv;
 layout(location = 1) out vec3 frag_pos;
 layout(location = 2) out mat3 TBN;
 
-layout(set = 0, binding = 0) uniform CameraUniform {
+layout(set = 0, binding = 0) uniform CameraUnif {
   mat4 view;
   mat4 proj;
   mat4 proj_view;

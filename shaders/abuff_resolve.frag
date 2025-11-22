@@ -5,15 +5,16 @@ layout(constant_id = 0) const uint SAMPLES = 4;
 layout(location = 0) in vec2 frag_uv;
 layout(location = 0) out vec4 out_color;
 
-struct FragmentNode {
-  float depth;
+struct ABuffNode {
   vec4 color;
+
+  float depth;
   uint next;
-  uint _padding[3];
+  uint _padding[2];
 };
 
-layout(set = 0, binding = 0) buffer FragmentNodes {
-  FragmentNode nodes[];
+layout(set = 0, binding = 0) buffer ABuffNodes {
+  ABuffNode nodes[];
 };
 
 layout(set = 0, binding = 1) buffer HeadPointers {
@@ -40,7 +41,7 @@ void main() {
 
     // collect fragments for this sample
     while (node_idx != NULL_PTR && count < MAX_FRAGMENTS) {
-      FragmentNode node = nodes[node_idx];
+      ABuffNode node = nodes[node_idx];
       depths[count] = node.depth;
       colors[count] = node.color;
       count++;

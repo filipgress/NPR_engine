@@ -11,10 +11,11 @@ layout(location = 0) out vec4 acc_color;
 layout(location = 1) out float acc_alpha;
 
 layout(set = 1, binding = 0) uniform sampler2D textures[MAX_TEXTURES];
-layout(set = 2, binding = 0) uniform MaterialUniform {
-  ivec4 maps;
-  vec4 color_factor;
-  vec3 emissive_factor;
+layout(set = 2, binding = 0) uniform MaterialUnif {
+  ivec4 maps; // x=albedo, y=normal, z=metallic_roughness, w=emissive
+  vec4 color_factor; // rgb = albedo, a = alpha
+  vec4 emissive_factor; // rgb = emissive, a = unused
+
   float metallic_factor;
   float roughness_factor;
   float alpha_cutoff;

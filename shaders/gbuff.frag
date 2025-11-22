@@ -14,14 +14,13 @@ layout(location = 3) out vec4 out_normal; // xyz = view space normal, w = unused
 layout(location = 4) out float out_coverage; // Coverage for MSAA resolve
 
 layout(set = 1, binding = 0) uniform sampler2D textures[MAX_TEXTURES];
-layout(set = 2, binding = 0) uniform MaterialUniform {
+layout(set = 2, binding = 0) uniform MaterialUnif {
   ivec4 maps; // x=albedo, y=normal, z=metallic_roughness, w=emissive
+  vec4 color_factor; // rgb = albedo, a = alpha
+  vec4 emissive_factor; // rgb = emissive, a = unused
 
-  vec4 color_factor;
-  vec3 emissive_factor;
   float metallic_factor;
   float roughness_factor;
-
   float alpha_cutoff;
   uint flags;
 } material;
@@ -46,7 +45,7 @@ void main() {
       texture(textures[material.maps.y], frag_uv).rgb * 2.0f - 1.0f;
     normal = normalize(TBN * normal_map);
   } else {
-    normal = TBN[2];
+    normal = normalize(TBN[2]);
   }
 
   if ((material.flags & MATERIAL_DOUBLE_SIDED) > 0 && !gl_FrontFacing)
@@ -63,7 +62,7 @@ void main() {
   }
 
   // emissive
-  vec3 emissive = material.emissive_factor;
+  vec3 emissive = material.emissive_factor.rgb;
   if (material.maps.w != -1)
     emissive *= texture(textures[material.maps.w], frag_uv).rgb;
 

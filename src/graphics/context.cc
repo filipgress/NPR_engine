@@ -181,7 +181,7 @@ int Context::RateDevice(vk::PhysicalDevice device) const {
   auto swap_supp = GetSwapSupp(device);
   auto q_families = GetQFamilies(device);
 
-  if (!swap_supp.IsAdequate() || !q_families.IsComplete()) return 0;
+  if (!swap_supp.IsValid() || !q_families.IsComplete()) return 0;
 
   auto props = device.getProperties();
   if (props.deviceType == vk::PhysicalDeviceType::eDiscreteGpu) score += 100;

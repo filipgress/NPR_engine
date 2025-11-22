@@ -93,7 +93,8 @@ vk::CommandBuffer Renderer::Record(uint image_idx, const Camera& camera,
   const auto& frame_resrc = resrc_.GetResrc()[frame_idx];
   auto resrc_extent = resrc_.GetProps().extent;
 
-  frame_resrc.camera_ubo->Write(camera.GetCameraUnif());
+  const auto& cam_ubo = camera.GetCameraUnif();
+  frame_resrc.camera_ubo->Write(cam_ubo);
 
   vk::Rect2D scissor{{0, 0}, resrc_extent};
   vk::Viewport viewport(0, 0, resrc_extent.width, resrc_extent.height, 0.0f,
@@ -103,25 +104,26 @@ vk::CommandBuffer Renderer::Record(uint image_idx, const Camera& camera,
   cmd_buff.setScissor(0, scissor);
   cmd_buff.setViewport(0, viewport);
 
-  RecordGBufferPass(cmd_buff, frame_idx, frame_resrc, resrc_extent, camera,
-                    scene);
-  RecordAOPass(cmd_buff, frame_idx, resrc_extent);
-  RecordLightPass(cmd_buff, frame_idx, resrc_extent);
-  // RecordABufferPass(cmd_buff, frame_idx, frame_resrc, resrc_extent, camera,
-  //                   scene);
-  // RecordWBoitPass(cmd_buff, frame_idx, frame_resrc, resrc_extent, camera,
-  //                 scene);
-  RecordSwapPass(cmd_buff, image_idx, frame_idx, camera.GetAspect(), is_loading,
-                 dt);
+  RecordGBuff(cmd_buff, frame_idx, frame_resrc, resrc_extent, camera, scene);
+  RecordAO(cmd_buff, frame_idx, resrc_extent);
+
+  RecordGlobLight(cmd_buff, frame_idx, frame_resrc, resrc_extent, cam_ubo,
+                  scene);
+
+  // RecordABuff(cmd_buff, frame_idx, frame_res, res_extent, camera, scene);
+  // RecordWBoit(cmd_buff, frame_idx, frame_res, res_extent, camera, scene);
+
+  RecordSwap(cmd_buff, image_idx, frame_idx, camera.GetAspect(), is_loading,
+             dt);
 
   cmd_buff.end();
   return cmd_buff;
 }
 
-void Renderer::RecordGBufferPass(vk::CommandBuffer cmd_buff, uint frame_idx,
-                                 const npr_graphics::FrameResources& frame_res,
-                                 const vk::Extent2D& resrc_extent,
-                                 const Camera& camera, Scene& scene) {
+void Renderer::RecordGBuff(vk::CommandBuffer cmd_buff, uint frame_idx,
+                           const npr_graphics::FrameResources& frame_res,
+                           const vk::Extent2D& resrc_extent,
+                           const Camera& camera, Scene& scene) {
   cmd_buff.beginRenderPass(gbuff_pass_.BeginInfo(frame_idx, resrc_extent),
                            vk::SubpassContents::eInline);
 
@@ -137,8 +139,6 @@ void Renderer::RecordGBufferPass(vk::CommandBuffer cmd_buff, uint frame_idx,
       scene.GetResrc().desc_pool.GetTextureSet().GetSet(0), {});
 
   RecordOpaque(cmd_buff, frame_idx, frame_res, scene, camera.GetFrustum());
-
-  cmd_buff.nextSubpass(vk::SubpassContents::eInline);  // resolve coverage_ms
   cmd_buff.endRenderPass();
 }
 
@@ -214,8 +214,8 @@ void Renderer::RecordOpaque(vk::CommandBuffer cmd_buff, uint frame_idx,
   }
 }
 
-void Renderer::RecordAOPass(vk::CommandBuffer cmd_buff, uint frame_idx,
-                            const vk::Extent2D& resrc_extent) {
+void Renderer::RecordAO(vk::CommandBuffer cmd_buff, uint frame_idx,
+                        const vk::Extent2D& resrc_extent) {
   cmd_buff.beginRenderPass(ao_pass_.BeginInfo(frame_idx, resrc_extent),
                            vk::SubpassContents::eInline);
 
@@ -277,18 +277,69 @@ void Renderer::RecordAOPass(vk::CommandBuffer cmd_buff, uint frame_idx,
   cmd_buff.endRenderPass();
 }
 
-void Renderer::RecordLightPass(vk::CommandBuffer cmd_buff, uint frame_idx,
-                               const vk::Extent2D& resrc_extent) {
-  cmd_buff.beginRenderPass(light_pass_.BeginInfo(frame_idx, resrc_extent),
+void Renderer::RecordGlobLight(vk::CommandBuffer cmd_buff, uint frame_idx,
+                               const npr_graphics::FrameResources& frame_resrc,
+                               const vk::Extent2D& resrc_extent,
+                               const CameraUnif& cam_ubo, Scene& scene) {
+  DirLightUnif dir_lights{};
+
+  float ambient_intensity = 0.07f;
+  glm::vec3 ambient_color = glm::vec3{1.0f, 1.0f, 1.0f} * ambient_intensity;
+  dir_lights.ambient = glm::vec4{ambient_color, ambient_intensity};
+
+  float rim_intensity = 0.0f;
+  glm::vec3 rim_color = glm::vec3{1.0f, 1.0f, 1.0f} * rim_intensity;
+  dir_lights.rim = glm::vec4{rim_color, rim_intensity};
+
+  dir_lights.diff_int = 1.0f;
+  dir_lights.spec_int = 1.0f;
+  dir_lights.rim_power = 4.0f;
+  dir_lights.inv_rim = 0;
+
+  int i = 0;
+  scene.GetDirLightQuery().each([&](const DirLightTag&, const TransformComp& tf,
+                                    const LightComp& light) {
+    if (i >= MAX_DIR_LIGHTS) return;
+
+    auto world_dir = tf.rot * glm::vec3{0, 0, -1};
+    auto view_dir = glm::normalize(cam_ubo.view * glm::vec4(world_dir, 0.0));
+
+    dir_lights.dir_lights[i].dir = -view_dir;
+    dir_lights.dir_lights[i].color =
+        glm::vec4(light.color * light.intensity, 1.0f);
+
+    i++;
+  });
+  dir_lights.count.x = i;
+
+  frame_resrc.dir_light_ubo->Write(dir_lights);
+
+  cmd_buff.beginRenderPass(glob_light_pass_.BeginInfo(frame_idx, resrc_extent),
                            vk::SubpassContents::eInline);
+
+  cmd_buff.bindPipeline(vk::PipelineBindPoint::eGraphics,
+                        glob_light_pipe_.GetPipeline());
+
+  cmd_buff.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,  // ao_res
+                              glob_light_pipe_.GetLayout(), 0,
+                              desc_pool_.GetAOResSets().GetSet(frame_idx), {});
+
+  cmd_buff.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,  // gbuff
+                              glob_light_pipe_.GetLayout(), 1,
+                              desc_pool_.GetGBuffSets().GetSet(frame_idx), {});
+
+  cmd_buff.bindDescriptorSets(  // dir lights
+      vk::PipelineBindPoint::eGraphics, glob_light_pipe_.GetLayout(), 2,
+      desc_pool_.GetDirLightSets().GetSet(frame_idx), {});
+
+  cmd_buff.draw(3, 1, 0, 0);
   cmd_buff.endRenderPass();
 }
 
-void Renderer::RecordABufferPass(vk::CommandBuffer cmd_buff, uint frame_idx,
-                                 const npr_graphics::FrameResources& frame_res,
-                                 const vk::Extent2D& resrc_extent,
-                                 const npr_scene::Camera& camera,
-                                 Scene& scene) {
+void Renderer::RecordABuff(vk::CommandBuffer cmd_buff, uint frame_idx,
+                           const npr_graphics::FrameResources& frame_res,
+                           const vk::Extent2D& resrc_extent,
+                           const npr_scene::Camera& camera, Scene& scene) {
   // clear abuff before fill pass
   const uint32_t null_ptr = 0xFFFFFFFF;
 
@@ -349,10 +400,10 @@ void Renderer::RecordABufferPass(vk::CommandBuffer cmd_buff, uint frame_idx,
   cmd_buff.endRenderPass();
 }
 
-void Renderer::RecordWBoitPass(vk::CommandBuffer cmd_buff, uint frame_idx,
-                               const npr_graphics::FrameResources& frame_res,
-                               const vk::Extent2D& resrc_extent,
-                               const npr_scene::Camera& camera, Scene& scene) {
+void Renderer::RecordWBoit(vk::CommandBuffer cmd_buff, uint frame_idx,
+                           const npr_graphics::FrameResources& frame_res,
+                           const vk::Extent2D& resrc_extent,
+                           const npr_scene::Camera& camera, Scene& scene) {
   cmd_buff.beginRenderPass(wboit_pass_.BeginInfo(frame_idx, resrc_extent),
                            vk::SubpassContents::eInline);
 
@@ -459,9 +510,9 @@ void Renderer::RecordTrans(vk::CommandBuffer cmd_buff, uint frame_idx,
   }
 }
 
-void Renderer::RecordSwapPass(vk::CommandBuffer cmd_buff, uint image_idx,
-                              uint frame_idx, float camera_aspect,
-                              bool is_loading, float dt) {
+void Renderer::RecordSwap(vk::CommandBuffer cmd_buff, uint image_idx,
+                          uint frame_idx, float camera_aspect, bool is_loading,
+                          float dt) {
   auto swap_extent = swapchain_.GetProps().extent;
   auto [viewport, scissor] = CalcViewportScissor(swap_extent, camera_aspect);
 
@@ -491,9 +542,9 @@ void Renderer::RecordSwapPass(vk::CommandBuffer cmd_buff, uint image_idx,
   cmd_buff.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
                               swap_pipe_.GetLayout(), 0,
                               desc_pool_.GetAOResSets().GetSet(frame_idx), {});
-  // cmd_buff.bindDescriptorSets(
-  //     vk::PipelineBindPoint::eGraphics, swap_pipe_.GetLayout(), 0,
-  //     desc_pool_.GetPresentSets().GetSet(frame_idx), {});
+  cmd_buff.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                              swap_pipe_.GetLayout(), 0,
+                              desc_pool_.GetColorSets().GetSet(frame_idx), {});
   // cmd_buff.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
   //                             swap_pipe_.GetLayout(), 0,
   //                             desc_pool_.GetGBuffSets().GetSet(frame_idx),
