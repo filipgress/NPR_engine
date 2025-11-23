@@ -44,16 +44,15 @@ void World::BuildQueries() {
   point_light_query_ =
       entities_
           .query_builder<const PointLightTag, const TransformComp,
-                         const LightComp, const RangeComp>()
+                         const LightComp, const RangeComp, BoundingBoxComp>()
           .cached()
-          .detect_changes()
           .build();
   spot_light_query_ =
       entities_
           .query_builder<const SpotLightTag, const TransformComp,
-                         const LightComp, const RangeComp, const SpotComp>()
+                         const LightComp, const RangeComp, const SpotComp,
+                         BoundingBoxComp>()
           .cached()
-          .detect_changes()
           .build();
 }
 
@@ -88,28 +87,38 @@ void World::UpdateTransforms() {
   });
 }
 
+void World::CalcBB(const TransformComp& tf, BoundingBoxComp& bb) {
+  glm::vec3 local_center = (bb.min_pos + bb.max_pos) * 0.5f;
+  glm::vec3 local_extent = (bb.max_pos - bb.min_pos) * 0.5f;
+
+  glm::mat3 model3 = glm::mat3(tf.glob_mat);
+  glm::vec3 scale;
+
+  scale.x = glm::length(model3[0]);
+  scale.y = glm::length(model3[1]);
+  scale.z = glm::length(model3[2]);
+
+  model3[0] = glm::normalize(model3[0]);
+  model3[1] = glm::normalize(model3[1]);
+  model3[2] = glm::normalize(model3[2]);
+
+  bb.center = tf.glob_mat * glm::vec4(local_center, 1.0f);
+  bb.extent = local_extent * scale;
+  bb.inv_rot = glm::transpose(model3);
+}
+
 void World::UpdateBB() {
   renderable_query_.each([](const TransformComp& tf, const PrimitiveTag&,
                             const MeshComp&, const MaterialComp&,
-                            BoundingBoxComp& bb) {
-    glm::vec3 local_center = (bb.min_pos + bb.max_pos) * 0.5f;
-    glm::vec3 local_extent = (bb.max_pos - bb.min_pos) * 0.5f;
+                            BoundingBoxComp& bb) { CalcBB(tf, bb); });
 
-    glm::mat3 model3 = glm::mat3(tf.glob_mat);
-    glm::vec3 scale;
+  point_light_query_.each([](const PointLightTag&, const TransformComp& tf,
+                             const LightComp&, const RangeComp&,
+                             BoundingBoxComp& bb) { CalcBB(tf, bb); });
 
-    scale.x = glm::length(model3[0]);
-    scale.y = glm::length(model3[1]);
-    scale.z = glm::length(model3[2]);
-
-    model3[0] = glm::normalize(model3[0]);
-    model3[1] = glm::normalize(model3[1]);
-    model3[2] = glm::normalize(model3[2]);
-
-    bb.center = tf.glob_mat * glm::vec4(local_center, 1.0f);
-    bb.extent = local_extent * scale;
-    bb.inv_rot = glm::transpose(model3);
-  });
+  spot_light_query_.each([](const SpotLightTag&, const TransformComp& tf,
+                            const LightComp&, const RangeComp&, const SpotComp&,
+                            BoundingBoxComp& bb) { CalcBB(tf, bb); });
 }
 
 void World::UpdateInstances() {

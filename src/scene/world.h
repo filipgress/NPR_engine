@@ -16,8 +16,10 @@ class World : npr_core::NonCopyable {
   void BuildQueries();
 
   void UpdateTransforms();
-  void UpdateBB();
   void UpdateInstances();
+  void UpdateBB();
+
+  static void CalcBB(const TransformComp& tf, BoundingBoxComp& bb);
 
  private:
   flecs::world entities_;
@@ -36,10 +38,10 @@ class World : npr_core::NonCopyable {
   flecs::query<const DirLightTag, const TransformComp, const LightComp>
       dir_light_query_;
   flecs::query<const PointLightTag, const TransformComp, const LightComp,
-               const RangeComp>
+               const RangeComp, BoundingBoxComp>
       point_light_query_;
   flecs::query<const SpotLightTag, const TransformComp, const LightComp,
-               const RangeComp, const SpotComp>
+               const RangeComp, const SpotComp, BoundingBoxComp>
       spot_light_query_;
 };
 

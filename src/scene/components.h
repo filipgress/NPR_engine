@@ -30,12 +30,14 @@ struct SpotLightTag {
   /* LightComp */
   /* SpotComp */
   /* RangeComp */
+  /* BoundingBoxComp */
 };
 
 struct PointLightTag {
   /* TransformComp */
   /* LightComp */
   /* RangeComp */
+  /* BoundingBoxComp */
 };
 
 struct TransformComp {

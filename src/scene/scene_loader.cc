@@ -209,6 +209,11 @@ void SceneLoader::LoadLight(flecs::entity node_ent,
     range_comp.range = gltf_light.range;
     node_ent.set<RangeComp>(range_comp);
 
+    BoundingBoxComp bb_comp;
+    bb_comp.min_pos = glm::vec3(-1, -1, -1);
+    bb_comp.max_pos = glm::vec3(1, 1, 1);
+    node_ent.set<BoundingBoxComp>(bb_comp);
+
     auto& tf = node_ent.get_mut<TransformComp>();
     tf.scale = glm::vec3(range_comp.range);
 
@@ -223,6 +228,11 @@ void SceneLoader::LoadLight(flecs::entity node_ent,
     spot_comp.inner_cone_angle = gltf_light.spot.innerConeAngle;
     spot_comp.outer_cone_angle = gltf_light.spot.outerConeAngle;
     node_ent.set<SpotComp>(spot_comp);
+
+    BoundingBoxComp bb_comp;
+    bb_comp.min_pos = glm::vec3(-1.0f, -1.0f, -1.0f);
+    bb_comp.max_pos = glm::vec3(1.0f, 1.0f, 0.0f);
+    node_ent.set<BoundingBoxComp>(bb_comp);
 
     auto base_radius = range_comp.range * std::tan(spot_comp.outer_cone_angle);
     auto& tf = node_ent.get_mut<TransformComp>();
