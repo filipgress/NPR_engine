@@ -4,6 +4,9 @@ layout(constant_id = 0) const uint SAMPLES = 4;
 
 layout(location = 0) in vec2 frag_uv;
 layout(location = 0) out vec4 out_color;
+layout(location = 1) out vec4 out_bright;
+
+layout(set = 0, binding = 0) uniform sampler2D opaque_color;
 
 struct ABuffNode {
   vec4 color;
@@ -13,11 +16,11 @@ struct ABuffNode {
   uint _padding[2];
 };
 
-layout(set = 0, binding = 0) buffer ABuffNodes {
+layout(set = 1, binding = 0) buffer ABuffNodes {
   ABuffNode nodes[];
 };
 
-layout(set = 0, binding = 1) buffer HeadPointers {
+layout(set = 1, binding = 1) buffer HeadPointers {
   uint heads[];
 };
 
@@ -50,7 +53,7 @@ void main() {
 
     if (count == 0) continue;
 
-    // insertion sort by depth (back-to-front)
+    // insertion sort by depth (front-to-back)
     for (int i = 1; i < count; ++i) {
       float key_depth = depths[i];
       vec4 key_color = colors[i];
@@ -66,14 +69,25 @@ void main() {
       colors[j + 1] = key_color;
     }
 
-    vec4 sample_color = vec4(0.0);
+    vec4 dest = vec4(0.0);
     for (int i = 0; i < count; ++i) {
       vec4 src = colors[i];
-      sample_color.rgb += src.rgb * (1.0 - sample_color.a);
-      sample_color.a += src.a * (1.0 - sample_color.a);
+      dest.rgb += src.rgb * (1.0 - dest.a);
+      dest.a += src.a * (1.0 - dest.a);
+
+      if (dest.a >= 0.99) break;
     }
 
-    acc_color += sample_color;
+    acc_color += dest;
   }
-  out_color = acc_color / float(SAMPLES);
+
+  vec4 transparent = acc_color / float(SAMPLES);
+  vec4 opaque = texture(opaque_color, frag_uv);
+
+  vec3 blended = mix(opaque.rgb, transparent.rgb, transparent.a);
+  out_color = vec4(blended, 1.0);
+
+  float brightness = dot(blended, vec3(0.2126, 0.7152, 0.0722));
+  float threshold = 0.2;
+  out_bright = brightness > threshold ? out_color : vec4(0.0);
 }

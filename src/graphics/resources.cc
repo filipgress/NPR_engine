@@ -148,13 +148,14 @@ void Resources::CreateImages() {
     resrc.color_ms = std::make_unique<Image>(
         ctx_, frame_props_.color_format, frame_props_.extent,
         vk::ImageUsageFlagBits::eColorAttachment |
-            vk::ImageUsageFlagBits::eTransientAttachment,
+            vk::ImageUsageFlagBits::eTransferSrc,
         vk::ImageAspectFlagBits::eColor, vk::SharingMode::eExclusive,
         frame_props_.samples, 1, "color_ms_" + std::to_string(idx));
 
     resrc.color_res = std::make_unique<Texture>(
         ctx_, frame_props_.color_format, frame_props_.extent,
         vk::ImageUsageFlagBits::eColorAttachment |
+            vk::ImageUsageFlagBits::eTransferDst |
             vk::ImageUsageFlagBits::eSampled,
         vk::ImageAspectFlagBits::eColor, vk::SampleCountFlagBits::e1,
         "color_res_" + std::to_string(idx));
@@ -188,22 +189,22 @@ void Resources::CreateBuffers() {
   int idx{0};
   for (auto& resrc : frame_resources_) {
     resrc.instance_buff = std::make_unique<InstanceBuffer>(
-        ctx_, MAX_INSTANCES, "instance_buff" + std::to_string(idx));
+        ctx_, kMaxInstances, "instance_buff" + std::to_string(idx));
     resrc.camera_ubo = std::make_unique<UniformBuffer<CameraUnif>>(
         ctx_, "camera_unif_buff" + std::to_string(idx));
     resrc.material_ubo = std::make_unique<DynamicUniformBuffer<MaterialUnif>>(
-        ctx_, MAX_MATERIALS,
+        ctx_, kMaxMaterials,
         "material_dynamic_unif_buff" + std::to_string(idx));
 
     resrc.dir_light_ubo = std::make_unique<UniformBuffer<DirLightUnif>>(
         ctx_, "dir_light_unif_buff" + std::to_string(idx));
     resrc.point_light_ubo =
         std::make_unique<DynamicUniformBuffer<PointLightUnif>>(
-            ctx_, MAX_POINT_LIGHTS,
+            ctx_, kMaxPointLights,
             "point_light_dynamic_unif_buff" + std::to_string(idx));
     resrc.spot_light_ubo =
         std::make_unique<DynamicUniformBuffer<SpotLightUnif>>(
-            ctx_, MAX_SPOT_LIGHTS,
+            ctx_, kMaxSpotLights,
             "spot_light_dynamic_unif_buff" + std::to_string(idx));
 
     idx++;
@@ -220,16 +221,16 @@ void Resources::CreateABuffers() {
     }
   }
 
-  uint32_t total_samples = frame_props_.extent.width *
-                           frame_props_.extent.height *
-                           static_cast<uint32_t>(frame_props_.samples);
-  uint32_t max_nodes = total_samples * ABUFF_INIT_SIZE;
+  frame_props_.total_samples = frame_props_.extent.width *
+                               frame_props_.extent.height *
+                               static_cast<uint32_t>(frame_props_.samples);
+  frame_props_.max_abuff_nodes = frame_props_.total_samples * kABuffInitSize;
 
   for (auto& resrc : frame_resources_) {
     resrc.abuff_nodes = std::make_unique<StorageBuffer<ABuffNode>>(
-        ctx_, max_nodes, "abuff_nodes");
+        ctx_, frame_props_.max_abuff_nodes, "abuff_nodes");
     resrc.abuff_heads = std::make_unique<StorageBuffer<uint32_t>>(
-        ctx_, total_samples, "abuff_heads");
+        ctx_, frame_props_.total_samples, "abuff_heads");
     resrc.abuff_counter =
         std::make_unique<StorageBuffer<uint32_t>>(ctx_, 1, "abuff_counter");
   }
@@ -264,10 +265,10 @@ vk::SampleCountFlagBits Resources::GetMaxSamples() {
   return vk::SampleCountFlagBits::e1;
 }
 
-BlurPushConst Resources::CreateGaussianKernel(int radius) {
+BlurPushConst Resources::CreateGaussianKernel(uint32_t radius) {
   BlurPushConst blur_pc;
 
-  radius = std::clamp(radius, 1, MAX_GAUSSIAN_RADIUS);
+  radius = std::clamp(radius, 1u, kMaxGaussianRadius);
   blur_pc.flags.y = radius;
 
   float sigma = radius / 3.0f;
@@ -275,19 +276,19 @@ BlurPushConst Resources::CreateGaussianKernel(int radius) {
 
   float sum = 0.0f;
 
-  for (int i = 0; i <= radius; ++i) {
+  for (uint32_t i = 0; i <= radius; ++i) {
     float w = std::exp(-float(i * i) / sigma_sq);
     blur_pc.weights[i] = w;
     sum += (i == 0) ? w : 2.0f * w;
   }
 
-  for (int i = 0; i <= radius; ++i) blur_pc.weights[i] /= sum;
+  for (uint32_t i = 0; i <= radius; ++i) blur_pc.weights[i] /= sum;
 
   return blur_pc;
 }
 
 void Resources::CreateAONoiseTex(vk::CommandBuffer cmd_buff) {
-  std::vector<glm::vec2> noise(AO_NOISE_DIM * AO_NOISE_DIM);
+  std::vector<glm::vec2> noise(kAONoiseDim * kAONoiseDim);
 
   std::mt19937 rng(std::random_device{}());
   std::uniform_real_distribution<float> dist(-1.0f, 1.0f);
@@ -300,7 +301,7 @@ void Resources::CreateAONoiseTex(vk::CommandBuffer cmd_buff) {
 
   ao_noise_tex_ = std::make_unique<Texture>(
       ctx_, frame_props_.ao_noise_format,
-      vk::Extent2D{AO_NOISE_DIM, AO_NOISE_DIM},
+      vk::Extent2D{kAONoiseDim, kAONoiseDim},
       vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
       vk::ImageAspectFlagBits::eColor, vk::SampleCountFlagBits::e1,
       "ao_noise_tex", props);
@@ -315,13 +316,13 @@ void Resources::CreateAOKernel() {
   std::mt19937 rng(std::random_device{}());
   std::uniform_real_distribution<float> rand01(0.0f, 1.0f);
 
-  for (int i = 0; i < AO_KERNEL_SIZE; ++i) {
+  for (uint32_t i = 0; i < kAOKernelSize; ++i) {
     glm::vec4 sample(rand01(rng) * 2.0f - 1.0f, rand01(rng) * 2.0f - 1.0f,
                      rand01(rng), 0.0f);
     sample = glm::normalize(sample);
     sample *= rand01(rng);
 
-    float scale = float(i) / float(AO_KERNEL_SIZE - 1);
+    float scale = float(i) / float(kAOKernelSize - 1);
     scale = glm::mix(0.1f, 1.0f, scale * scale);
     sample *= scale;
 
@@ -339,7 +340,6 @@ void Resources::CreateSphereMesh(vk::CommandBuffer cmd_buff) {
 
   std::vector<LightVertex> vertices;
   std::vector<uint32_t> indices;
-  npr_scene::BoundingBoxComp bb;
 
   // vertices
   for (int y = 0; y <= rings; ++y) {
@@ -357,8 +357,6 @@ void Resources::CreateSphereMesh(vk::CommandBuffer cmd_buff) {
       glm::vec3 pos(sin_theta * cos_phi, sin_theta * sin_phi, cos_theta);
 
       vertices.push_back({pos});
-      bb.min_pos = glm::min(bb.min_pos, pos);
-      bb.max_pos = glm::max(bb.max_pos, pos);
     }
   }
 
@@ -382,7 +380,7 @@ void Resources::CreateSphereMesh(vk::CommandBuffer cmd_buff) {
 
   sphere_mesh_ = std::make_unique<LightMesh>(
       VertexBuffer{ctx_, cmd_buff, vertices, "sphere_mesh_vbo"},
-      IndexBuffer{ctx_, cmd_buff, indices, "sphere_mesh_ibo"}, bb);
+      IndexBuffer{ctx_, cmd_buff, indices, "sphere_mesh_ibo"});
 }
 
 void Resources::CreateConeMesh(vk::CommandBuffer cmd_buff) {
@@ -390,19 +388,14 @@ void Resources::CreateConeMesh(vk::CommandBuffer cmd_buff) {
 
   std::vector<LightVertex> vertices;
   std::vector<uint32_t> indices;
-  npr_scene::BoundingBoxComp bb;
 
   // tip vertex
   glm::vec3 tip_pos(0, 0, 0);
   vertices.emplace_back(tip_pos);
-  bb.min_pos = glm::min(bb.min_pos, tip_pos);
-  bb.max_pos = glm::max(bb.max_pos, tip_pos);
   int tip_idx = 0;
 
   glm::vec3 base_center_pos(0, 0, -1);
   vertices.emplace_back(base_center_pos);
-  bb.min_pos = glm::min(bb.min_pos, base_center_pos);
-  bb.max_pos = glm::max(bb.max_pos, base_center_pos);
   int base_center_idx = 1;
 
   // base ring vertices
@@ -413,8 +406,6 @@ void Resources::CreateConeMesh(vk::CommandBuffer cmd_buff) {
 
     glm::vec3 pos(x, y, -1);
     vertices.emplace_back(pos);
-    bb.min_pos = glm::min(bb.min_pos, pos);
-    bb.max_pos = glm::max(bb.max_pos, pos);
   }
 
   // side faces (tip to base, CCW)
@@ -441,7 +432,7 @@ void Resources::CreateConeMesh(vk::CommandBuffer cmd_buff) {
 
   cone_mesh_ = std::make_unique<LightMesh>(
       VertexBuffer{ctx_, cmd_buff, vertices, "cone_mesh_vbo"},
-      IndexBuffer{ctx_, cmd_buff, indices, "cone_mesh_ibo"}, bb);
+      IndexBuffer{ctx_, cmd_buff, indices, "cone_mesh_ibo"});
 }
 
 }  // namespace npr_graphics

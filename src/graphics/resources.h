@@ -5,25 +5,24 @@
 #include "command_pool.h"
 #include "image.h"
 
-#include "scene/components.h"
-
 namespace npr_graphics {
 
-#define MAX_TEXTURES 128
-#define MAX_MATERIALS 1024
-#define MAX_INSTANCES 65536  // 2^16
+constexpr uint32_t kMaxTextures = 128;
+constexpr uint32_t kMaxMaterials = 1024;
+constexpr uint32_t kMaxInstances = 65536;  // 2^16
 
-#define MAX_DIR_LIGHTS 2
-#define MAX_POINT_LIGHTS 4
-#define MAX_SPOT_LIGHTS 4
+constexpr uint32_t kMaxDirLights = 2;
+constexpr uint32_t kMaxPointLights = 4;
+constexpr uint32_t kMaxSpotLights = 4;
 
-#define ABUFF_INIT_SIZE 8  // avg fragments per pixel
+constexpr uint32_t kABuffInitSize = 8;  // avg fragments per sample
 
-#define AO_NOISE_DIM 4
-#define AO_KERNEL_SIZE 64
-using AOKernel = std::array<glm::vec4, AO_KERNEL_SIZE>;
+constexpr uint32_t kAONoiseDim = 4;
+constexpr uint32_t kAOKernelSize = 64;
 
-#define MAX_GAUSSIAN_RADIUS 10
+constexpr uint32_t kMaxGaussianRadius = 10;
+
+using AOKernel = std::array<glm::vec4, kAOKernelSize>;
 
 enum MaterialFlags : uint32_t {
   kNone = BIT(0),
@@ -66,18 +65,18 @@ struct DirLightUnif {
 
   glm::uvec4 count;  // x = count, yzw = unused
 
-  DirLight dir_lights[MAX_DIR_LIGHTS];
+  DirLight dir_lights[kMaxDirLights];
 };
 
 struct PointLightUnif {
-  glm::vec4 pos;    // xyz = view-space position, w = radius
-  glm::vec4 color;  // rgb = color, a = intensity
+  glm::vec4 pos;    // xyz = view-space position, w = range
+  glm::vec4 color;  // rgb = color, a = unused
 };
 
 struct SpotLightUnif {
-  glm::vec4 pos;     // xyz = view-space position, w = radius
+  glm::vec4 pos;     // xyz = view-space position, w = range
   glm::vec4 dir;     // xyz = normalized direction, w = unused
-  glm::vec4 color;   // rgb = color, a = intensity
+  glm::vec4 color;   // rgb = color, a = unused
   glm::vec4 params;  // x = angle_scale, y = angle_offset, zw = unused
 };
 
@@ -102,7 +101,7 @@ struct ABuffFillPushConst {
 
 struct BlurPushConst {
   glm::ivec4 flags;  // x = horizontal(1) / vertical(0), y = radius, zw = unused
-  float weights[MAX_GAUSSIAN_RADIUS + 1];  // weights[0] to weights[radius]
+  float weights[kMaxGaussianRadius + 1];  // weights[0] to weights[radius]
 };
 
 struct LoadPushConst {
@@ -114,6 +113,9 @@ struct LoadPushConst {
 struct FrameProps {
   vk::SampleCountFlagBits samples;
   vk::Extent2D extent;
+
+  uint32_t max_abuff_nodes;
+  uint32_t total_samples;  // extent.width * extent.height * samples
 
   vk::Format color_format = vk::Format::eR16G16B16A16Sfloat;
   vk::Format ds_format;
@@ -185,11 +187,9 @@ struct FrameResources {
 struct LightMesh {
   VertexBuffer<LightVertex> vbo;
   IndexBuffer ibo;
-  npr_scene::BoundingBoxComp bb;
 
-  LightMesh(VertexBuffer<LightVertex>&& v, IndexBuffer&& i,
-            const npr_scene::BoundingBoxComp& b)
-      : vbo(std::move(v)), ibo(std::move(i)), bb{b} {}
+  LightMesh(VertexBuffer<LightVertex>&& v, IndexBuffer&& i)
+      : vbo(std::move(v)), ibo(std::move(i)) {}
 };
 
 class Resources : public npr_core::NonCopyable {
@@ -201,6 +201,10 @@ class Resources : public npr_core::NonCopyable {
 
   uint GetFrameCount() const { return frame_count_; }
   const FrameProps& GetProps() const { return frame_props_; }
+
+  const LightMesh& GetSphereMesh() const { return *sphere_mesh_; }
+  const LightMesh& GetConeMesh() const { return *cone_mesh_; }
+
   BlurPushConst& GetSSAOBlurPC() { return ssao_blur_; }
   const Texture& GetDefaultColorTex() const { return *default_color_tex_; }
   const Texture& GetAONoiseTex() const { return *ao_noise_tex_; }
@@ -222,7 +226,7 @@ class Resources : public npr_core::NonCopyable {
   void CreateConeMesh(vk::CommandBuffer cmd_buff);
 
   void CreateDefaultColorTex(vk::CommandBuffer cmd_buff);
-  BlurPushConst CreateGaussianKernel(int radius);
+  BlurPushConst CreateGaussianKernel(uint32_t radius);
 
   vk::SampleCountFlagBits GetMaxSamples();
 

@@ -31,6 +31,9 @@ class DescriptorPool : public npr_core::NonCopyable {
   const WBoitInputSets& GetWBoitInputSets() const { return wboit_input_sets_; }
 
   const ColorSets& GetColorSets() const { return color_sets_; }
+  const TempColorSets& GetTempColorSets() const { return temp_sets_; }
+  const PresentColorSets& GetPresentColorSets() const { return present_sets_; }
+  const BrightColorSets& GetBrightColorSets() const { return bright_sets_; }
 
  private:
   void CreateDescriptorPool();
@@ -56,6 +59,9 @@ class DescriptorPool : public npr_core::NonCopyable {
   WBoitInputSets wboit_input_sets_;
 
   ColorSets color_sets_;
+  TempColorSets temp_sets_;
+  PresentColorSets present_sets_;
+  BrightColorSets bright_sets_;
 };
 
 class TexDescriptorPool : public npr_core::NonCopyable {

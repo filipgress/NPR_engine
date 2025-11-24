@@ -20,7 +20,10 @@ DescriptorPool::DescriptorPool(const Context& ctx, const Resources& resrc)
       abuff_sets_{ctx, resrc.GetFrameCount()},
       wboit_input_sets_{ctx, resrc.GetFrameCount()},
 
-      color_sets_{ctx, resrc.GetFrameCount()} {
+      color_sets_{ctx, resrc.GetFrameCount()},
+      temp_sets_{ctx, resrc.GetFrameCount()},
+      present_sets_{ctx, resrc.GetFrameCount()},
+      bright_sets_{ctx, resrc.GetFrameCount()} {
   CreateDescriptorPool();
 
   gbuff_sets_.AllocSets(pool_);
@@ -58,6 +61,15 @@ DescriptorPool::DescriptorPool(const Context& ctx, const Resources& resrc)
 
   color_sets_.AllocSets(pool_);
   color_sets_.Update(resrc);
+
+  temp_sets_.AllocSets(pool_);
+  temp_sets_.Update(resrc);
+
+  present_sets_.AllocSets(pool_);
+  present_sets_.Update(resrc);
+
+  bright_sets_.AllocSets(pool_);
+  bright_sets_.Update(resrc);
 };
 
 void DescriptorPool::CreateDescriptorPool() {
@@ -103,13 +115,24 @@ void DescriptorPool::CreateDescriptorPool() {
   const auto& color_sizes = color_sets_.GetPoolSizes();
   pool_sizes.insert(pool_sizes.end(), color_sizes.begin(), color_sizes.end());
 
+  const auto& temp_sizes = temp_sets_.GetPoolSizes();
+  pool_sizes.insert(pool_sizes.end(), temp_sizes.begin(), temp_sizes.end());
+
+  const auto& present_sizes = present_sets_.GetPoolSizes();
+  pool_sizes.insert(pool_sizes.end(), present_sizes.begin(),
+                    present_sizes.end());
+
+  const auto& bright_sizes = bright_sets_.GetPoolSizes();
+  pool_sizes.insert(pool_sizes.end(), bright_sizes.begin(), bright_sizes.end());
+
   uint32_t max_sets = gbuff_sets_.GetCount() + camera_sets_.GetCount() +
                       material_sets_.GetCount() + dir_light_sets_.GetCount() +
                       point_light_sets_.GetCount() +
                       spot_light_sets_.GetCount() + ao_set_.GetCount() +
                       ao_res_sets_.GetCount() + ao_temp_sets_.GetCount() +
                       abuff_sets_.GetCount() + wboit_input_sets_.GetCount() +
-                      color_sets_.GetCount();
+                      color_sets_.GetCount() + temp_sets_.GetCount() +
+                      present_sets_.GetCount() + bright_sets_.GetCount();
 
   vk::DescriptorPoolCreateInfo poolInfo{};
   poolInfo.poolSizeCount = pool_sizes.size();

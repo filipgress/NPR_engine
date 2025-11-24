@@ -238,7 +238,7 @@ void TextureArraySet::CreateLayout() {
   vk::DescriptorSetLayoutBinding binding{};
   binding.binding = 0;
   binding.descriptorType = vk::DescriptorType::eCombinedImageSampler;
-  binding.descriptorCount = MAX_TEXTURES;
+  binding.descriptorCount = kMaxTextures;
   binding.stageFlags = vk::ShaderStageFlagBits::eFragment;
 
   vk::DescriptorSetLayoutCreateInfo layout_info{};
@@ -253,9 +253,9 @@ void TextureArraySet::CreateLayout() {
 
 void TextureArraySet::Update(const std::vector<npr_graphics::Texture>& textures,
                              const npr_graphics::Texture& default_tex) const {
-  assert(textures.size() <= MAX_TEXTURES && count_);
+  assert(textures.size() <= kMaxTextures && count_);
 
-  std::vector<vk::DescriptorImageInfo> image_infos(MAX_TEXTURES);
+  std::vector<vk::DescriptorImageInfo> image_infos(kMaxTextures);
   for (size_t i = 0; i < textures.size(); ++i) {
     image_infos[i].imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
     image_infos[i].imageView = textures[i].GetImageView();
@@ -267,7 +267,7 @@ void TextureArraySet::Update(const std::vector<npr_graphics::Texture>& textures,
   default_info.imageView = default_tex.GetImageView();
   default_info.sampler = default_tex.GetSampler();
 
-  for (size_t i = textures.size(); i < MAX_TEXTURES; ++i)
+  for (size_t i = textures.size(); i < kMaxTextures; ++i)
     image_infos[i] = default_info[0];
 
   vk::WriteDescriptorSet desc_write{};
@@ -275,7 +275,7 @@ void TextureArraySet::Update(const std::vector<npr_graphics::Texture>& textures,
   desc_write.dstBinding = 0;
   desc_write.dstArrayElement = 0;
   desc_write.descriptorType = vk::DescriptorType::eCombinedImageSampler;
-  desc_write.descriptorCount = MAX_TEXTURES;
+  desc_write.descriptorCount = kMaxTextures;
   desc_write.pImageInfo = image_infos.data();
 
   ctx_.GetDevice().updateDescriptorSets(1, &desc_write, 0, nullptr);
@@ -283,7 +283,7 @@ void TextureArraySet::Update(const std::vector<npr_graphics::Texture>& textures,
 
 void TextureArraySet::Update(uint idx,
                              const npr_graphics::Texture& texture) const {
-  assert(idx < MAX_TEXTURES && count_);
+  assert(idx < kMaxTextures && count_);
 
   vk::DescriptorImageInfo imageInfo{};
   imageInfo.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;

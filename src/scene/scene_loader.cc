@@ -117,8 +117,8 @@ void SceneLoader::LoadEntity(Scene& scene, flecs::entity parent_ent,
       LoadCamera(child_ent, model, node);
     else if (int light_idx = GetLightIdx(node, cache); light_idx == -1)
       LoadObject(scene, child_ent, model, node, cache);
-    else {
-    }  // child_ent.add<LightTag>();
+    else
+      LoadLight(child_ent, model, node, light_idx);
 
     for (int glfw_child_node_idx : node.children)
       s.push({child_ent, glfw_child_node_idx});
@@ -196,7 +196,7 @@ void SceneLoader::LoadLight(flecs::entity node_ent,
 
   LightComp light;
   light.color = {gltf_light.color[0], gltf_light.color[1], gltf_light.color[2]};
-  light.intensity = gltf_light.intensity;
+  light.intensity = gltf_light.intensity * 0.001f;
   node_ent.set<LightComp>(light);
 
   if (gltf_light.type == "directional") {

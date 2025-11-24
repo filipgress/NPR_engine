@@ -1,30 +1,57 @@
 #include "pipeline.h"
-#include "buffer.h"
 
 namespace npr_graphics {
 
+PipelineState::PipelineState() {
+  input_assembly.topology = vk::PrimitiveTopology::eTriangleList;
+  input_assembly.primitiveRestartEnable = VK_FALSE;
+
+  viewport.viewportCount = 1;
+  viewport.scissorCount = 1;
+
+  rasterization.depthClampEnable = VK_FALSE;
+  rasterization.rasterizerDiscardEnable = VK_FALSE;
+  rasterization.polygonMode = vk::PolygonMode::eFill;
+  rasterization.cullMode = vk::CullModeFlagBits::eNone;
+  rasterization.frontFace = vk::FrontFace::eCounterClockwise;
+  rasterization.depthBiasEnable = VK_FALSE;
+  rasterization.lineWidth = 1.0f;
+
+  multisample.rasterizationSamples = vk::SampleCountFlagBits::e1;
+  multisample.sampleShadingEnable = VK_FALSE;
+
+  depth_stencil.depthTestEnable = VK_FALSE;
+  depth_stencil.depthWriteEnable = VK_FALSE;
+  depth_stencil.depthCompareOp = vk::CompareOp::eLess;
+  depth_stencil.depthBoundsTestEnable = VK_FALSE;
+  depth_stencil.stencilTestEnable = VK_FALSE;
+}
+
+Pipeline::Pipeline(const Context& ctx, const PipelineCache& cache,
+                   const BasePass& render_pass)
+    : ctx_{ctx}, cache_{cache}, render_pass_{render_pass} {}
+
 Pipeline::~Pipeline() {
-  DestroyPipeline();
+  if (pipeline_) ctx_.GetDevice().destroyPipeline(pipeline_);
   if (layout_) ctx_.GetDevice().destroyPipelineLayout(layout_);
 }
 
-void Pipeline::DestroyPipeline() {
-  if (pipeline_) {
-    ctx_.GetDevice().destroyPipeline(pipeline_);
-    pipeline_ = nullptr;
-  }
+bool Pipeline::IsUpToDate() const {
+  for (const auto& shader_info : state_.shaders)
+    if (shader_info.built_ver != shader_info.shader.GetVer()) return false;
+  return true;
 }
 
 void Pipeline::CreateLayout(
     const std::vector<vk::DescriptorSetLayout>& set_layouts,
     const std::vector<PushConstInfo>& push_consts) {
-  vk::PipelineLayoutCreateInfo pipeline_layout_info{};
+  vk::PipelineLayoutCreateInfo info{};
 
-  pipeline_layout_info.setLayoutCount = set_layouts.size();
-  pipeline_layout_info.pSetLayouts = set_layouts.data();
+  info.setLayoutCount = set_layouts.size();
+  info.pSetLayouts = set_layouts.data();
 
-  std::vector<vk::PushConstantRange> push_constant_ranges{};
-  push_constant_ranges.reserve(push_consts.size());
+  std::vector<vk::PushConstantRange> ranges{};
+  ranges.reserve(push_consts.size());
 
   size_t offset{0};
   for (const auto& pc : push_consts) {
@@ -34,48 +61,93 @@ void Pipeline::CreateLayout(
     range.stageFlags = pc.stage;
     range.offset = offset;
     range.size = pc.size;
-    push_constant_ranges.push_back(range);
+    ranges.push_back(range);
 
     offset += npr_core::Align(pc.size, 4);
   }
 
-  pipeline_layout_info.pushConstantRangeCount = push_constant_ranges.size();
-  pipeline_layout_info.pPushConstantRanges = push_constant_ranges.data();
+  info.pushConstantRangeCount = ranges.size();
+  info.pPushConstantRanges = ranges.data();
 
-  layout_ = ctx_.GetDevice().createPipelineLayout(pipeline_layout_info);
+  layout_ = ctx_.GetDevice().createPipelineLayout(info);
   ctx_.SetDbgName((uint64_t)(VkPipelineLayout)layout_,
                   vk::ObjectType::ePipelineLayout, GetDbgName() + "_layout");
 }
 
-void Pipeline::CreatePipeline(size_t subpass, const std::string& vert_entry,
-                              const std::string& frag_entry,
-                              const std::vector<SpecConstInfo>& spec_consts) {
-  DestroyPipeline();
+void Pipeline::BuildPipeline() {
+  if (pipeline_) {
+    ctx_.GetDevice().destroyPipeline(pipeline_);
+    pipeline_ = nullptr;
+  }
 
-  auto shader_stages = GetShaderStages(vert_entry, frag_entry, spec_consts);
-  auto vertex_input = GetVertexInputState();
-  auto input_assembly = GetInputAssemblyState();
-  auto viewport = GetViewportState();
-  auto rasterization = GetRasterizationState();
-  auto multisample = GetMultisampleState();
-  auto depth_stencil = GetDepthStencilState();
-  auto color_blend = GetColorBlendState();
-  auto dynamic_state = GetDynamicState();
+  std::vector<vk::PipelineShaderStageCreateInfo> stages{};
+  std::list<vk::SpecializationInfo> spec_infos;
+  std::list<std::vector<vk::SpecializationMapEntry>> spec_entries_list;
+  std::list<std::vector<uint8_t>> spec_data_list;
+
+  for (auto& shader_info : state_.shaders) {
+    auto stage_info = shader_info.shader.GetShaderStageInfo(shader_info.entry);
+    shader_info.built_ver = shader_info.shader.GetVer();
+
+    if (!shader_info.spec_consts.empty()) {
+      spec_entries_list.emplace_back();
+      spec_data_list.emplace_back();
+
+      auto& entries = spec_entries_list.back();
+      auto& data = spec_data_list.back();
+
+      entries.reserve(shader_info.spec_consts.size());
+
+      uint32_t offset = 0;
+      for (const auto& spec : shader_info.spec_consts) {
+        entries.emplace_back(
+            vk::SpecializationMapEntry{spec.constant_id, offset, spec.size});
+
+        // copy data
+        const uint8_t* byte_data = static_cast<const uint8_t*>(spec.data);
+        data.insert(data.end(), byte_data, byte_data + spec.size);
+
+        offset += spec.size;
+      }
+
+      spec_infos.emplace_back(static_cast<uint32_t>(entries.size()),
+                              entries.data(), static_cast<size_t>(data.size()),
+                              data.data());
+      stage_info.pSpecializationInfo = &spec_infos.back();
+    }
+
+    stages.push_back(stage_info);
+  }
+
+  vk::PipelineVertexInputStateCreateInfo vertex_input{};
+  vertex_input.vertexBindingDescriptionCount = state_.vertex_bindings.size();
+  vertex_input.pVertexBindingDescriptions = state_.vertex_bindings.data();
+  vertex_input.vertexAttributeDescriptionCount = state_.vertex_attribs.size();
+  vertex_input.pVertexAttributeDescriptions = state_.vertex_attribs.data();
+
+  vk::PipelineColorBlendStateCreateInfo color_blend{};
+  color_blend.logicOpEnable = VK_FALSE;
+  color_blend.attachmentCount = state_.color_attachments.size();
+  color_blend.pAttachments = state_.color_attachments.data();
+
+  vk::PipelineDynamicStateCreateInfo dynamic_state{};
+  dynamic_state.dynamicStateCount = state_.dynamic_states.size();
+  dynamic_state.pDynamicStates = state_.dynamic_states.data();
 
   vk::GraphicsPipelineCreateInfo pipeline_info{};
-  pipeline_info.stageCount = shader_stages.size();
-  pipeline_info.pStages = shader_stages.data();
+  pipeline_info.stageCount = stages.size();
+  pipeline_info.pStages = stages.data();
   pipeline_info.pVertexInputState = &vertex_input;
-  pipeline_info.pInputAssemblyState = &input_assembly;
-  pipeline_info.pViewportState = &viewport;
-  pipeline_info.pRasterizationState = &rasterization;
-  pipeline_info.pMultisampleState = &multisample;
-  pipeline_info.pDepthStencilState = &depth_stencil;
+  pipeline_info.pInputAssemblyState = &state_.input_assembly;
+  pipeline_info.pViewportState = &state_.viewport;
+  pipeline_info.pRasterizationState = &state_.rasterization;
+  pipeline_info.pMultisampleState = &state_.multisample;
+  pipeline_info.pDepthStencilState = &state_.depth_stencil;
   pipeline_info.pColorBlendState = &color_blend;
   pipeline_info.pDynamicState = &dynamic_state;
   pipeline_info.layout = layout_;
   pipeline_info.renderPass = render_pass_.GetRenderPass();
-  pipeline_info.subpass = subpass;
+  pipeline_info.subpass = state_.subpass;
 
   pipeline_ = ctx_.GetDevice()
                   .createGraphicsPipeline(cache_.GetCache(), pipeline_info)
@@ -84,363 +156,574 @@ void Pipeline::CreatePipeline(size_t subpass, const std::string& vert_entry,
                   GetDbgName());
 }
 
-std::array<vk::PipelineShaderStageCreateInfo, 2> Pipeline::GetShaderStages(
-    const std::string& vert_entry, const std::string& frag_entry,
-    const std::vector<SpecConstInfo>& specialization_consts) {
-  vert_shader_ver_ = vert_shader_.GetVersion();
-  frag_shader_ver_ = frag_shader_.GetVersion();
-
-  std::array<vk::PipelineShaderStageCreateInfo, 2> shader_stages = {
-      vert_shader_.GetShaderStageInfo(vert_entry),
-      frag_shader_.GetShaderStageInfo(frag_entry)};
-
-  if (specialization_consts.empty()) return shader_stages;
-  if (data_.specialization_data.empty()) {
-    data_.specialization_entries.reserve(specialization_consts.size());
-    uint32_t offset = 0;
-    for (const auto& spec : specialization_consts) {
-      data_.specialization_entries.emplace_back(
-          vk::SpecializationMapEntry{spec.constant_id, offset, spec.size});
-
-      // Copy data
-      const uint8_t* byte_data = static_cast<const uint8_t*>(spec.data);
-      data_.specialization_data.insert(data_.specialization_data.end(),
-                                       byte_data, byte_data + spec.size);
-
-      offset += spec.size;
-    }
-
-    data_.specialization_info.mapEntryCount =
-        data_.specialization_entries.size();
-    data_.specialization_info.pMapEntries = data_.specialization_entries.data();
-    data_.specialization_info.dataSize = data_.specialization_data.size();
-    data_.specialization_info.pData = data_.specialization_data.data();
-  }
-
-  shader_stages[1].pSpecializationInfo = &data_.specialization_info;
-  return shader_stages;
-}
-
-vk::PipelineVertexInputStateCreateInfo Pipeline::GetVertexInputState() {
-  vk::PipelineVertexInputStateCreateInfo vertex_input{};
-
-  if (data_.use_vbo) {
-    data_.binding_descs.resize(2);
-
-    // Vertex binding
-    data_.binding_descs[0].binding = 0;
-    data_.binding_descs[0].stride = sizeof(Vertex);
-    data_.binding_descs[0].inputRate = vk::VertexInputRate::eVertex;
-
-    // Instance binding
-    data_.binding_descs[1].binding = 1;
-    data_.binding_descs[1].stride = sizeof(InstanceData);
-    data_.binding_descs[1].inputRate = vk::VertexInputRate::eInstance;
-
-    data_.attr_descs.resize(11);
-
-    // position
-    data_.attr_descs[0].binding = 0;
-    data_.attr_descs[0].location = 0;
-    data_.attr_descs[0].format = vk::Format::eR32G32B32Sfloat;
-    data_.attr_descs[0].offset = offsetof(Vertex, pos);
-
-    // uv
-    data_.attr_descs[1].binding = 0;
-    data_.attr_descs[1].location = 1;
-    data_.attr_descs[1].format = vk::Format::eR32G32Sfloat;
-    data_.attr_descs[1].offset = offsetof(Vertex, uv);
-
-    // normal
-    data_.attr_descs[2].binding = 0;
-    data_.attr_descs[2].location = 2;
-    data_.attr_descs[2].format = vk::Format::eR32G32B32Sfloat;
-    data_.attr_descs[2].offset = offsetof(Vertex, normal);
-
-    // tan
-    data_.attr_descs[3].binding = 0;
-    data_.attr_descs[3].location = 3;
-    data_.attr_descs[3].format = vk::Format::eR32G32B32A32Sfloat;
-    data_.attr_descs[3].offset = offsetof(Vertex, tangent);
-
-    // model matrix (4 vec4s)
-    for (int i = 0; i < 4; i++) {
-      data_.attr_descs[4 + i].binding = 1;
-      data_.attr_descs[4 + i].location = 4 + i;
-      data_.attr_descs[4 + i].format = vk::Format::eR32G32B32A32Sfloat;
-      data_.attr_descs[4 + i].offset = sizeof(glm::vec4) * i;
-    }
-
-    // normal matrix (3 vec3s)
-    for (int i = 0; i < 3; i++) {
-      data_.attr_descs[8 + i].binding = 1;
-      data_.attr_descs[8 + i].location = 8 + i;
-      data_.attr_descs[8 + i].format = vk::Format::eR32G32B32Sfloat;
-      data_.attr_descs[8 + i].offset =
-          offsetof(InstanceData, normal) + sizeof(glm::vec3) * i;
-    }
-
-    vertex_input.vertexBindingDescriptionCount = data_.binding_descs.size();
-    vertex_input.pVertexBindingDescriptions = data_.binding_descs.data();
-    vertex_input.vertexAttributeDescriptionCount = data_.attr_descs.size();
-    vertex_input.pVertexAttributeDescriptions = data_.attr_descs.data();
-  } else {
-    vertex_input.vertexBindingDescriptionCount = 0;
-    vertex_input.vertexAttributeDescriptionCount = 0;
-  }
-
-  return vertex_input;
-}
-
-vk::PipelineInputAssemblyStateCreateInfo Pipeline::GetInputAssemblyState()
-    const {
-  vk::PipelineInputAssemblyStateCreateInfo input_assembly{};
-  input_assembly.topology = vk::PrimitiveTopology::eTriangleList;
-  input_assembly.primitiveRestartEnable = VK_FALSE;
-
-  return input_assembly;
-}
-
-vk::PipelineViewportStateCreateInfo Pipeline::GetViewportState() const {
-  vk::PipelineViewportStateCreateInfo viewport{};
-  viewport.viewportCount = 1;
-  viewport.scissorCount = 1;
-  return viewport;
-}
-
-vk::PipelineRasterizationStateCreateInfo Pipeline::GetRasterizationState()
-    const {
-  vk::PipelineRasterizationStateCreateInfo rasterization{};
-  rasterization.depthClampEnable = VK_FALSE;
-  rasterization.rasterizerDiscardEnable = VK_FALSE;
-  rasterization.polygonMode = vk::PolygonMode::eFill;
-  rasterization.cullMode = data_.cull_mode;
-  rasterization.frontFace = vk::FrontFace::eCounterClockwise;
-  rasterization.depthBiasEnable = VK_FALSE;
-  rasterization.lineWidth = 1.0f;
-  return rasterization;
-}
-
-vk::PipelineMultisampleStateCreateInfo Pipeline::GetMultisampleState() const {
-  vk::PipelineMultisampleStateCreateInfo multisample{};
-  multisample.rasterizationSamples = data_.samples;
-  multisample.sampleShadingEnable = VK_FALSE;
-
-  return multisample;
-}
-
-vk::PipelineDepthStencilStateCreateInfo Pipeline::GetDepthStencilState() const {
-  vk::PipelineDepthStencilStateCreateInfo depth_stencil{};
-  depth_stencil.depthTestEnable = VK_FALSE;
-  depth_stencil.depthWriteEnable = VK_FALSE;
-  depth_stencil.depthCompareOp = vk::CompareOp::eLess;
-  depth_stencil.depthBoundsTestEnable = VK_FALSE;
-  depth_stencil.stencilTestEnable = VK_FALSE;
-
-  return depth_stencil;
-}
-
-vk::PipelineColorBlendStateCreateInfo Pipeline::GetColorBlendState() const {
-  vk::PipelineColorBlendStateCreateInfo color_blend{};
-  color_blend.logicOpEnable = VK_FALSE;
-  color_blend.attachmentCount = data_.color_attachments.size();
-  color_blend.pAttachments = data_.color_attachments.data();
-
-  return color_blend;
-}
-
-vk::PipelineDynamicStateCreateInfo Pipeline::GetDynamicState() const {
-  vk::PipelineDynamicStateCreateInfo dynamic_state{};
-  dynamic_state.dynamicStateCount = data_.dynamic_states.size();
-  dynamic_state.pDynamicStates = data_.dynamic_states.data();
-  return dynamic_state;
-}
-
 /*
  * GBuffPipe
  */
-vk::PipelineDepthStencilStateCreateInfo GBuffPipe::GetDepthStencilState()
-    const {
-  vk::PipelineDepthStencilStateCreateInfo depth_stencil{};
-  depth_stencil.depthTestEnable = VK_TRUE;
-  depth_stencil.depthWriteEnable = VK_TRUE;
-  depth_stencil.depthCompareOp = vk::CompareOp::eLess;
-  depth_stencil.depthBoundsTestEnable = VK_FALSE;
-  depth_stencil.stencilTestEnable = VK_TRUE;
+GBuffPipe::GBuffPipe(const Context& ctx, const PipelineCache& cache,
+                     const GBuffPass& render_pass, VertexShader& vert_shader,
+                     FragmentShader& frag_shader,
+                     vk::SampleCountFlagBits samples,
+                     const DescriptorPool& desc_pool)
+    : Pipeline(ctx, cache, render_pass) {
+  CreateLayout(
+      {desc_pool.GetCameraSets().GetLayout(), TextureArraySet(ctx_).GetLayout(),
+       desc_pool.GetMaterialSets().GetLayout()},
+      {});
 
-  depth_stencil.front.failOp = vk::StencilOp::eKeep;
-  depth_stencil.front.passOp = vk::StencilOp::eReplace;
-  depth_stencil.front.depthFailOp = vk::StencilOp::eKeep;
-  depth_stencil.front.compareOp = vk::CompareOp::eAlways;
-  depth_stencil.front.compareMask = BIT(1);
-  depth_stencil.front.writeMask = BIT(1);
-  depth_stencil.front.reference = BIT(1);
+  AddShader(vert_shader);
+  AddShader(frag_shader,
+            {MakeSpecConst(0, samples), MakeSpecConst(1, kMaxTextures)});
 
-  depth_stencil.back = depth_stencil.front;
+  AddVertexBinding(0, sizeof(Vertex));
+  AddVertexBinding(1, sizeof(InstanceData), vk::VertexInputRate::eInstance);
 
-  return depth_stencil;
+  AddVertexAttribute(0, 0, vk::Format::eR32G32B32Sfloat, offsetof(Vertex, pos));
+  AddVertexAttribute(1, 0, vk::Format::eR32G32Sfloat, offsetof(Vertex, uv));
+  AddVertexAttribute(2, 0, vk::Format::eR32G32B32Sfloat,
+                     offsetof(Vertex, normal));
+  AddVertexAttribute(3, 0, vk::Format::eR32G32B32A32Sfloat,
+                     offsetof(Vertex, tangent));
+
+  for (int i = 0; i < 4; i++)
+    AddVertexAttribute(4 + i, 1, vk::Format::eR32G32B32A32Sfloat,
+                       i * sizeof(glm::vec4));
+  for (int i = 0; i < 3; i++)
+    AddVertexAttribute(8 + i, 1, vk::Format::eR32G32B32Sfloat,
+                       offsetof(InstanceData, normal) + i * sizeof(glm::vec3));
+
+  state_.multisample.rasterizationSamples = samples;
+
+  state_.dynamic_states = {vk::DynamicState::eViewport,
+                           vk::DynamicState::eScissor,
+                           vk::DynamicState::eCullMode};
+
+  state_.depth_stencil.depthTestEnable = VK_TRUE;
+  state_.depth_stencil.depthWriteEnable = VK_TRUE;
+  state_.depth_stencil.depthCompareOp = vk::CompareOp::eLess;
+  state_.depth_stencil.stencilTestEnable = VK_TRUE;
+
+  state_.depth_stencil.front.failOp = vk::StencilOp::eKeep;
+  state_.depth_stencil.front.passOp = vk::StencilOp::eReplace;
+  state_.depth_stencil.front.depthFailOp = vk::StencilOp::eKeep;
+  state_.depth_stencil.front.compareOp = vk::CompareOp::eAlways;
+  state_.depth_stencil.front.compareMask = BIT(1);
+  state_.depth_stencil.front.writeMask = BIT(1);
+  state_.depth_stencil.front.reference = BIT(1);
+  state_.depth_stencil.back = state_.depth_stencil.front;
+
+  state_.color_attachments.resize(5);
+  for (auto& att : state_.color_attachments) {
+    att.blendEnable = VK_FALSE;
+    att.colorWriteMask =
+        vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+        vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+  }
+  state_.color_attachments[4].colorWriteMask = vk::ColorComponentFlagBits::eR;
+
+  BuildPipeline();
 }
 
 /*
- * AOGenPipe
+ * AOPipe
  */
-vk::PipelineDepthStencilStateCreateInfo AOGenPipe::GetDepthStencilState()
-    const {
-  vk::PipelineDepthStencilStateCreateInfo depth_stencil{};
-  depth_stencil.depthTestEnable = VK_FALSE;
-  depth_stencil.depthWriteEnable = VK_FALSE;
-  depth_stencil.depthCompareOp = vk::CompareOp::eAlways;
-  depth_stencil.depthBoundsTestEnable = VK_FALSE;
-  depth_stencil.stencilTestEnable = VK_TRUE;
+AOPipe::AOPipe(const Context& ctx, const PipelineCache& cache,
+               const AOPass& render_pass, VertexShader& vert_shader,
+               FragmentShader& frag_shader, vk::SampleCountFlagBits samples,
+               const DescriptorPool& desc_pool)
+    : Pipeline(ctx, cache, render_pass) {
+  CreateLayout(
+      {desc_pool.GetCameraSets().GetLayout(),
+       desc_pool.GetGBuffSets().GetLayout(), desc_pool.GetAOSet().GetLayout()},
+      {});
 
-  // stencil test
-  depth_stencil.front.failOp = vk::StencilOp::eKeep;
-  depth_stencil.front.passOp = vk::StencilOp::eKeep;
-  depth_stencil.front.depthFailOp = vk::StencilOp::eKeep;
-  depth_stencil.front.compareOp = vk::CompareOp::eEqual;
-  depth_stencil.front.compareMask = BIT(1);
-  depth_stencil.front.writeMask = 0;
-  depth_stencil.front.reference = BIT(1);
+  AddShader(vert_shader);
+  AddShader(frag_shader,
+            {MakeSpecConst(0, kAONoiseDim), MakeSpecConst(1, kAOKernelSize)});
 
-  depth_stencil.back = depth_stencil.front;
+  state_.multisample.rasterizationSamples = samples;
 
-  return depth_stencil;
+  state_.color_attachments.resize(1);
+  state_.color_attachments[0].blendEnable = VK_FALSE;
+  state_.color_attachments[0].colorWriteMask = vk::ColorComponentFlagBits::eR;
+
+  state_.depth_stencil.depthTestEnable = VK_FALSE;
+  state_.depth_stencil.depthWriteEnable = VK_FALSE;
+  state_.depth_stencil.depthCompareOp = vk::CompareOp::eAlways;
+  state_.depth_stencil.depthBoundsTestEnable = VK_FALSE;
+  state_.depth_stencil.stencilTestEnable = VK_TRUE;
+
+  state_.depth_stencil.front.failOp = vk::StencilOp::eKeep;
+  state_.depth_stencil.front.passOp = vk::StencilOp::eKeep;
+  state_.depth_stencil.front.depthFailOp = vk::StencilOp::eKeep;
+  state_.depth_stencil.front.compareOp = vk::CompareOp::eEqual;
+  state_.depth_stencil.front.compareMask = BIT(1);
+  state_.depth_stencil.front.writeMask = 0;
+  state_.depth_stencil.front.reference = BIT(1);
+  state_.depth_stencil.back = state_.depth_stencil.front;
+
+  BuildPipeline();
 }
 
 /*
- * LightPipe
+ * AOBlurPipe
  */
-vk::PipelineVertexInputStateCreateInfo LightPipe::GetVertexInputState() {
-  vk::PipelineVertexInputStateCreateInfo vertex_input{};
+AOBlurPipe::AOBlurPipe(const Context& ctx, const PipelineCache& cache,
+                       const BlurPass& render_pass, VertexShader& vert_shader,
+                       FragmentShader& frag_shader,
+                       const DescriptorPool& desc_pool)
+    : Pipeline(ctx, cache, render_pass) {
+  CreateLayout(
+      {desc_pool.GetAOResSets().GetLayout()},
+      {MakePushConst<BlurPushConst>(vk::ShaderStageFlagBits::eFragment)});
 
-  data_.binding_descs.resize(1);
-  data_.attr_descs.resize(1);
+  AddShader(vert_shader);
+  AddShader(frag_shader, {MakeSpecConst(0, kMaxGaussianRadius)});
 
-  // LightVertex
-  data_.binding_descs[0].binding = 0;
-  data_.binding_descs[0].stride = sizeof(LightVertex);
-  data_.binding_descs[0].inputRate = vk::VertexInputRate::eVertex;
+  state_.color_attachments.resize(1);
+  state_.color_attachments[0].blendEnable = VK_FALSE;
+  state_.color_attachments[0].colorWriteMask = vk::ColorComponentFlagBits::eR;
 
-  // position
-  data_.attr_descs[0].binding = 0;
-  data_.attr_descs[0].location = 0;
-  data_.attr_descs[0].format = vk::Format::eR32G32B32Sfloat;
-  data_.attr_descs[0].offset = offsetof(LightVertex, pos);
-
-  vertex_input.vertexBindingDescriptionCount = data_.binding_descs.size();
-  vertex_input.pVertexBindingDescriptions = data_.binding_descs.data();
-  vertex_input.vertexAttributeDescriptionCount = data_.attr_descs.size();
-  vertex_input.pVertexAttributeDescriptions = data_.attr_descs.data();
-
-  return vertex_input;
+  BuildPipeline();
 }
 
 /*
- * DirLightPipe
+ * GlobLightPipe
  */
-vk::PipelineDepthStencilStateCreateInfo DirLightPipe::GetDepthStencilState()
-    const {
-  vk::PipelineDepthStencilStateCreateInfo depth_stencil{};
-  depth_stencil.depthTestEnable = VK_FALSE;
-  depth_stencil.depthWriteEnable = VK_FALSE;
-  depth_stencil.depthCompareOp = vk::CompareOp::eAlways;
-  depth_stencil.depthBoundsTestEnable = VK_FALSE;
-  depth_stencil.stencilTestEnable = VK_TRUE;
+GlobLightPipe::GlobLightPipe(const Context& ctx, const PipelineCache& cache,
+                             const GlobLightPass& render_pass,
+                             VertexShader& vert_shader,
+                             FragmentShader& frag_shader,
+                             vk::SampleCountFlagBits samples,
+                             const DescriptorPool& desc_pool)
+    : Pipeline(ctx, cache, render_pass) {
+  CreateLayout({desc_pool.GetAOResSets().GetLayout(),
+                desc_pool.GetGBuffSets().GetLayout(),
+                desc_pool.GetDirLightSets().GetLayout()},
+               {});
 
-  // stencil test
-  depth_stencil.front.failOp = vk::StencilOp::eKeep;
-  depth_stencil.front.passOp = vk::StencilOp::eKeep;
-  depth_stencil.front.depthFailOp = vk::StencilOp::eKeep;
-  depth_stencil.front.compareOp = vk::CompareOp::eEqual;
-  depth_stencil.front.compareMask = BIT(1);
-  depth_stencil.front.writeMask = 0;
-  depth_stencil.front.reference = BIT(1);
+  AddShader(vert_shader);
+  AddShader(frag_shader,
+            {MakeSpecConst(0, samples), MakeSpecConst(1, kMaxDirLights)});
 
-  depth_stencil.back = depth_stencil.front;
+  state_.multisample.rasterizationSamples = samples;
 
-  return depth_stencil;
+  state_.color_attachments.resize(1);
+  state_.color_attachments[0].blendEnable = VK_FALSE;
+  state_.color_attachments[0].colorWriteMask =
+      vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+      vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+
+  state_.depth_stencil.depthTestEnable = VK_FALSE;
+  state_.depth_stencil.depthWriteEnable = VK_FALSE;
+  state_.depth_stencil.depthCompareOp = vk::CompareOp::eAlways;
+  state_.depth_stencil.depthBoundsTestEnable = VK_FALSE;
+  state_.depth_stencil.stencilTestEnable = VK_TRUE;
+
+  state_.depth_stencil.front.failOp = vk::StencilOp::eKeep;
+  state_.depth_stencil.front.passOp = vk::StencilOp::eKeep;
+  state_.depth_stencil.front.depthFailOp = vk::StencilOp::eKeep;
+  state_.depth_stencil.front.compareOp = vk::CompareOp::eEqual;
+  state_.depth_stencil.front.compareMask = BIT(1);
+  state_.depth_stencil.front.writeMask = 0;
+  state_.depth_stencil.front.reference = BIT(1);
+
+  state_.depth_stencil.back = state_.depth_stencil.front;
+
+  BuildPipeline();
 }
 
 /*
- * LightStencilPipe
+ * LocalLightPipe
  */
-vk::PipelineDepthStencilStateCreateInfo LightStencilPipe::GetDepthStencilState()
-    const {
-  vk::PipelineDepthStencilStateCreateInfo depth_stencil{};
-  depth_stencil.depthTestEnable = VK_TRUE;
-  depth_stencil.depthWriteEnable = VK_FALSE;
-  depth_stencil.depthCompareOp = vk::CompareOp::eLessOrEqual;
-  depth_stencil.depthBoundsTestEnable = VK_FALSE;
-  depth_stencil.stencilTestEnable = VK_TRUE;
+LocalLightPipe::LocalLightPipe(const Context& ctx, const PipelineCache& cache,
+                               const LocalLightPass& render_pass,
+                               VertexShader& vert_shader,
+                               vk::SampleCountFlagBits samples,
+                               const DescriptorPool& desc_pool)
+    : Pipeline(ctx, cache, render_pass) {
+  CreateLayout(
+      {desc_pool.GetCameraSets().GetLayout()},
+      {MakePushConst<LightPushConst>(vk::ShaderStageFlagBits::eVertex)});
 
-  // stencil test
-  depth_stencil.front.failOp = vk::StencilOp::eKeep;
-  depth_stencil.front.passOp = vk::StencilOp::eKeep;
-  depth_stencil.front.depthFailOp = vk::StencilOp::eReplace;
-  depth_stencil.front.compareOp = vk::CompareOp::eAlways;
-  depth_stencil.front.compareMask = BIT(1);
-  depth_stencil.front.writeMask = BIT(1);
-  depth_stencil.front.reference = BIT(1);
+  AddShader(vert_shader);
 
-  depth_stencil.back = depth_stencil.front;
+  AddVertexBinding(0, sizeof(LightVertex));
+  AddVertexAttribute(0, 0, vk::Format::eR32G32B32Sfloat,
+                     offsetof(LightVertex, pos));
 
-  return depth_stencil;
+  state_.multisample.rasterizationSamples = samples;
+  state_.rasterization.cullMode = vk::CullModeFlagBits::eBack;
+
+  state_.depth_stencil.depthTestEnable = VK_TRUE;
+  state_.depth_stencil.depthWriteEnable = VK_FALSE;
+  state_.depth_stencil.depthCompareOp = vk::CompareOp::eLessOrEqual;
+  state_.depth_stencil.stencilTestEnable = VK_TRUE;
+
+  state_.depth_stencil.front.failOp = vk::StencilOp::eKeep;
+  state_.depth_stencil.front.passOp = vk::StencilOp::eKeep;
+  state_.depth_stencil.front.depthFailOp = vk::StencilOp::eReplace;
+  state_.depth_stencil.front.compareOp = vk::CompareOp::eAlways;
+  state_.depth_stencil.front.compareMask = BIT(1);
+  state_.depth_stencil.front.writeMask = BIT(1);
+  state_.depth_stencil.front.reference = BIT(1);
+  state_.depth_stencil.back = state_.depth_stencil.front;
+
+  state_.subpass = 0;
+
+  BuildPipeline();
 }
 
 /*
- * LightVolPipe
+ * PointLightPipe
  */
-vk::PipelineDepthStencilStateCreateInfo LightVolPipe::GetDepthStencilState()
-    const {
-  vk::PipelineDepthStencilStateCreateInfo depth_stencil{};
-  depth_stencil.depthTestEnable = VK_TRUE;
-  depth_stencil.depthWriteEnable = VK_FALSE;
-  depth_stencil.depthCompareOp = vk::CompareOp::eGreaterOrEqual;
-  depth_stencil.depthBoundsTestEnable = VK_FALSE;
-  depth_stencil.stencilTestEnable = VK_TRUE;
+PointLightPipe::PointLightPipe(const Context& ctx, const PipelineCache& cache,
+                               const LocalLightPass& render_pass,
+                               VertexShader& vert_shader,
+                               FragmentShader& frag_shader,
+                               vk::SampleCountFlagBits samples,
+                               const DescriptorPool& desc_pool)
+    : Pipeline(ctx, cache, render_pass) {
+  CreateLayout(
+      {desc_pool.GetCameraSets().GetLayout(),
+       desc_pool.GetGBuffSets().GetLayout(),
+       desc_pool.GetPointLightSets().GetLayout()},
+      {MakePushConst<LightPushConst>(vk::ShaderStageFlagBits::eVertex)});
 
-  // stencil test
-  depth_stencil.front.failOp = vk::StencilOp::eKeep;
-  depth_stencil.front.passOp = vk::StencilOp::eKeep;
-  depth_stencil.front.depthFailOp = vk::StencilOp::eKeep;
-  depth_stencil.front.compareOp = vk::CompareOp::eEqual;
-  depth_stencil.front.compareMask = BIT(1);
-  depth_stencil.front.writeMask = 0;
-  depth_stencil.front.reference = 0;
+  AddShader(vert_shader);
+  AddShader(frag_shader, {MakeSpecConst(0, samples)});
 
-  depth_stencil.back = depth_stencil.front;
+  AddVertexBinding(0, sizeof(LightVertex));
+  AddVertexAttribute(0, 0, vk::Format::eR32G32B32Sfloat,
+                     offsetof(LightVertex, pos));
 
-  return depth_stencil;
+  state_.multisample.rasterizationSamples = samples;
+  state_.rasterization.cullMode = vk::CullModeFlagBits::eFront;
+
+  state_.color_attachments.resize(1);
+  auto& att = state_.color_attachments[0];
+
+  att.blendEnable = VK_TRUE;
+  att.colorWriteMask =
+      vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+      vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+
+  att.srcColorBlendFactor = vk::BlendFactor::eOne;
+  att.dstColorBlendFactor = vk::BlendFactor::eOne;
+  att.colorBlendOp = vk::BlendOp::eAdd;
+  att.srcAlphaBlendFactor = vk::BlendFactor::eOne;
+  att.dstAlphaBlendFactor = vk::BlendFactor::eOne;
+  att.alphaBlendOp = vk::BlendOp::eAdd;
+
+  state_.depth_stencil.depthTestEnable = VK_TRUE;
+  state_.depth_stencil.depthWriteEnable = VK_FALSE;
+  state_.depth_stencil.depthCompareOp = vk::CompareOp::eGreaterOrEqual;
+  state_.depth_stencil.stencilTestEnable = VK_TRUE;
+
+  state_.depth_stencil.front.failOp = vk::StencilOp::eKeep;
+  state_.depth_stencil.front.passOp = vk::StencilOp::eKeep;
+  state_.depth_stencil.front.depthFailOp = vk::StencilOp::eKeep;
+  state_.depth_stencil.front.compareOp = vk::CompareOp::eEqual;
+  state_.depth_stencil.front.compareMask = BIT(1);
+  state_.depth_stencil.front.writeMask = 0;
+  state_.depth_stencil.front.reference = 0;
+  state_.depth_stencil.back = state_.depth_stencil.front;
+
+  state_.subpass = 1;
+
+  BuildPipeline();
+}
+
+/*
+ * SpotLightPipe
+ */
+SpotLightPipe::SpotLightPipe(const Context& ctx, const PipelineCache& cache,
+                             const LocalLightPass& render_pass,
+                             VertexShader& vert_shader,
+                             FragmentShader& frag_shader,
+                             vk::SampleCountFlagBits samples,
+                             const DescriptorPool& desc_pool)
+    : Pipeline(ctx, cache, render_pass) {
+  CreateLayout(
+      {desc_pool.GetCameraSets().GetLayout(),
+       desc_pool.GetGBuffSets().GetLayout(),
+       desc_pool.GetSpotLightSets().GetLayout()},
+      {MakePushConst<LightPushConst>(vk::ShaderStageFlagBits::eVertex)});
+
+  AddShader(vert_shader);
+  AddShader(frag_shader, {MakeSpecConst(0, samples)});
+
+  AddVertexBinding(0, sizeof(LightVertex));
+  AddVertexAttribute(0, 0, vk::Format::eR32G32B32Sfloat,
+                     offsetof(LightVertex, pos));
+
+  state_.multisample.rasterizationSamples = samples;
+  state_.rasterization.cullMode = vk::CullModeFlagBits::eFront;
+
+  state_.color_attachments.resize(1);
+  auto& att = state_.color_attachments[0];
+
+  att.blendEnable = VK_TRUE;
+  att.colorWriteMask =
+      vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+      vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+
+  att.srcColorBlendFactor = vk::BlendFactor::eOne;
+  att.dstColorBlendFactor = vk::BlendFactor::eOne;
+  att.colorBlendOp = vk::BlendOp::eAdd;
+  att.srcAlphaBlendFactor = vk::BlendFactor::eOne;
+  att.dstAlphaBlendFactor = vk::BlendFactor::eOne;
+  att.alphaBlendOp = vk::BlendOp::eAdd;
+
+  state_.depth_stencil.depthTestEnable = VK_TRUE;
+  state_.depth_stencil.depthWriteEnable = VK_FALSE;
+  state_.depth_stencil.depthCompareOp = vk::CompareOp::eGreaterOrEqual;
+  state_.depth_stencil.stencilTestEnable = VK_TRUE;
+
+  state_.depth_stencil.front.failOp = vk::StencilOp::eKeep;
+  state_.depth_stencil.front.passOp = vk::StencilOp::eKeep;
+  state_.depth_stencil.front.depthFailOp = vk::StencilOp::eKeep;
+  state_.depth_stencil.front.compareOp = vk::CompareOp::eEqual;
+  state_.depth_stencil.front.compareMask = BIT(1);
+  state_.depth_stencil.front.writeMask = 0;
+  state_.depth_stencil.front.reference = 0;
+  state_.depth_stencil.back = state_.depth_stencil.front;
+
+  state_.subpass = 1;
+
+  BuildPipeline();
 }
 
 /*
  * ABuffFillPipe
  */
-vk::PipelineDepthStencilStateCreateInfo ABuffFillPipe::GetDepthStencilState()
-    const {
-  vk::PipelineDepthStencilStateCreateInfo depth_stencil{};
-  depth_stencil.depthTestEnable = VK_TRUE;
-  depth_stencil.depthWriteEnable = VK_FALSE;
-  depth_stencil.depthCompareOp = vk::CompareOp::eLess;
-  depth_stencil.depthBoundsTestEnable = VK_FALSE;
-  depth_stencil.stencilTestEnable = VK_FALSE;
+ABuffFillPipe::ABuffFillPipe(const Context& ctx, const PipelineCache& cache,
+                             const ABuffPass& render_pass,
+                             VertexShader& vert_shader,
+                             FragmentShader& frag_shader,
+                             vk::SampleCountFlagBits samples,
+                             const DescriptorPool& desc_pool)
+    : Pipeline(ctx, cache, render_pass) {
+  CreateLayout(
+      {
+          desc_pool.GetCameraSets().GetLayout(),
+          TextureArraySet(ctx_).GetLayout(),
+          desc_pool.GetABufferSets().GetLayout(),
+          desc_pool.GetMaterialSets().GetLayout(),
+      },
+      {MakePushConst<ABuffFillPushConst>(vk::ShaderStageFlagBits::eFragment)});
 
-  return depth_stencil;
+  AddShader(vert_shader);
+  AddShader(frag_shader,
+            {MakeSpecConst(0, samples), MakeSpecConst(1, kMaxTextures)});
+
+  AddVertexBinding(0, sizeof(Vertex));
+  AddVertexBinding(1, sizeof(InstanceData), vk::VertexInputRate::eInstance);
+
+  AddVertexAttribute(0, 0, vk::Format::eR32G32B32Sfloat, offsetof(Vertex, pos));
+  AddVertexAttribute(1, 0, vk::Format::eR32G32Sfloat, offsetof(Vertex, uv));
+  AddVertexAttribute(2, 0, vk::Format::eR32G32B32Sfloat,
+                     offsetof(Vertex, normal));
+  AddVertexAttribute(3, 0, vk::Format::eR32G32B32A32Sfloat,
+                     offsetof(Vertex, tangent));
+
+  for (int i = 0; i < 4; i++)
+    AddVertexAttribute(4 + i, 1, vk::Format::eR32G32B32A32Sfloat,
+                       i * sizeof(glm::vec4));
+  for (int i = 0; i < 3; i++)
+    AddVertexAttribute(8 + i, 1, vk::Format::eR32G32B32Sfloat,
+                       offsetof(InstanceData, normal) + i * sizeof(glm::vec3));
+
+  state_.multisample.rasterizationSamples = samples;
+
+  state_.depth_stencil.depthTestEnable = VK_TRUE;
+  state_.depth_stencil.depthWriteEnable = VK_FALSE;
+  state_.depth_stencil.depthCompareOp = vk::CompareOp::eLess;
+  state_.depth_stencil.depthBoundsTestEnable = VK_FALSE;
+  state_.depth_stencil.stencilTestEnable = VK_FALSE;
+
+  state_.subpass = 0;
+
+  BuildPipeline();
+}
+
+/*
+ * ABuffResolvePipe
+ */
+ABuffResolvePipe::ABuffResolvePipe(const Context& ctx,
+                                   const PipelineCache& cache,
+                                   const ABuffPass& render_pass,
+                                   VertexShader& vert_shader,
+                                   FragmentShader& frag_shader,
+                                   vk::SampleCountFlagBits samples,
+                                   const DescriptorPool& desc_pool)
+    : Pipeline(ctx, cache, render_pass) {
+  CreateLayout({desc_pool.GetColorSets().GetLayout(),
+                desc_pool.GetABufferSets().GetLayout()},
+               {MakePushConst<uint32_t>(vk::ShaderStageFlagBits::eFragment)});
+
+  AddShader(vert_shader);
+  AddShader(frag_shader, {MakeSpecConst(0, samples)});
+
+  // present_color, bright_color
+  state_.color_attachments.resize(2);
+  for (auto& att : state_.color_attachments) {
+    att.blendEnable = VK_FALSE;
+    att.colorWriteMask =
+        vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+        vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+  }
+
+  state_.subpass = 1;
+
+  BuildPipeline();
 }
 
 /*
  * WBoitAccPipe
  */
-vk::PipelineDepthStencilStateCreateInfo WBoitAccPipe::GetDepthStencilState()
-    const {
-  vk::PipelineDepthStencilStateCreateInfo depth_stencil{};
-  depth_stencil.depthTestEnable = VK_TRUE;
-  depth_stencil.depthWriteEnable = VK_FALSE;
-  depth_stencil.depthCompareOp = vk::CompareOp::eLess;
-  depth_stencil.depthBoundsTestEnable = VK_FALSE;
-  depth_stencil.stencilTestEnable = VK_FALSE;
+WBoitAccPipe::WBoitAccPipe(const Context& ctx, const PipelineCache& cache,
+                           const WBoitPass& render_pass,
+                           VertexShader& vert_shader,
+                           FragmentShader& frag_shader,
+                           vk::SampleCountFlagBits samples,
+                           const DescriptorPool& desc_pool)
+    : Pipeline(ctx, cache, render_pass) {
+  CreateLayout(
+      {
+          desc_pool.GetCameraSets().GetLayout(),
+          TextureArraySet(ctx_).GetLayout(),
+          desc_pool.GetMaterialSets().GetLayout(),
+      },
+      {MakePushConst<ABuffFillPushConst>(vk::ShaderStageFlagBits::eFragment)});
 
-  return depth_stencil;
+  AddShader(vert_shader);
+  AddShader(frag_shader,
+            {MakeSpecConst(0, samples), MakeSpecConst(1, kMaxTextures)});
+
+  AddVertexBinding(0, sizeof(Vertex));
+  AddVertexBinding(1, sizeof(InstanceData), vk::VertexInputRate::eInstance);
+
+  AddVertexAttribute(0, 0, vk::Format::eR32G32B32Sfloat, offsetof(Vertex, pos));
+  AddVertexAttribute(1, 0, vk::Format::eR32G32Sfloat, offsetof(Vertex, uv));
+  AddVertexAttribute(2, 0, vk::Format::eR32G32B32Sfloat,
+                     offsetof(Vertex, normal));
+  AddVertexAttribute(3, 0, vk::Format::eR32G32B32A32Sfloat,
+                     offsetof(Vertex, tangent));
+
+  for (int i = 0; i < 4; i++)
+    AddVertexAttribute(4 + i, 1, vk::Format::eR32G32B32A32Sfloat,
+                       i * sizeof(glm::vec4));
+  for (int i = 0; i < 3; i++)
+    AddVertexAttribute(8 + i, 1, vk::Format::eR32G32B32Sfloat,
+                       offsetof(InstanceData, normal) + i * sizeof(glm::vec3));
+
+  state_.multisample.rasterizationSamples = samples;
+
+  state_.color_attachments.resize(2);
+
+  state_.color_attachments[0].blendEnable = VK_TRUE;
+  state_.color_attachments[0].colorWriteMask =
+      vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+      vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+
+  state_.color_attachments[0].srcColorBlendFactor = vk::BlendFactor::eOne;
+  state_.color_attachments[0].dstColorBlendFactor = vk::BlendFactor::eOne;
+  state_.color_attachments[0].colorBlendOp = vk::BlendOp::eAdd;
+  state_.color_attachments[0].srcAlphaBlendFactor = vk::BlendFactor::eOne;
+  state_.color_attachments[0].dstAlphaBlendFactor = vk::BlendFactor::eOne;
+  state_.color_attachments[0].alphaBlendOp = vk::BlendOp::eAdd;
+
+  state_.color_attachments[1].blendEnable = VK_TRUE;
+  state_.color_attachments[1].colorWriteMask = vk::ColorComponentFlagBits::eR;
+
+  state_.color_attachments[1].srcColorBlendFactor = vk::BlendFactor::eZero;
+  state_.color_attachments[1].dstColorBlendFactor =
+      vk::BlendFactor::eOneMinusSrcColor;
+  state_.color_attachments[1].colorBlendOp = vk::BlendOp::eAdd;
+  state_.color_attachments[1].srcAlphaBlendFactor = vk::BlendFactor::eZero;
+  state_.color_attachments[1].dstAlphaBlendFactor =
+      vk::BlendFactor::eOneMinusSrcColor;
+  state_.color_attachments[1].alphaBlendOp = vk::BlendOp::eAdd;
+
+  // for (auto& att : state_.color_attachments) {
+  //   att.blendEnable = VK_TRUE;
+  //   att.colorWriteMask =
+  //       vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+  //       vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+  //
+  //   att.srcColorBlendFactor = vk::BlendFactor::eOne;
+  //   att.dstColorBlendFactor = vk::BlendFactor::eOne;
+  //   att.colorBlendOp = vk::BlendOp::eAdd;
+  //
+  //   att.srcAlphaBlendFactor = vk::BlendFactor::eOne;
+  //   att.dstAlphaBlendFactor = vk::BlendFactor::eOne;
+  //   att.alphaBlendOp = vk::BlendOp::eAdd;
+  // }
+
+  state_.depth_stencil.depthTestEnable = VK_TRUE;
+  state_.depth_stencil.depthWriteEnable = VK_FALSE;
+  state_.depth_stencil.depthCompareOp = vk::CompareOp::eLess;
+  state_.depth_stencil.stencilTestEnable = VK_FALSE;
+
+  state_.subpass = 0;
+
+  BuildPipeline();
+}
+
+/*
+ * WBoitResolvePipe
+ */
+WBoitResolvePipe::WBoitResolvePipe(const Context& ctx,
+                                   const PipelineCache& cache,
+                                   const WBoitPass& render_pass,
+                                   VertexShader& vert_shader,
+                                   FragmentShader& frag_shader,
+                                   const DescriptorPool& desc_pool)
+    : Pipeline(ctx, cache, render_pass) {
+  CreateLayout({desc_pool.GetColorSets().GetLayout(),
+                desc_pool.GetWBoitInputSets().GetLayout()},
+               {});
+
+  AddShader(vert_shader);
+  AddShader(frag_shader);
+
+  // present_color, bright_color
+  state_.color_attachments.resize(2);
+  for (auto& att : state_.color_attachments) {
+    att.blendEnable = VK_FALSE;
+    att.colorWriteMask =
+        vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+        vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+  }
+
+  state_.subpass = 1;
+
+  BuildPipeline();
+}
+
+/*
+ * SwapPipe
+ */
+SwapPipe::SwapPipe(const Context& ctx, const PipelineCache& cache,
+                   const SwapPass& render_pass, VertexShader& vert_shader,
+                   FragmentShader& frag_shader, const DescriptorPool& desc_pool)
+    : Pipeline(ctx, cache, render_pass) {
+  CreateLayout(
+      {desc_pool.GetPresentColorSets().GetLayout()},
+      {MakePushConst<LoadPushConst>(vk::ShaderStageFlagBits::eFragment)});
+
+  AddShader(vert_shader);
+  AddShader(frag_shader);
+
+  state_.color_attachments.resize(1);
+  state_.color_attachments[0].blendEnable = VK_FALSE;
+  state_.color_attachments[0].colorWriteMask =
+      vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+      vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+
+  state_.subpass = 0;
+
+  BuildPipeline();
 }
 
 }  // namespace npr_graphics

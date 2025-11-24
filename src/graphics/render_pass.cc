@@ -801,7 +801,7 @@ std::vector<vk::ImageView> ABuffPass::GetAttachmentViews(int frame_idx) const {
 void WBoitPass::SetClearValues() {
   clear_values_.resize(7);
 
-  // acc_color_ms, acc_weight_ms, acc_color_res, acc_weight_res,
+  // acc_color_ms, acc_weight_ms
   clear_values_[0].color = std::array<float, 4>{0.0f, 0.0f, 0.0f, 0.0f};
   clear_values_[1].color = std::array<float, 4>{1.0f, 0.0f, 0.0f, 0.0f};
 }

@@ -1,4 +1,5 @@
 #version 450
+layout(early_fragment_tests) in; // force early depth test
 
 layout(constant_id = 0) const uint SAMPLES = 4;
 layout(constant_id = 1) const uint MAX_TEXTURES = 128;
@@ -48,7 +49,7 @@ void main() {
   if (material.maps.x != -1)
     albedo *= texture(textures[material.maps.x], frag_uv);
 
-  if (albedo.a < 0.01) discard; // insignificant
+  if (albedo.a < 0.01) return; // insignificant
 
   uint coverage_mask = gl_SampleMaskIn[0];
   uint pixel_idx = (uint(gl_FragCoord.y) * width + uint(gl_FragCoord.x)) * SAMPLES;

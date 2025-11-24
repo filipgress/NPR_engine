@@ -62,6 +62,37 @@ class ColorSets : public SingleTexSets {
   }
 };
 
+class TempColorSets : public SingleTexSets {
+ public:
+  TempColorSets(const Context& ctx, uint count) : SingleTexSets{ctx, count} {}
+
+  const Texture* GetAttach(const Resources& resrc,
+                           int frame_idx) const override {
+    return resrc.GetResrc()[frame_idx].temp_color.get();
+  }
+};
+
+class PresentColorSets : public SingleTexSets {
+ public:
+  PresentColorSets(const Context& ctx, uint count)
+      : SingleTexSets{ctx, count} {}
+
+  const Texture* GetAttach(const Resources& resrc,
+                           int frame_idx) const override {
+    return resrc.GetResrc()[frame_idx].present_color.get();
+  }
+};
+
+class BrightColorSets : public SingleTexSets {
+ public:
+  BrightColorSets(const Context& ctx, uint count) : SingleTexSets{ctx, count} {}
+
+  const Texture* GetAttach(const Resources& resrc,
+                           int frame_idx) const override {
+    return resrc.GetResrc()[frame_idx].bright_color.get();
+  }
+};
+
 class AOResSets : public SingleTexSets {
  public:
   AOResSets(const Context& ctx, uint count) : SingleTexSets{ctx, count} {}
@@ -181,7 +212,7 @@ class TextureArraySet : public BaseDescSets {
               const npr_graphics::Texture& default_tex) const;
   void Update(uint idx, const npr_graphics::Texture& texture) const;
   std::vector<vk::DescriptorPoolSize> GetPoolSizes() const override {
-    return {{vk::DescriptorType::eCombinedImageSampler, MAX_TEXTURES}};
+    return {{vk::DescriptorType::eCombinedImageSampler, kMaxTextures}};
   }
 
  private:

@@ -34,7 +34,7 @@ void Shader::CreateShaderModule() {
   ctx_.SetDbgName((uint64_t)(VkShaderModule)module_,
                   vk::ObjectType::eShaderModule, name_);
 
-  version_++;
+  ver_++;
   dirty_ = false;
 }
 

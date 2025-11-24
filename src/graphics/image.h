@@ -17,6 +17,12 @@ class Image : public npr_core::NonCopyable {
 
   vk::ImageView GetImageView() const { return image_view_; }
 
+  void Transition(vk::CommandBuffer cmd_buff, vk::ImageLayout old_layout,
+                  vk::ImageLayout new_layout, uint32_t start_mip_level,
+                  uint32_t mip_level_count);
+  void Resolve(vk::CommandBuffer cmd_buff, Image& dst,
+               vk::ImageLayout src_layout, vk::ImageLayout dst_layout);
+
  private:
   void CreateImage(vk::ImageUsageFlags usage, vk::SampleCountFlagBits samples,
                    vk::SharingMode sharing_mode);
@@ -91,9 +97,6 @@ class Texture : public Image {
  private:
   void CreateSampler(const SamplerProps& props = SamplerProps());
 
-  void Transition(vk::CommandBuffer cmd_buff, vk::ImageLayout old_layout,
-                  vk::ImageLayout new_layout, uint32_t start_mip_level,
-                  uint32_t mip_level_count);
   void CopyFromBuffer(vk::CommandBuffer cmd_buff);
   void GenerateMipmaps(vk::CommandBuffer cmd_buff);
 

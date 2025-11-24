@@ -14,7 +14,7 @@ class Shader : public npr_core::NonCopyable {
   void CreateShaderModule();
   void DestroyShaderModule();
 
-  uint64_t GetVersion() const { return version_; }
+  uint32_t GetVer() const { return ver_; }
   vk::PipelineShaderStageCreateInfo GetShaderStageInfo(
       const std::string& entry) const;
 
@@ -43,7 +43,7 @@ class Shader : public npr_core::NonCopyable {
 
   std::future<bool> handle_;
   bool dirty_{false};
-  uint64_t version_{0};
+  uint32_t ver_{0};
 };
 
 class VertexShader : public Shader {
