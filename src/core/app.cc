@@ -15,12 +15,15 @@ App::App()
 }
 
 void App::Run() {
+  timer_.SetTargetFPS(60);
+
   while (running_) {
+    timer_.Wait();
     Update();
 
     if (window_.IsMinimized()) continue;
-    renderer_.Render(camera_, *active_scene_, loading_scene_->IsLoading(),
-                     timer_.GetElapsed());
+    renderer_.Render(timer_, camera_, *active_scene_,
+                     loading_scene_->IsLoading());
   }
 
   renderer_.Finish();
@@ -41,11 +44,11 @@ void App::Update() {
 }
 
 void App::ProcessInput() {
+  if (ImGui::GetIO().WantCaptureMouse) return;
+
   if (inputs_.key_tokens.contains(GLFW_KEY_LEFT_CONTROL) &&
       inputs_.key_tokens.contains(GLFW_KEY_R))
     renderer_.RecompileShaders();
-
-  if (inputs_.key_tokens.contains(GLFW_KEY_I)) INFO(timer_.GetAvgFPS(), "fps");
 
   if (inputs_.key_tokens.contains(GLFW_KEY_O)) {
     if (active_scene_->IsValid()) {
@@ -56,7 +59,7 @@ void App::ProcessInput() {
 
   if (camera_.GetMode() == npr_scene::CameraMode::kFree) {
     float dt = timer_.GetDelta();
-    camera_.Rotate(inputs_.mouse_move, dt);
+    camera_.Rotate(inputs_.mouse_move);
 
     if (inputs_.key_tokens.contains(GLFW_KEY_W))
       camera_.Move({0.0f, 0.0f, 1.0f}, dt);

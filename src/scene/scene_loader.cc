@@ -106,11 +106,9 @@ void SceneLoader::LoadEntity(Scene& scene, flecs::entity parent_ent,
 
     const auto& node = model.nodes[node_idx];
 
-    std::string entity_name =
-        scene.GetSceneName() + "_node_" + std::to_string(node_idx) + node.name;
+    std::string ent_name = node.name + "_" + std::to_string(node_idx);
+    flecs::entity child_ent = scene.world_.entities_.entity(ent_name.c_str());
 
-    flecs::entity child_ent =
-        scene.world_.entities_.entity(entity_name.c_str());
     if (parent_ent.is_valid()) child_ent.child_of(parent_ent);
 
     if (node.camera != -1)
@@ -145,7 +143,8 @@ void SceneLoader::LoadObject(Scene& scene, flecs::entity node_ent,
       continue;
     }
 
-    std::string prim_name = node.name + "_prim_" + std::to_string(prim_idx);
+    std::string prim_name =
+        std::string(node_ent.name()) + "_prim_" + std::to_string(prim_idx);
     flecs::entity prim_ent = scene.world_.entities_.entity(prim_name.c_str());
 
     prim_ent.child_of(node_ent);

@@ -6,8 +6,8 @@
 namespace npr_scene {
 
 struct MeshMaterialKey {
-  MeshComp mesh;
-  MaterialComp mat;
+  const MeshComp& mesh;
+  const MaterialComp& mat;
 
   bool operator==(const MeshMaterialKey& other) const {
     return mesh.vbo_idx == other.mesh.vbo_idx &&
@@ -58,8 +58,8 @@ struct MeshMaterialHash {
 };
 
 struct PerInstanceData {
-  TransformComp tf;
-  BoundingBoxComp bb;
+  const TransformComp& tf;
+  const BoundingBoxComp& bb;
 };
 
 using InstanceMap =

@@ -13,6 +13,7 @@
 #include "pipeline.h"
 #include "pipeline_cache.h"
 
+#include "core/frame_timer.h"
 #include "window/window.h"
 #include "scene/scene.h"
 #include "scene/camera.h"
@@ -23,8 +24,8 @@ class Renderer : public npr_core::NonCopyable {
   Renderer(const npr_window::Window& window) : window_{window} {}
   ~Renderer() { Finish(); }
 
-  void Render(const npr_scene::Camera& camera, npr_scene::Scene& scene,
-              bool is_loading, float dt);
+  void Render(const npr_core::FrameTimer& timer, npr_scene::Camera& camera,
+              npr_scene::Scene& scene, bool is_loading);
 
   const Context& GetContext() const { return ctx_; }
   const Resources& GetResrc() const { return resrc_; }

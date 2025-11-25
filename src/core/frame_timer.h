@@ -15,8 +15,7 @@ class FrameTimer {
 
   uint GetMinFPS() const { return min_fps_; }
   uint GetMaxFPS() const { return max_fps_; }
-  uint GetAvgFPS() const { return std::round(avg_fps_); }
-  // float GetAvgFPS() const { return avg_fps_; }
+  float GetAvgFPS() const { return avg_fps_; }
   float GetDelta() const { return delta_; }
   float GetElapsed() const { return elapsed_; }
 

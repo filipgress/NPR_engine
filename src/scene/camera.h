@@ -22,10 +22,10 @@ struct CameraProps {
   float pan_factor{1.3f};
   float zoom_factor{0.02f};
   float move_factor{10.0f};
-  float rotate_factor{750.0f};
+  float rotate_factor{3.0f};
 
   float orbit_anim_factor{11.0f};
-  float free_anim_factor{17.0f};
+  float free_anim_factor{22.0f};
 
   float min_dist{0.5f};
   float max_dist{100.0f};
@@ -47,6 +47,7 @@ class Camera {
   Camera(float aspect) : Camera{{.aspect = aspect}} {}
 
   CameraMode GetMode() const { return props_.mode; }
+  bool IsOrbit() const { return props_.mode == CameraMode::kOrbit; }
   void SetMode(CameraMode mode) { props_.mode = mode; }
   void ToggleMode() {
     props_.mode = props_.mode == CameraMode::kFree ? CameraMode::kOrbit
@@ -62,6 +63,7 @@ class Camera {
   }
 
   void SetEntity(flecs::entity ent);
+  void SetTrackTarget(flecs::entity ent);
   void SetTrackTarget(const glm::vec3& target);
 
   void Update(float dt);
@@ -71,7 +73,7 @@ class Camera {
   void Zoom(float delta);
 
   void Move(glm::vec3 delta, float dt);
-  void Rotate(glm::vec2 delta, float dt);
+  void Rotate(glm::vec2 delta);
 
  private:
   void SetProjMat();

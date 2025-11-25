@@ -32,6 +32,8 @@ void Camera::SetAspect(float aspect) {
 }
 
 void Camera::SetEntity(flecs::entity ent) {
+  if (!ent.is_valid() || !ent.has<CameraTag>()) return;
+
   ent_ = ent;
 
   const auto& transform = ent_.get<TransformComp>();
@@ -43,9 +45,19 @@ void Camera::SetEntity(flecs::entity ent) {
   frustum_.Update(proj_ * view_);
 }
 
+void Camera::SetTrackTarget(flecs::entity ent) {
+  if (!ent.is_valid() || !ent.has<TransformComp>()) return;
+
+  const auto& tf = ent.get<TransformComp>();
+  glm::vec3 target = glm::vec3(tf.glob_mat[3]);
+  SetTrackTarget(target);
+}
+
 void Camera::SetTrackTarget(const glm::vec3& target) {
   target_ = target;
   dest_.front = glm::normalize(target_ - dest_.pos);
+
+  InvalidateEntity();
 }
 
 void Camera::SetProjMat() {
@@ -75,17 +87,15 @@ void Camera::Update(float dt) {
       glm::length(curr_.front - dest_.front) < 0.001f)
     return;
 
-  float t{0.0f};
   if (props_.mode == CameraMode::kOrbit) {
-    t = glm::clamp(props_.orbit_anim_factor * dt, 0.0f, 1.0f);
+    float t = glm::clamp(props_.orbit_anim_factor * dt, 0.0f, 1.0f);
     curr_.pos = glm::mix(curr_.pos, dest_.pos, t);
+    curr_.front = glm::normalize(glm::mix(curr_.front, dest_.front, t));
 
   } else if (props_.mode == CameraMode::kFree) {
-    t = glm::clamp(props_.free_anim_factor * dt, 0.0f, 1.0f);
     curr_.pos = dest_.pos;
+    curr_.front = dest_.front;
   }
-
-  curr_.front = glm::normalize(glm::mix(curr_.front, dest_.front, t));
 
   SetViewMat();
   frustum_.Update(proj_ * view_);
@@ -156,7 +166,7 @@ void Camera::Move(glm::vec3 delta, float dt) {
                (right * delta.x + up * delta.y + dest_.front * delta.z);
 }
 
-void Camera::Rotate(glm::vec2 delta, float dt) {
+void Camera::Rotate(glm::vec2 delta) {
   if (!delta.x && !delta.y) return;
   InvalidateEntity();
 
@@ -164,8 +174,8 @@ void Camera::Rotate(glm::vec2 delta, float dt) {
   float theta = glm::asin(dir.y);
   float phi = std::atan2(dir.z, dir.x);
 
-  theta += delta.y * dt * props_.rotate_factor;
-  phi += delta.x * dt * props_.rotate_factor;
+  theta += delta.y * props_.rotate_factor;
+  phi += delta.x * props_.rotate_factor;
 
   theta = glm::clamp(theta, -props_.max_theta, props_.max_theta);
   phi = glm::mod(phi, glm::two_pi<float>());

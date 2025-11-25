@@ -34,6 +34,8 @@ class World : npr_core::NonCopyable {
                BoundingBoxComp>
       renderable_query_;
 
+  flecs::query<const ObjectTag, const TransformComp> object_query_;
+
   // light queries
   flecs::query<const DirLightTag, const TransformComp, const LightComp>
       dir_light_query_;

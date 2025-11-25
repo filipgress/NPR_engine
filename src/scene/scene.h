@@ -20,7 +20,10 @@ class Scene : npr_core::NonCopyable {
 
   auto& GetResrc() const { return *resrc_; }
   auto& GetInstances() const { return world_.instances_; }
+
   auto& GetCamQuery() const { return world_.cam_query_; }
+  auto& GetObjectQuery() const { return world_.object_query_; }
+  auto& GetRenderableQuery() const { return world_.renderable_query_; }
   auto& GetDirLightQuery() const { return world_.dir_light_query_; }
   auto& GetPointLightQuery() const { return world_.point_light_query_; }
   auto& GetSpotLightQuery() const { return world_.spot_light_query_; }

@@ -5,14 +5,16 @@
 
 namespace npr_scene {
 
+struct ObjectTag {
+  /* TransformComp */
+};
+
 struct PrimitiveTag {
+  /* must be ChildOf ObjectTag */
+
   /* MeshComp */
   /* MaterialComp */
   /* BoundingBoxComp */
-};
-
-struct ObjectTag {
-  /* TransformComp */
 };
 
 struct CameraTag {

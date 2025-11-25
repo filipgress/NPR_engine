@@ -7,7 +7,10 @@
 #include "pipeline_cache.h"
 #include "descriptor_pool.h"
 
+#include "core/frame_timer.h"
 #include "window/window.h"
+#include "scene/camera.h"
+#include "scene/scene.h"
 
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
@@ -27,7 +30,9 @@ class GuiManager : public npr_core::NonCopyable {
              const PipelineCache& pipeline_cache);
   ~GuiManager();
 
-  void NewFrame();
+  void NewFrame(const npr_core::FrameTimer& timer, npr_scene::Camera& camera,
+                npr_scene::Scene& scene);
+
   void RecordUI(vk::CommandBuffer cmd) {
     ImGui::Render();
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
@@ -38,7 +43,32 @@ class GuiManager : public npr_core::NonCopyable {
   static void CheckVkResult(VkResult result);
 
  private:
+  void SceneWindow(npr_scene::Camera& camera, npr_scene::Scene& scene);
+  void InspectorWindow(npr_scene::Camera& camera);
+  void FpsOverlay(float fps);
+
+  void DrawEntTree(flecs::entity ent, npr_scene::Camera& camera, bool filter,
+                   const std::unordered_set<uint64_t>& visible_entities);
+  void CalcVisib(npr_scene::Scene& scene, const std::string& search,
+                 std::unordered_set<uint64_t>& visible_entities);
+
+  void DrawTransformComp(npr_scene::Camera& camera);
+  void DrawMeshComp();
+  void DrawMaterialComp();
+  void DrawBoundingBoxComp();
+
+  void DrawPerspectiveComp(npr_scene::Camera& camera);
+  void DrawOrthographicComp(npr_scene::Camera& camera);
+
+  void DrawLightComp();
+  void DrawRangeComp();
+  void DrawSpotComp();
+
+ private:
   ImGuiDescriptorPool desc_pool_;
+  char search_buff_[128] = "";
+
+  flecs::entity selected_ent_ = flecs::entity::null();
 };
 
 }  // namespace npr_graphics

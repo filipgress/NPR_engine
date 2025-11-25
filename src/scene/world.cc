@@ -10,6 +10,8 @@ void World::Reset() {
   tf_query_ = {};
   renderable_query_ = {};
 
+  object_query_ = {};
+
   dir_light_query_ = {};
   point_light_query_ = {};
   spot_light_query_ = {};
@@ -33,6 +35,13 @@ void World::BuildQueries() {
           .detect_changes()
           .term_at(0)
           .parent()
+          .build();
+
+  object_query_ =
+      entities_.query_builder<const ObjectTag, const TransformComp>()
+          .parent()
+          .oper(flecs::oper_kind_t::Not)
+          .cached()
           .build();
 
   dir_light_query_ = entities_

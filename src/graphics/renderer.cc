@@ -7,8 +7,8 @@ namespace npr_graphics {
 uint Renderer::mat_at{0};
 uint Renderer::inst_at{0};
 
-void Renderer::Render(const Camera& camera, Scene& scene, bool is_loading,
-                      float dt) {
+void Renderer::Render(const npr_core::FrameTimer& timer, Camera& camera,
+                      Scene& scene, bool is_loading) {
   if (!scene.IsValid() || !scene.IsInit()) return;
   auto device = ctx_.GetDevice();
 
@@ -45,8 +45,8 @@ void Renderer::Render(const Camera& camera, Scene& scene, bool is_loading,
   // record & submit commands
   vk::CommandBuffer cmd_buff;
   if (scene.IsValid() && scene.IsInit()) {
-    gui_manager_.NewFrame();
-    cmd_buff = Record(image_idx, camera, scene, is_loading, dt);
+    gui_manager_.NewFrame(timer, camera, scene);
+    cmd_buff = Record(image_idx, camera, scene, is_loading, timer.GetElapsed());
   }
 
   auto render_finished = sync_.GetRenderFinished(image_idx);
@@ -112,8 +112,8 @@ vk::CommandBuffer Renderer::Record(uint image_idx, const Camera& camera,
   RecordLocalLight(cmd_buff, frame_idx, frame_resrc, resrc_extent, cam_ubo,
                    camera, scene);
 
-  // RecordABuff(cmd_buff, frame_idx, frame_resrc, resrc_extent, camera, scene);
-  RecordWBoit(cmd_buff, frame_idx, frame_resrc, resrc_extent, camera, scene);
+  RecordABuff(cmd_buff, frame_idx, frame_resrc, resrc_extent, camera, scene);
+  // RecordWBoit(cmd_buff, frame_idx, frame_resrc, resrc_extent, camera, scene);
 
   RecordSwap(cmd_buff, image_idx, frame_idx, camera.GetAspect(), is_loading,
              dt);
