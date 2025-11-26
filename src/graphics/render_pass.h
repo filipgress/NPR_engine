@@ -14,6 +14,8 @@ class BasePass : public npr_core::NonCopyable {
   vk::RenderPassBeginInfo BeginInfo(uint frame_idx, vk::Extent2D extent) const;
   vk::RenderPass GetRenderPass() const { return render_pass_; }
 
+  virtual void CreateFramebuffers() = 0;
+
  protected:
   void Init() {
     SetClearValues();
@@ -22,8 +24,6 @@ class BasePass : public npr_core::NonCopyable {
   }
 
   void CreateRenderPass();
-
-  virtual void CreateFramebuffers() = 0;
   void DestroyFramebuffers();
 
   virtual void SetClearValues() = 0;
@@ -47,8 +47,9 @@ class RenderPass : public BasePass {
       : BasePass{ctx}, resrc_{resrc} {}
   virtual ~RenderPass() = default;
 
- protected:
   void CreateFramebuffers() override;
+
+ protected:
   virtual std::vector<vk::ImageView> GetAttachmentViews(
       int frame_idx) const = 0;
 

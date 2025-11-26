@@ -222,6 +222,8 @@ class Resources : public npr_core::NonCopyable {
     return frame_resources_;
   }
 
+  void RecreateFrame(vk::Extent2D extent);
+
  private:
   void CreateImages();
   void CreateBuffers();

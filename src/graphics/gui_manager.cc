@@ -87,9 +87,11 @@ void GuiManager::NewFrame(npr_graphics::RenderSettings& settings,
   FpsOverlay(timer.GetAvgFPS());
   if (!camera.IsOrbit()) return;
 
-  GlobalSettingsWindow(settings, timer);
+  GlobalSettingsWindow(settings, timer, camera.GetAspect());
   SceneWindow(camera, scene);
   InspectorWindow(camera);
+
+  // ImGui::ShowDemoWindow();
 }
 
 void GuiManager::FpsOverlay(float fps) {
@@ -111,8 +113,9 @@ void GuiManager::FpsOverlay(float fps) {
 }
 
 void GuiManager::GlobalSettingsWindow(npr_graphics::RenderSettings& settings,
-                                      npr_core::FrameTimer& timer) {
-  ImVec2 win_size{300, 350};
+                                      npr_core::FrameTimer& timer,
+                                      float cam_aspect) {
+  ImVec2 win_size{300, 250};
   ImVec2 display_size = ImGui::GetIO().DisplaySize;
 
   ImGui::SetNextWindowPos(ImVec2(display_size.x - win_size.x - 10, 40),
@@ -121,58 +124,125 @@ void GuiManager::GlobalSettingsWindow(npr_graphics::RenderSettings& settings,
 
   ImGui::Begin("settings");
 
-  // === fps limiter ===
-  ImGui::SeparatorText("fps limiter");
-  ImGui::Spacing();
+  if (ImGui::CollapsingHeader("frame rate")) {
+    ImGui::Spacing();
 
-  bool enable_limit = (timer.GetTargetFPS() > 0);
-  if (ImGui::Checkbox("##fps_limit", &enable_limit))
-    enable_limit ? timer.SetTargetFPS(60) : timer.SetTargetFPS(0);
+    bool enable_limit = (timer.GetTargetFPS() > 0);
+    if (ImGui::Checkbox("##fps_limit", &enable_limit))
+      enable_limit ? timer.SetTargetFPS(60) : timer.SetTargetFPS(0);
 
-  ImGui::SameLine();
-
-  ImGui::BeginDisabled(!enable_limit);
-  int target_fps = timer.GetTargetFPS();
-  target_fps = target_fps == 0 ? 60 : target_fps;
-  if (ImGui::SliderInt("##fps_target", &target_fps, 30, 120, "%d FPS"))
-    timer.SetTargetFPS(static_cast<uint>(target_fps));
-  ImGui::EndDisabled();
-
-  // === transparency ===
-  ImGui::SeparatorText("transparency");
-  ImGui::Spacing();
-
-  int curr_mode = static_cast<int>(settings.trans_mode);
-  const char* modes[] = {"disabled", "linked list (a-buffer)",
-                         "weighted blended (wboit)"};
-  if (ImGui::Combo("mode", &curr_mode, modes, IM_ARRAYSIZE(modes)))
-    settings.trans_mode = static_cast<TransparencyMode>(curr_mode);
-
-  // === ambient occlusion ===
-  ImGui::SeparatorText("ambient");
-  ImGui::Spacing();
-
-  ImGui::ColorEdit3("color", &settings.ambient_color.x);
-  ImGui::DragFloat("intensity", &settings.ambient_intensity, 0.005f, 0.0f,
-                   1.0f);
-
-  if (settings.ambient_intensity < 0.05f) settings.enable_ssao = false;
-
-  ImGui::Spacing();
-
-  ImGui::BeginDisabled(settings.ambient_intensity < 0.05f);
-  ImGui::Checkbox("ambient occlusion", &settings.enable_ssao);
-  ImGui::EndDisabled();
-
-  if (settings.ambient_intensity < 0.05f) {
     ImGui::SameLine();
-    ImGui::Text("(ineffective)");
+
+    ImGui::BeginDisabled(!enable_limit);
+    int target_fps = timer.GetTargetFPS();
+    target_fps = target_fps == 0 ? 60 : target_fps;
+    if (ImGui::SliderInt("##fps_target", &target_fps, 30, 120, "%d FPS"))
+      timer.SetTargetFPS(static_cast<uint>(target_fps));
+    ImGui::EndDisabled();
+
+    ImGui::Spacing();
   }
 
-  ImGui::BeginDisabled(!settings.enable_ssao);
-  ImGui::DragFloat("radius", &settings.ssao_radius, 0.01f, 0.1f, 2.0f);
-  ImGui::DragFloat("bias", &settings.ssao_bias, 0.001f, 0.001f, 0.1f);
-  ImGui::EndDisabled();
+  if (ImGui::CollapsingHeader("resolution")) {
+    static int width = settings.target_size.width;
+    static int height = settings.target_size.height;
+    static bool lock_aspect = false;
+
+    ImGui::Spacing();
+
+    ImGui::Checkbox("lock aspect", &lock_aspect);
+    ImGui::SameLine();
+
+    ImGui::SetNextItemWidth(150.0f);
+    int values[2] = {width, height};
+    if (ImGui::DragInt2("##res", values, 1.0f, 20, 3840, "%d")) {
+      int new_width = values[0];
+      int new_height = values[1];
+
+      if (lock_aspect) {
+        if (new_width != width) {
+          height = static_cast<int>(static_cast<float>(new_width) / cam_aspect);
+          width = new_width;
+        } else if (new_height != height) {
+          width = static_cast<int>(static_cast<float>(new_height) * cam_aspect);
+          height = new_height;
+        }
+      } else {
+        width = new_width;
+        height = new_height;
+      }
+    }
+    ImGui::Spacing();
+
+    bool resolution_changed =
+        (width != static_cast<int>(settings.target_size.width) ||
+         height != static_cast<int>(settings.target_size.height));
+
+    ImGui::BeginDisabled(!resolution_changed);
+    if (ImGui::Button("apply", ImVec2(80, 0))) {
+      settings.dirty_target_size = true;
+      settings.target_size = vk::Extent2D{static_cast<uint32_t>(width),
+                                          static_cast<uint32_t>(height)};
+    }
+    ImGui::EndDisabled();
+
+    ImGui::SameLine();
+    if (ImGui::Button("reset", ImVec2(80, 0))) {
+      width = settings.target_size.width;
+      height = settings.target_size.height;
+    }
+
+    ImGui::Spacing();
+  }
+
+  if (ImGui::CollapsingHeader("transparency")) {
+    static int selected_mode = static_cast<int>(settings.trans_mode);
+
+    ImGui::Spacing();
+    if (ImGui::Selectable("disabled", selected_mode == 0)) {
+      selected_mode = 0;
+      settings.trans_mode = static_cast<TransparencyMode>(selected_mode);
+    }
+
+    if (ImGui::Selectable("linked list (A-buffer)", selected_mode == 1)) {
+      selected_mode = 1;
+      settings.trans_mode = static_cast<TransparencyMode>(selected_mode);
+    }
+
+    if (ImGui::Selectable("weighted blended (WBoit)", selected_mode == 2)) {
+      selected_mode = 2;
+      settings.trans_mode = static_cast<TransparencyMode>(selected_mode);
+    }
+    ImGui::Spacing();
+  }
+
+  if (ImGui::CollapsingHeader("ambient")) {
+    ImGui::Spacing();
+
+    ImGui::ColorEdit3("color", &settings.ambient_color.x);
+    ImGui::DragFloat("intensity", &settings.ambient_intensity, 0.005f, 0.0f,
+                     1.0f);
+
+    if (settings.ambient_intensity < 0.05f) settings.enable_ssao = false;
+
+    ImGui::Spacing();
+
+    ImGui::BeginDisabled(settings.ambient_intensity < 0.05f);
+    ImGui::Checkbox("ambient occlusion", &settings.enable_ssao);
+    ImGui::EndDisabled();
+
+    if (settings.ambient_intensity < 0.05f) {
+      ImGui::SameLine();
+      ImGui::Text("(ineffective)");
+    }
+
+    ImGui::BeginDisabled(!settings.enable_ssao);
+    ImGui::DragFloat("radius", &settings.ssao_radius, 0.01f, 0.1f, 2.0f);
+    ImGui::DragFloat("bias", &settings.ssao_bias, 0.001f, 0.001f, 0.1f);
+    ImGui::EndDisabled();
+
+    ImGui::Spacing();
+  }
 
   ImGui::End();
 }
@@ -245,6 +315,7 @@ void GuiManager::SceneWindow(Camera& camera, Scene& scene) {
   if (ImGui::CollapsingHeader("scene graph")) {
     ImGui::Spacing();
 
+    static char search_buff_[128] = "";
     ImGui::InputTextWithHint("##search", "search", search_buff_,
                              sizeof(search_buff_));
 

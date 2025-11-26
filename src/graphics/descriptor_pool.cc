@@ -144,6 +144,21 @@ void DescriptorPool::CreateDescriptorPool() {
                   vk::ObjectType::eDescriptorPool, "main_descriptor_pool");
 }
 
+void DescriptorPool::UpdateDescriptors(const Resources& resrc) {
+  gbuff_sets_.Update(resrc);
+
+  ao_res_sets_.Update(resrc);
+  ao_temp_sets_.Update(resrc);
+
+  abuff_sets_.Update(resrc);
+  wboit_input_sets_.Update(resrc);
+
+  color_sets_.Update(resrc);
+  temp_sets_.Update(resrc);
+  present_sets_.Update(resrc);
+  bright_sets_.Update(resrc);
+}
+
 /*
  * TexDescriptorPool
  */

@@ -35,6 +35,8 @@ class DescriptorPool : public npr_core::NonCopyable {
   const PresentColorSets& GetPresentColorSets() const { return present_sets_; }
   const BrightColorSets& GetBrightColorSets() const { return bright_sets_; }
 
+  void UpdateDescriptors(const Resources& resrc);
+
  private:
   void CreateDescriptorPool();
 

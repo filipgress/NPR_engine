@@ -47,6 +47,8 @@ void BasePass::CreateRenderPass() {
 }
 
 void RenderPass::CreateFramebuffers() {
+  DestroyFramebuffers();
+
   auto& resrc = resrc_.GetResrc();
   auto extent = resrc_.GetProps().extent;
 

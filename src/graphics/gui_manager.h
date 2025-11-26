@@ -48,7 +48,7 @@ class GuiManager : public npr_core::NonCopyable {
  private:
   void FpsOverlay(float fps);
   void GlobalSettingsWindow(npr_graphics::RenderSettings& settings,
-                            npr_core::FrameTimer& timer);
+                            npr_core::FrameTimer& timer, float cam_aspect);
   void SceneWindow(npr_scene::Camera& camera, npr_scene::Scene& scene);
   void InspectorWindow(npr_scene::Camera& camera);
 
@@ -71,8 +71,6 @@ class GuiManager : public npr_core::NonCopyable {
 
  private:
   ImGuiDescriptorPool desc_pool_;
-  char search_buff_[128] = "";
-
   flecs::entity selected_ent_ = flecs::entity::null();
 };
 

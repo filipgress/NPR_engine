@@ -22,6 +22,17 @@ class PassManager : public npr_core::NonCopyable {
         swap_{ctx, swapchain} {}
   ~PassManager() = default;
 
+  void RecreateFramebuffers() {
+    gbuff_.CreateFramebuffers();
+    ao_.CreateFramebuffers();
+    ao_blur_h_.CreateFramebuffers();
+    ao_blur_v_.CreateFramebuffers();
+    glob_light_.CreateFramebuffers();
+    local_light_.CreateFramebuffers();
+    abuff_.CreateFramebuffers();
+    wboit_.CreateFramebuffers();
+  }
+
  private:
   GBuffPass gbuff_;
   AOPass ao_;

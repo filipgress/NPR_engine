@@ -24,6 +24,8 @@ namespace npr_graphics {
 enum class TransparencyMode { kNone, kABuff, kWBoit };
 struct RenderSettings {
   vk::Extent2D target_size{500, 400};
+  bool dirty_target_size{false};
+
   glm::vec3 ambient_color{0.3f, 0.3f, 0.3f};
   float ambient_intensity{0.225f};
 
@@ -52,6 +54,12 @@ class Renderer : public npr_core::NonCopyable {
   void UpdatePipelines();
 
  private:
+  void SwapTargetResize();
+  void RenderTargetResize();
+
+  std::pair<vk::Viewport, vk::Rect2D> CalcViewportScissor(
+      vk::Extent2D swap_extent, float camera_aspect) const;
+
   vk::CommandBuffer Record(uint image_idx, const npr_scene::Camera& camera,
                            npr_scene::Scene& scene, bool is_loading, float dt);
 
@@ -106,10 +114,6 @@ class Renderer : public npr_core::NonCopyable {
   void RecordSwap(vk::CommandBuffer cmd_buff, uint image_idx,
                   const uint frame_idx, float camera_aspect, bool is_loading,
                   float dt);
-
-  void RenderTargetResize();
-  std::pair<vk::Viewport, vk::Rect2D> CalcViewportScissor(
-      vk::Extent2D swap_extent, float camera_aspect) const;
 
  private:
   static uint mat_at;   // cycling through material descriptor sets

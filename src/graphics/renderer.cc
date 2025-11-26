@@ -7,6 +7,28 @@ namespace npr_graphics {
 uint Renderer::mat_at{0};
 uint Renderer::inst_at{0};
 
+void Renderer::SwapTargetResize() {
+  WaitIdle();
+
+  swapchain_.Recreate(window_.GetSize());
+  passes_.swap_.CreateFramebuffers();
+}
+
+void Renderer::RenderTargetResize() {
+  WaitIdle();
+
+  resrc_.RecreateFrame(settings_.target_size);
+  desc_pool_.UpdateDescriptors(resrc_);
+  passes_.RecreateFramebuffers();
+}
+
+void Renderer::UpdatePipelines() {
+  if (shaders_.IsDirty()) {
+    WaitIdle();
+    pipelines_.RebuildPipes();
+  }
+}
+
 void Renderer::Render(npr_core::FrameTimer& timer, Camera& camera, Scene& scene,
                       bool is_loading) {
   if (!scene.IsValid() || !scene.IsInit()) return;
@@ -34,7 +56,7 @@ void Renderer::Render(npr_core::FrameTimer& timer, Camera& camera, Scene& scene,
     case vk::Result::eNotReady:
       return;  // skip frame
     case vk::Result::eErrorOutOfDateKHR:
-      RenderTargetResize();
+      SwapTargetResize();
       return;
     default:
       throw std::runtime_error("failed to acquire swapchain image: " +
@@ -76,10 +98,15 @@ void Renderer::Render(npr_core::FrameTimer& timer, Camera& camera, Scene& scene,
   if (res_present == vk::Result::eErrorOutOfDateKHR ||
       res_present == vk::Result::eSuboptimalKHR ||
       swapchain_.GetProps().dirty) {
-    RenderTargetResize();
+    SwapTargetResize();
   } else if (res_present != vk::Result::eSuccess) {
     throw std::runtime_error("failed to present image: " +
                              vk::to_string(res_present));
+  }
+
+  if (settings_.dirty_target_size) {
+    settings_.dirty_target_size = false;
+    RenderTargetResize();
   }
 
   sync_.Increment();
@@ -837,20 +864,6 @@ std::pair<vk::Viewport, vk::Rect2D> Renderer::CalcViewportScissor(
 
     return {viewport, scissor};
   }
-}
-
-void Renderer::RenderTargetResize() {
-  WaitIdle();
-
-  swapchain_.Recreate(window_.GetSize());
-  passes_.swap_.CreateFramebuffers();
-}
-
-void Renderer::UpdatePipelines() {
-  if (!shaders_.IsDirty()) return;
-
-  WaitIdle();
-  pipelines_.RebuildPipes();
 }
 
 }  // namespace npr_graphics

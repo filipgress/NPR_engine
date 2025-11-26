@@ -212,15 +212,6 @@ void Resources::CreateBuffers() {
 }
 
 void Resources::CreateABuffers() {
-  if (frame_resources_[0].abuff_heads) {
-    ctx_.GetDevice().waitIdle();
-    for (auto& resrc : frame_resources_) {
-      resrc.abuff_heads.reset();
-      resrc.abuff_nodes.reset();
-      resrc.abuff_counter.reset();
-    }
-  }
-
   frame_props_.total_samples = frame_props_.extent.width *
                                frame_props_.extent.height *
                                static_cast<uint32_t>(frame_props_.samples);
@@ -234,6 +225,49 @@ void Resources::CreateABuffers() {
     resrc.abuff_counter =
         std::make_unique<StorageBuffer<uint32_t>>(ctx_, 1, "abuff_counter");
   }
+}
+
+void Resources::RecreateFrame(vk::Extent2D extent) {
+  frame_props_.extent = extent;
+
+  // destroy existing resources
+  if (frame_resources_[0].abuff_heads) {
+    for (auto& resrc : frame_resources_) {
+      // abuff
+      resrc.abuff_heads.reset();
+      resrc.abuff_nodes.reset();
+      resrc.abuff_counter.reset();
+
+      // targets
+      resrc.albedo_metallic_ms.reset();
+      resrc.emissive_roughness_ms.reset();
+      resrc.position_ms.reset();
+      resrc.normal_ms.reset();
+
+      resrc.coverage_ms.reset();
+      resrc.coverage_res.reset();
+
+      resrc.ds_ms.reset();
+
+      resrc.ao_ms.reset();
+      resrc.ao_res.reset();
+      resrc.ao_temp.reset();
+
+      resrc.acc_color_ms.reset();
+      resrc.acc_color_res.reset();
+      resrc.acc_weight_ms.reset();
+      resrc.acc_weight_res.reset();
+
+      resrc.color_ms.reset();
+      resrc.color_res.reset();
+      resrc.temp_color.reset();
+      resrc.bright_color.reset();
+      resrc.present_color.reset();
+    }
+  }
+
+  CreateImages();
+  CreateABuffers();
 }
 
 void Resources::CreateDefaultColorTex(vk::CommandBuffer cmd_buff) {
