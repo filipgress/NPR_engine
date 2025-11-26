@@ -11,12 +11,11 @@ App::App()
   npr_scene::SceneLoader::LoadAsync(
       renderer_, *loading_scene_, tasks_,
       [this]() { loading_scene_.swap(active_scene_); },
-      "../assets/ds/scene.gltf");
+      // "../assets/ds/scene.gltf");
+      "../assets/ds_3/scene.gltf");
 }
 
 void App::Run() {
-  timer_.SetTargetFPS(60);
-
   while (running_) {
     timer_.Wait();
     Update();
@@ -26,7 +25,7 @@ void App::Run() {
                      loading_scene_->IsLoading());
   }
 
-  renderer_.Finish();
+  renderer_.WaitIdle();
 }
 
 void App::Update() {
@@ -106,7 +105,7 @@ void App::OnEvent(npr_window::Event& e) {
 
   // app events
   dispatcher.Dispatch<AppTickEvent>([this](AppTickEvent&) {
-    renderer_.SwapShaders();
+    renderer_.UpdatePipelines();
     return true;
   });
 

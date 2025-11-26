@@ -131,10 +131,13 @@ set(HEADER_FILES
     ./src/graphics/descriptor_pool.h
     ./src/graphics/descriptor_sets.h
     ./src/graphics/render_pass.h
+    ./src/graphics/pass_manager.h
     ./src/graphics/gui_manager.cc
     ./src/graphics/shader.h
+    ./src/graphics/shader_manager.h
     ./src/graphics/pipeline.h
     ./src/graphics/pipeline_cache.h
+    ./src/graphics/pipe_manager.h
 )
 set(SOURCE_FILES
     # core
@@ -166,8 +169,10 @@ set(SOURCE_FILES
     ./src/graphics/render_pass.cc
     ./src/graphics/gui_manager.cc
     ./src/graphics/shader.cc
+    ./src/graphics/shader_manager.cc
     ./src/graphics/pipeline.cc
     ./src/graphics/pipeline_cache.cc
+    ./src/graphics/pipe_manager.cc
 )
 
 configure_file(src/core/config.h.in config.h)
