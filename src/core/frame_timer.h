@@ -19,6 +19,7 @@ class FrameTimer {
   float GetDelta() const { return delta_; }
   float GetElapsed() const { return elapsed_; }
 
+  uint GetTargetFPS() const { return target_fps_; }
   void SetTargetFPS(uint fps) { target_fps_ = fps; }
 
   void Reset();

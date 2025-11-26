@@ -11,7 +11,7 @@ constexpr uint32_t kMaxTextures = 128;
 constexpr uint32_t kMaxMaterials = 1024;
 constexpr uint32_t kMaxInstances = 65536;  // 2^16
 
-constexpr uint32_t kMaxDirLights = 2;
+constexpr uint32_t kMaxDirLights = 3;
 constexpr uint32_t kMaxPointLights = 4;
 constexpr uint32_t kMaxSpotLights = 4;
 
@@ -63,7 +63,10 @@ struct DirLightUnif {
   float rim_power;
   uint32_t inv_rim;  // 0 or 1
 
-  glm::uvec4 count;  // x = count, yzw = unused
+  uint32_t count;
+  uint32_t use_ssao;
+  uint32_t pad0;
+  uint32_t pad1;
 
   DirLight dir_lights[kMaxDirLights];
 };
@@ -86,6 +89,11 @@ struct ABuffNode {
   float depth;
   uint32_t next;
   uint32_t _padding[2];
+};
+
+struct AOPushConst {
+  float radius;
+  float bias;
 };
 
 struct LightPushConst {

@@ -13,7 +13,7 @@ Window::Window(EventCallbackFn callback_fn) : callback_fn_{callback_fn} {
   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
   glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 
-  window_ = glfwCreateWindow(1200, 800, PROJECT_NAME, nullptr, nullptr);
+  window_ = glfwCreateWindow(1280, 720, PROJECT_NAME, nullptr, nullptr);
 
   SetEventCallbacks();
 }

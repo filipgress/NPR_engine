@@ -19,12 +19,26 @@
 #include "scene/camera.h"
 
 namespace npr_graphics {
+
+enum class TransparencyMode { kNone, kABuff, kWBoit };
+struct RenderSettings {
+  vk::Extent2D target_size{500, 400};
+  glm::vec3 ambient_color{0.3f, 0.3f, 0.3f};
+  float ambient_intensity{0.225f};
+
+  bool enable_ssao{true};
+  float ssao_radius{0.5f};
+  float ssao_bias{0.025f};
+
+  TransparencyMode trans_mode{TransparencyMode::kABuff};
+};
+
 class Renderer : public npr_core::NonCopyable {
  public:
   Renderer(const npr_window::Window& window) : window_{window} {}
   ~Renderer() { Finish(); }
 
-  void Render(const npr_core::FrameTimer& timer, npr_scene::Camera& camera,
+  void Render(npr_core::FrameTimer& timer, npr_scene::Camera& camera,
               npr_scene::Scene& scene, bool is_loading);
 
   const Context& GetContext() const { return ctx_; }
@@ -104,6 +118,8 @@ class Renderer : public npr_core::NonCopyable {
   static uint mat_at;   // cycling through material descriptor sets
   static uint inst_at;  // cycling through instance descriptor sets
 
+  RenderSettings settings_;
+
   const npr_window::Window& window_;
 
   Context ctx_{window_};
@@ -112,7 +128,8 @@ class Renderer : public npr_core::NonCopyable {
   Sync sync_{ctx_, swapchain_.GetProps().image_count};
   GraphicsCommandPool cmd_pool_{ctx_, sync_.GetFrameCount(), "renderer"};
 
-  Resources resrc_{ctx_, cmd_pool_, {400, 300}, sync_.GetFrameCount()};
+  Resources resrc_{ctx_, cmd_pool_, settings_.target_size,
+                   sync_.GetFrameCount()};
   DescriptorPool desc_pool_{ctx_, resrc_};
 
   // render passes

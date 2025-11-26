@@ -8,6 +8,7 @@
 #include "descriptor_pool.h"
 
 #include "core/frame_timer.h"
+#include "core/frame_timer.h"
 #include "window/window.h"
 #include "scene/camera.h"
 #include "scene/scene.h"
@@ -17,6 +18,7 @@
 #include <imgui_impl_vulkan.h>
 
 namespace npr_graphics {
+struct RenderSettings;
 
 struct VulkanHandles {
   vk::Instance instance;
@@ -30,7 +32,8 @@ class GuiManager : public npr_core::NonCopyable {
              const PipelineCache& pipeline_cache);
   ~GuiManager();
 
-  void NewFrame(const npr_core::FrameTimer& timer, npr_scene::Camera& camera,
+  void NewFrame(npr_graphics::RenderSettings& settings,
+                npr_core::FrameTimer& timer, npr_scene::Camera& camera,
                 npr_scene::Scene& scene);
 
   void RecordUI(vk::CommandBuffer cmd) {
@@ -43,9 +46,11 @@ class GuiManager : public npr_core::NonCopyable {
   static void CheckVkResult(VkResult result);
 
  private:
+  void FpsOverlay(float fps);
+  void GlobalSettingsWindow(npr_graphics::RenderSettings& settings,
+                            npr_core::FrameTimer& timer);
   void SceneWindow(npr_scene::Camera& camera, npr_scene::Scene& scene);
   void InspectorWindow(npr_scene::Camera& camera);
-  void FpsOverlay(float fps);
 
   void DrawEntTree(flecs::entity ent, npr_scene::Camera& camera, bool filter,
                    const std::unordered_set<uint64_t>& visible_entities);

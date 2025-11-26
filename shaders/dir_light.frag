@@ -31,7 +31,10 @@ layout(set = 2, binding = 0) uniform DirLightUnif {
   float rim_power;
   uint inv_rim; // 0 = normal rim, 1 = inverse rim
 
-  uvec4 count; // x = count, yzw = unused
+  uint count;
+  uint use_ssao;
+  uint pad0;
+  uint pad1;
 
   DirLight dir_lights[MAX_DIR_LIGHTS];
 };
@@ -94,7 +97,7 @@ vec3 calc_pbr(int idx, ivec2 coord, vec3 ao) {
   vec3 ambient_light = ao * albedo;
   vec3 Lo = vec3(0.0);
 
-  for (int i = 0; i < count.x; ++i) {
+  for (int i = 0; i < count; ++i) {
     vec3 light_dir = dir_lights[i].dir.xyz;
     vec3 halfway = normalize(view_dir + light_dir);
     vec3 radiance = dir_lights[i].color.rgb;
@@ -152,7 +155,7 @@ vec3 calc_blinn_phong(int idx, ivec2 coord, vec3 ao) {
   if (diff_int < EPSILON && spec_int < EPSILON)
     return color;
 
-  for (int i = 0; i < count.x; ++i) {
+  for (int i = 0; i < count; ++i) {
     vec3 light_dir = dir_lights[i].dir.xyz;
     vec3 albedo_light = albedo * dir_lights[i].color.rgb;
 
@@ -179,11 +182,23 @@ vec3 calc_blinn_phong(int idx, ivec2 coord, vec3 ao) {
 }
 
 void main() {
+  // if (count == 0) {
+  //   out_color = vec4(1.0, 0.0, 0.0, 1.0); // Red = no lights
+  //   return;
+  // } else if (count == 1) {
+  //   out_color = vec4(0.0, 1.0, 0.0, 1.0); // Green = 1 light
+  //   return;
+  // } else if (count == 2) {
+  //   out_color = dir_lights[0].color;
+  //   // out_color = vec4(0.0, 0.0, 1.0, 1.0); // Blue = 2 lights
+  //   return;
+  // }
+
   ivec2 coord = ivec2(gl_FragCoord.xy);
 
-  vec3 ao = vec3(0.0);
-  if (ambient.a >= EPSILON)
-    ao = ambient.rgb * texture(ao_tex, frag_uv).r;
+  vec3 ao = ambient.rgb;
+  if (ambient.a >= EPSILON && use_ssao != 0u)
+    ao *= texture(ao_tex, frag_uv).r;
 
   float coverage = texture(g_coverage, frag_uv).r;
   if (coverage == 1.0) { // simple pixel

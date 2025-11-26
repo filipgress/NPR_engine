@@ -20,8 +20,10 @@ layout(set = 2, binding = 0) uniform ssao_kernel {
 };
 layout(set = 2, binding = 1) uniform sampler2D noise_tex;
 
-const float radius = 0.5;
-const float bias = 0.025;
+layout(push_constant) uniform PushConst {
+  float radius;
+  float bias;
+};
 
 void main() {
   ivec2 screen_size = textureSize(g_position);

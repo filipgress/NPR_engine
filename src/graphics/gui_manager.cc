@@ -1,4 +1,5 @@
 #include "gui_manager.h"
+#include "graphics/renderer.h"
 
 using namespace npr_scene;
 
@@ -76,7 +77,8 @@ GuiManager::~GuiManager() {
   ImGui::DestroyContext();
 }
 
-void GuiManager::NewFrame(const npr_core::FrameTimer& timer, Camera& camera,
+void GuiManager::NewFrame(npr_graphics::RenderSettings& settings,
+                          npr_core::FrameTimer& timer, Camera& camera,
                           Scene& scene) {
   ImGui_ImplVulkan_NewFrame();
   ImGui_ImplGlfw_NewFrame();
@@ -85,6 +87,7 @@ void GuiManager::NewFrame(const npr_core::FrameTimer& timer, Camera& camera,
   FpsOverlay(timer.GetAvgFPS());
   if (!camera.IsOrbit()) return;
 
+  GlobalSettingsWindow(settings, timer);
   SceneWindow(camera, scene);
   InspectorWindow(camera);
 }
@@ -105,6 +108,73 @@ void GuiManager::FpsOverlay(float fps) {
 
   ImGui::PopStyleColor();
   ImGui::PopStyleVar(2);
+}
+
+void GuiManager::GlobalSettingsWindow(npr_graphics::RenderSettings& settings,
+                                      npr_core::FrameTimer& timer) {
+  ImVec2 win_size{300, 350};
+  ImVec2 display_size = ImGui::GetIO().DisplaySize;
+
+  ImGui::SetNextWindowPos(ImVec2(display_size.x - win_size.x - 10, 40),
+                          ImGuiCond_Once);
+  ImGui::SetNextWindowSize(win_size, ImGuiCond_Once);
+
+  ImGui::Begin("settings");
+
+  // === fps limiter ===
+  ImGui::SeparatorText("fps limiter");
+  ImGui::Spacing();
+
+  bool enable_limit = (timer.GetTargetFPS() > 0);
+  if (ImGui::Checkbox("##fps_limit", &enable_limit))
+    enable_limit ? timer.SetTargetFPS(60) : timer.SetTargetFPS(0);
+
+  ImGui::SameLine();
+
+  ImGui::BeginDisabled(!enable_limit);
+  int target_fps = timer.GetTargetFPS();
+  target_fps = target_fps == 0 ? 60 : target_fps;
+  if (ImGui::SliderInt("##fps_target", &target_fps, 30, 120, "%d FPS"))
+    timer.SetTargetFPS(static_cast<uint>(target_fps));
+  ImGui::EndDisabled();
+
+  // === transparency ===
+  ImGui::SeparatorText("transparency");
+  ImGui::Spacing();
+
+  int curr_mode = static_cast<int>(settings.trans_mode);
+  const char* modes[] = {"disabled", "linked list (a-buffer)",
+                         "weighted blended (wboit)"};
+  if (ImGui::Combo("mode", &curr_mode, modes, IM_ARRAYSIZE(modes)))
+    settings.trans_mode = static_cast<TransparencyMode>(curr_mode);
+
+  // === ambient occlusion ===
+  ImGui::SeparatorText("ambient");
+  ImGui::Spacing();
+
+  ImGui::ColorEdit3("color", &settings.ambient_color.x);
+  ImGui::DragFloat("intensity", &settings.ambient_intensity, 0.005f, 0.0f,
+                   1.0f);
+
+  if (settings.ambient_intensity < 0.05f) settings.enable_ssao = false;
+
+  ImGui::Spacing();
+
+  ImGui::BeginDisabled(settings.ambient_intensity < 0.05f);
+  ImGui::Checkbox("ambient occlusion", &settings.enable_ssao);
+  ImGui::EndDisabled();
+
+  if (settings.ambient_intensity < 0.05f) {
+    ImGui::SameLine();
+    ImGui::Text("(ineffective)");
+  }
+
+  ImGui::BeginDisabled(!settings.enable_ssao);
+  ImGui::DragFloat("radius", &settings.ssao_radius, 0.01f, 0.1f, 2.0f);
+  ImGui::DragFloat("bias", &settings.ssao_bias, 0.001f, 0.001f, 0.1f);
+  ImGui::EndDisabled();
+
+  ImGui::End();
 }
 
 void GuiManager::SceneWindow(Camera& camera, Scene& scene) {
@@ -201,9 +271,10 @@ void GuiManager::SceneWindow(Camera& camera, Scene& scene) {
 void GuiManager::InspectorWindow(npr_scene::Camera& camera) {
   if (!selected_ent_.is_valid()) return;
 
-  ImVec2 win_size{350, 400};
+  ImVec2 win_size{300, 400};
   ImVec2 display_size = ImGui::GetIO().DisplaySize;
-  ImGui::SetNextWindowPos(ImVec2(display_size.x - win_size.x - 10, 40),
+  ImGui::SetNextWindowPos(ImVec2(display_size.x - win_size.x - 10,
+                                 display_size.y - win_size.y - 10),
                           ImGuiCond_Once);
   ImGui::SetNextWindowSize(win_size, ImGuiCond_Once);
 
@@ -216,9 +287,7 @@ void GuiManager::InspectorWindow(npr_scene::Camera& camera) {
   ImGui::Spacing();
 
   DrawTransformComp(camera);
-  DrawMeshComp();
   DrawMaterialComp();
-  DrawBoundingBoxComp();
 
   DrawOrthographicComp(camera);
   DrawPerspectiveComp(camera);
@@ -226,6 +295,8 @@ void GuiManager::InspectorWindow(npr_scene::Camera& camera) {
   DrawLightComp();
   DrawRangeComp();
   DrawSpotComp();
+
+  DrawMeshComp();
   DrawBoundingBoxComp();
 
   ImGui::End();
@@ -280,10 +351,10 @@ void GuiManager::DrawMaterialComp() {
 
   ImGui::SeparatorText("material");
 
-  ImGui::Text("color: %d", mat.color_map_idx);
-  ImGui::Text("normal: %d", mat.normal_map_idx);
-  ImGui::Text("metallic/roughness: %d", mat.metallic_roughness_map_idx);
-  ImGui::Text("emissive: %d", mat.emissive_map_idx);
+  ImGui::Text("color map: %d", mat.color_map_idx);
+  ImGui::Text("normal map: %d", mat.normal_map_idx);
+  ImGui::Text("metallic/roughness map: %d", mat.metallic_roughness_map_idx);
+  ImGui::Text("emissive map: %d", mat.emissive_map_idx);
 
   ImGui::Spacing();
 

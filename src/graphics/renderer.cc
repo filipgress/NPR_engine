@@ -7,8 +7,8 @@ namespace npr_graphics {
 uint Renderer::mat_at{0};
 uint Renderer::inst_at{0};
 
-void Renderer::Render(const npr_core::FrameTimer& timer, Camera& camera,
-                      Scene& scene, bool is_loading) {
+void Renderer::Render(npr_core::FrameTimer& timer, Camera& camera, Scene& scene,
+                      bool is_loading) {
   if (!scene.IsValid() || !scene.IsInit()) return;
   auto device = ctx_.GetDevice();
 
@@ -45,7 +45,7 @@ void Renderer::Render(const npr_core::FrameTimer& timer, Camera& camera,
   // record & submit commands
   vk::CommandBuffer cmd_buff;
   if (scene.IsValid() && scene.IsInit()) {
-    gui_manager_.NewFrame(timer, camera, scene);
+    gui_manager_.NewFrame(settings_, timer, camera, scene);
     cmd_buff = Record(image_idx, camera, scene, is_loading, timer.GetElapsed());
   }
 
@@ -105,15 +105,23 @@ vk::CommandBuffer Renderer::Record(uint image_idx, const Camera& camera,
   cmd_buff.setViewport(0, viewport);
 
   RecordGBuff(cmd_buff, frame_idx, frame_resrc, resrc_extent, camera, scene);
-  RecordAO(cmd_buff, frame_idx, resrc_extent);
+  if (settings_.enable_ssao) {
+    RecordAO(cmd_buff, frame_idx, resrc_extent);
+  } else {
+    frame_resrc.ao_res->Transition(cmd_buff, vk::ImageLayout::eUndefined,
+                                   vk::ImageLayout::eShaderReadOnlyOptimal, 0,
+                                   1);
+  }
 
   RecordGlobLight(cmd_buff, frame_idx, frame_resrc, resrc_extent, cam_ubo,
                   scene);
   RecordLocalLight(cmd_buff, frame_idx, frame_resrc, resrc_extent, cam_ubo,
                    camera, scene);
 
-  RecordABuff(cmd_buff, frame_idx, frame_resrc, resrc_extent, camera, scene);
-  // RecordWBoit(cmd_buff, frame_idx, frame_resrc, resrc_extent, camera, scene);
+  if (settings_.trans_mode == TransparencyMode::kABuff)
+    RecordABuff(cmd_buff, frame_idx, frame_resrc, resrc_extent, camera, scene);
+  else if (settings_.trans_mode == TransparencyMode::kWBoit)
+    RecordWBoit(cmd_buff, frame_idx, frame_resrc, resrc_extent, camera, scene);
 
   RecordSwap(cmd_buff, image_idx, frame_idx, camera.GetAspect(), is_loading,
              dt);
@@ -236,6 +244,11 @@ void Renderer::RecordAO(vk::CommandBuffer cmd_buff, const uint frame_idx,
       vk::PipelineBindPoint::eGraphics, ao_pipe_.GetLayout(), 2,
       desc_pool_.GetAOSet().GetSet(0), {});
 
+  AOPushConst ao_pc = {settings_.ssao_radius, settings_.ssao_bias};
+  cmd_buff.pushConstants(ao_pipe_.GetLayout(),
+                         vk::ShaderStageFlagBits::eFragment, 0, sizeof(ao_pc),
+                         &ao_pc);
+
   cmd_buff.draw(3, 1, 0, 0);
   cmd_buff.endRenderPass();
 
@@ -288,6 +301,9 @@ void Renderer::RecordGlobLight(vk::CommandBuffer cmd_buff, const uint frame_idx,
   float ambient_intensity = 0.07f;
   glm::vec3 ambient_color = glm::vec3{1.0f, 1.0f, 1.0f} * ambient_intensity;
   dir_lights.ambient = glm::vec4{ambient_color, ambient_intensity};
+  dir_lights.ambient =
+      glm::vec4(settings_.ambient_color * settings_.ambient_intensity,
+                settings_.ambient_intensity);
 
   float rim_intensity = 0.0f;
   glm::vec3 rim_color = glm::vec3{1.0f, 1.0f, 1.0f} * rim_intensity;
@@ -317,7 +333,9 @@ void Renderer::RecordGlobLight(vk::CommandBuffer cmd_buff, const uint frame_idx,
 
     i++;
   });
-  dir_lights.count.x = i;
+
+  dir_lights.count = i;
+  dir_lights.use_ssao = settings_.enable_ssao ? 1 : 0;
 
   frame_resrc.dir_light_ubo->Write(dir_lights);
 
@@ -778,17 +796,16 @@ void Renderer::RecordSwap(vk::CommandBuffer cmd_buff, uint image_idx,
                          sizeof(load_data), &load_data);
   cmd_buff.bindPipeline(vk::PipelineBindPoint::eGraphics,
                         swap_pipe_.GetPipeline());
-  // cmd_buff.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-  //                             swap_pipe_.GetLayout(), 0,
-  //                             desc_pool_.GetAOResSets().GetSet(frame_idx),
-  //                             {});
-  cmd_buff.bindDescriptorSets(
-      vk::PipelineBindPoint::eGraphics, swap_pipe_.GetLayout(), 0,
-      desc_pool_.GetPresentColorSets().GetSet(frame_idx), {});
-  // cmd_buff.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-  //                             swap_pipe_.GetLayout(), 0,
-  //                             desc_pool_.GetGBuffSets().GetSet(frame_idx),
-  //                             {});
+
+  if (settings_.trans_mode == TransparencyMode::kNone) {
+    cmd_buff.bindDescriptorSets(  // color_res
+        vk::PipelineBindPoint::eGraphics, swap_pipe_.GetLayout(), 0,
+        desc_pool_.GetColorSets().GetSet(frame_idx), {});
+  } else {
+    cmd_buff.bindDescriptorSets(  // present_color
+        vk::PipelineBindPoint::eGraphics, swap_pipe_.GetLayout(), 0,
+        desc_pool_.GetPresentColorSets().GetSet(frame_idx), {});
+  }
 
   cmd_buff.draw(3, 1, 0, 0);
   cmd_buff.nextSubpass(vk::SubpassContents::eInline);

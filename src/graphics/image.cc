@@ -168,6 +168,13 @@ void Image::Transition(vk::CommandBuffer cmd_buff, vk::ImageLayout old_layout,
 
     src_stage = vk::PipelineStageFlagBits::eFragmentShader;
     dst_stage = vk::PipelineStageFlagBits::eTransfer;
+  } else if (old_layout == vk::ImageLayout::eUndefined &&
+             new_layout == vk::ImageLayout::eShaderReadOnlyOptimal) {
+    barrier.srcAccessMask = vk::AccessFlagBits::eNone;
+    barrier.dstAccessMask = vk::AccessFlagBits::eShaderRead;
+
+    src_stage = vk::PipelineStageFlagBits::eTopOfPipe;
+    dst_stage = vk::PipelineStageFlagBits::eFragmentShader;
   } else {
     throw std::runtime_error("unsupported image layout transition: " +
                              std::to_string(static_cast<int>(old_layout)) +

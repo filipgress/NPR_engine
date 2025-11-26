@@ -234,7 +234,7 @@ AOPipe::AOPipe(const Context& ctx, const PipelineCache& cache,
   CreateLayout(
       {desc_pool.GetCameraSets().GetLayout(),
        desc_pool.GetGBuffSets().GetLayout(), desc_pool.GetAOSet().GetLayout()},
-      {});
+      {MakePushConst<AOPushConst>(vk::ShaderStageFlagBits::eFragment)});
 
   AddShader(vert_shader);
   AddShader(frag_shader,
