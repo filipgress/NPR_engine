@@ -1,5 +1,5 @@
 #include "gui_manager.h"
-#include "graphics/renderer.h"
+#include "renderer.h"
 
 using namespace npr_scene;
 
@@ -27,6 +27,19 @@ void GuiManager::CheckVkResult(VkResult result) {
   if (result != VK_SUCCESS)
     throw std::runtime_error("Vulkan Error: VkResult = " +
                              std::to_string(result));
+}
+
+void GuiManager::ToggleFileBrowser(
+    std::function<void(std::string)> on_file_selected) {
+  show_browser_ = !show_browser_;
+
+  if (show_browser_ && !path_.has_value()) {
+    on_file_selected_ = on_file_selected;
+    const char* home = std::getenv("HOME");
+    if (!home) home = std::getenv("USERPROFILE");  // win fallback
+    path_ = home ? home : std::filesystem::current_path();
+    RefreshDirList();
+  }
 }
 
 GuiManager::GuiManager(const npr_window::Window& window, const Context& ctx,
@@ -86,6 +99,8 @@ void GuiManager::NewFrame(npr_graphics::RenderSettings& settings,
 
   FpsOverlay(timer.GetAvgFPS());
   if (!camera.IsOrbit()) return;
+
+  if (show_browser_) BrowserWindow();
 
   GlobalSettingsWindow(settings, timer, camera.GetAspect());
   SceneWindow(camera, scene);
@@ -373,6 +388,109 @@ void GuiManager::InspectorWindow(npr_scene::Camera& camera) {
   ImGui::End();
 
   if (!open) selected_ent_ = flecs::entity::null();
+}
+
+void GuiManager::BrowserWindow() {
+  ImVec2 display_size = ImGui::GetIO().DisplaySize;
+  ImVec2 window_size(400, 400);
+
+  ImGui::SetNextWindowPos(ImVec2(display_size.x * 0.5f - window_size.x * 0.5f,
+                                 display_size.y * 0.5f - window_size.y * 0.5f),
+                          ImGuiCond_Always);
+  ImGui::SetNextWindowSize(window_size, ImGuiCond_Always);
+
+  ImGui::Begin("File Browser", &show_browser_,
+               ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+                   ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar |
+                   ImGuiWindowFlags_NoTitleBar);
+
+  ImGui::TextWrapped("%s", path_.value().string().c_str());
+  ImGui::Spacing();
+
+  std::optional<std::filesystem::path> path_change;
+  std::optional<std::filesystem::path> file_open;
+
+  ImGui::BeginChild("FileList", ImVec2(0, 0), true);
+  if (path_.value().has_parent_path() &&
+      path_.value() != path_.value().root_path()) {
+    if (ImGui::Selectable("[..]", false,
+                          ImGuiSelectableFlags_DontClosePopups |
+                              ImGuiSelectableFlags_AllowDoubleClick)) {
+      if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+        path_change = path_.value().parent_path();
+    }
+    ImGui::Spacing();
+  }
+
+  for (const auto& entry : dir_list_) {
+    std::string display_name = entry.filename().string();
+
+    bool is_dir = std::filesystem::is_directory(entry);
+    if (is_dir) display_name = "[dir] " + display_name;
+
+    if (ImGui::Selectable(display_name.c_str(),
+                          selected_file_ == entry.string(),
+                          ImGuiSelectableFlags_DontClosePopups |
+                              ImGuiSelectableFlags_AllowDoubleClick)) {
+      selected_file_ = entry.string();
+
+      if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+        if (is_dir) {
+          path_change = entry;
+          selected_file_.clear();
+        } else {
+          file_open = entry;
+        }
+      }
+    }
+  }
+
+  ImGui::EndChild();
+  ImGui::End();
+
+  if (path_change.has_value()) {
+    path_ = path_change.value();
+    RefreshDirList();
+  }
+
+  if (file_open.has_value()) {
+    on_file_selected_(file_open->string());
+    show_browser_ = false;
+    selected_file_.clear();
+  }
+}
+
+void GuiManager::RefreshDirList() {
+  dir_list_.clear();
+
+  try {
+    if (!std::filesystem::exists(path_.value()) ||
+        !std::filesystem::is_directory(path_.value()))
+      path_ = std::filesystem::current_path();
+
+    for (const auto& entry : std::filesystem::directory_iterator(path_.value()))
+      if (entry.is_directory() || IsGlfwFile(entry.path()))
+        dir_list_.push_back(entry.path());
+
+    std::sort(
+        dir_list_.begin(), dir_list_.end(),
+        [](const std::filesystem::path& a, const std::filesystem::path& b) {
+          bool a_is_dir = std::filesystem::is_directory(a);
+          bool b_is_dir = std::filesystem::is_directory(b);
+
+          if (a_is_dir != b_is_dir) return a_is_dir;  // files after dirs
+          return a.filename().string() < b.filename().string();  // alphabetical
+        });
+
+  } catch (const std::filesystem::filesystem_error& e) {
+    ERR("while reading directory: ", e.what());
+  }
+}
+
+bool GuiManager::IsGlfwFile(const std::filesystem::path& path) {
+  auto ext = path.extension().string();
+  auto lower_ext = npr_core::ToLower(ext);
+  return lower_ext == ".gltf" || lower_ext == ".glb";
 }
 
 void GuiManager::DrawTransformComp(npr_scene::Camera& camera) {

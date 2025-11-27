@@ -8,6 +8,7 @@
 namespace npr_core {
 struct InputHandler {
   std::unordered_map<uint16_t, bool> key_tokens;
+  std::unordered_set<uint16_t> key_pressed;  // this frame
   std::unordered_set<uint16_t> mouse_buttons;
 
   glm::vec2 curr_mouse_pos{};

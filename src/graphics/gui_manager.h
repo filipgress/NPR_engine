@@ -45,6 +45,8 @@ class GuiManager : public npr_core::NonCopyable {
                                            void* user_data);
   static void CheckVkResult(VkResult result);
 
+  void ToggleFileBrowser(std::function<void(std::string)> on_file_selected);
+
  private:
   void FpsOverlay(float fps);
   void GlobalSettingsWindow(npr_graphics::RenderSettings& settings,
@@ -56,6 +58,10 @@ class GuiManager : public npr_core::NonCopyable {
                    const std::unordered_set<uint64_t>& visible_entities);
   void CalcVisib(npr_scene::Scene& scene, const std::string& search,
                  std::unordered_set<uint64_t>& visible_entities);
+
+  void BrowserWindow();
+  void RefreshDirList();
+  bool IsGlfwFile(const std::filesystem::path& path);
 
   void DrawTransformComp(npr_scene::Camera& camera);
   void DrawMeshComp();
@@ -72,6 +78,12 @@ class GuiManager : public npr_core::NonCopyable {
  private:
   ImGuiDescriptorPool desc_pool_;
   flecs::entity selected_ent_ = flecs::entity::null();
+
+  bool show_browser_{false};
+  std::optional<std::filesystem::path> path_;
+  std::vector<std::filesystem::path> dir_list_;
+  std::string selected_file_;
+  std::function<void(std::string)> on_file_selected_;
 };
 
 }  // namespace npr_graphics

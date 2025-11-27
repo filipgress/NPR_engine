@@ -46,6 +46,7 @@ class Renderer : public npr_core::NonCopyable {
 
   const Context& GetContext() const { return ctx_; }
   const Resources& GetResrc() const { return resrc_; }
+  GuiManager& GetGui() { return gui_; }
 
   void WaitIdle() { ctx_.GetDevice().waitIdle(); }
   void Resize() { swapchain_.GetProps().dirty = true; }

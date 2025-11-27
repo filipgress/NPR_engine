@@ -11,7 +11,6 @@ App::App()
   npr_scene::SceneLoader::LoadAsync(
       renderer_, *loading_scene_, tasks_,
       [this]() { loading_scene_.swap(active_scene_); },
-      // "../assets/ds/scene.gltf");
       "../assets/ds_3/scene.gltf");
 }
 
@@ -32,6 +31,7 @@ void App::Update() {
   timer_.Update();
 
   // gather inputs and process tasks
+  inputs_.key_pressed.clear();
   window_.PollEvents();
   inputs_.Update(window_.GetSize());
   tasks_.Process();
@@ -43,18 +43,20 @@ void App::Update() {
 }
 
 void App::ProcessInput() {
+  if (inputs_.key_tokens.contains(GLFW_KEY_LEFT_CONTROL) &&
+      inputs_.key_pressed.contains(GLFW_KEY_O)) {
+    renderer_.GetGui().ToggleFileBrowser([this](std::string path) {
+      npr_scene::SceneLoader::LoadAsync(
+          renderer_, *loading_scene_, tasks_,
+          [this]() { loading_scene_.swap(active_scene_); }, path);
+    });
+  }
+
   if (ImGui::GetIO().WantCaptureMouse) return;
 
   if (inputs_.key_tokens.contains(GLFW_KEY_LEFT_CONTROL) &&
-      inputs_.key_tokens.contains(GLFW_KEY_R))
+      inputs_.key_pressed.contains(GLFW_KEY_R))
     renderer_.RecompileShaders();
-
-  if (inputs_.key_tokens.contains(GLFW_KEY_O)) {
-    if (active_scene_->IsValid()) {
-      flecs::entity first_camera = active_scene_->GetCamQuery().first();
-      camera_.SetEntity(first_camera);
-    }
-  }
 
   if (camera_.GetMode() == npr_scene::CameraMode::kFree) {
     float dt = timer_.GetDelta();

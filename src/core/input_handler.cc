@@ -36,6 +36,7 @@ void InputHandler::OnEvent(npr_window::Event& e) {
 
   // key events
   dispatcher.Dispatch<KeyPressEvent>([this](KeyPressEvent& e) {
+    if (!e.IsRepeat()) key_pressed.insert(e.GetKeyCode());
     key_tokens[e.GetKeyCode()] = e.IsRepeat();
     return false;
   });
