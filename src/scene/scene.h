@@ -12,7 +12,7 @@ class Scene : npr_core::NonCopyable {
 
  public:
   Scene() = default;
-  ~Scene() { Complete(); }
+  ~Scene() { StopLoading(); }
 
   // !! getters can only be used on valid scenes !!
   const std::string& GetSceneName() const { return scene_name_; }
@@ -29,16 +29,17 @@ class Scene : npr_core::NonCopyable {
   auto& GetSpotLightQuery() const { return world_.spot_light_query_; }
 
   void Update() {
-    if (IsValid()) world_.Update();
+    if (success_) world_.Update();
   }
 
   bool IsLoading() const;
-  bool IsValid() const { return valid_; };
-  bool IsInit() const { return valid_ && resrc_->IsInit(); }
+
+  bool IsLoaded() const { return success_; }
+  bool IsInit() const { return success_ && resrc_->IsInit(); }
 
  private:
   void Init(npr_core::TaskManager& tasks, std::function<void()> on_complete);
-  void Complete();
+  void StopLoading();
 
  private:
   World world_;
@@ -47,7 +48,7 @@ class Scene : npr_core::NonCopyable {
   std::string filename_;
   std::string scene_name_;
 
-  bool valid_{false};
+  bool success_{false};
 
   std::future<bool> handle_;
   std::atomic<bool> stop_async_{false};

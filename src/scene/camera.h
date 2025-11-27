@@ -54,6 +54,8 @@ class Camera {
                                                    : CameraMode::kFree;
   }
 
+  bool IsFocused() const { return ent_.is_valid(); }
+
   float GetAspect() const;
   void SetAspect(float aspect);
 

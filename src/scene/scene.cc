@@ -7,11 +7,11 @@ bool Scene::IsLoading() const {
          handle_.wait_for(std::chrono::seconds(0)) != std::future_status::ready;
 }
 
-void Scene::Complete() {
+void Scene::StopLoading() {
   if (!handle_.valid()) return;
 
   stop_async_ = true;
-  valid_ = handle_.get();
+  success_ = handle_.get();
 }
 
 void Scene::Init(npr_core::TaskManager& tasks,

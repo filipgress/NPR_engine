@@ -120,6 +120,7 @@ set(HEADER_FILES
     ./src/window/mouse_event.h
     ./src/window/app_event.h
     # graphics
+    ./src/graphics/settings.h
     ./src/graphics/renderer.h
     ./src/graphics/context.h
     ./src/graphics/swapchain.h

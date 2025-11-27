@@ -1,6 +1,7 @@
 #ifndef RENDERER_H_
 #define RENDERER_H_
 
+#include "settings.h"
 #include "context.h"
 #include "swapchain.h"
 #include "sync.h"
@@ -20,22 +21,6 @@
 #include "scene/camera.h"
 
 namespace npr_graphics {
-
-enum class TransparencyMode { kNone, kABuff, kWBoit };
-struct RenderSettings {
-  vk::Extent2D target_size{500, 400};
-  bool dirty_target_size{false};
-
-  glm::vec3 ambient_color{0.3f, 0.3f, 0.3f};
-  float ambient_intensity{0.225f};
-
-  bool enable_ssao{true};
-  float ssao_radius{0.5f};
-  float ssao_bias{0.025f};
-
-  TransparencyMode trans_mode{TransparencyMode::kABuff};
-};
-
 class Renderer : public npr_core::NonCopyable {
  public:
   Renderer(const npr_window::Window& window) : window_{window} {}
@@ -48,18 +33,18 @@ class Renderer : public npr_core::NonCopyable {
   const Resources& GetResrc() const { return resrc_; }
   GuiManager& GetGui() { return gui_; }
 
+  void Update();
+
   void WaitIdle() { ctx_.GetDevice().waitIdle(); }
   void Resize() { swapchain_.GetProps().dirty = true; }
 
   void RecompileShaders() { shaders_.Recompile(); };
-  void UpdatePipelines();
 
  private:
   void SwapTargetResize();
-  void RenderTargetResize();
 
   std::pair<vk::Viewport, vk::Rect2D> CalcViewportScissor(
-      vk::Extent2D swap_extent, float camera_aspect) const;
+      vk::Extent2D swap_extent, const npr_scene::Camera& camera) const;
 
   vk::CommandBuffer Record(uint image_idx, const npr_scene::Camera& camera,
                            npr_scene::Scene& scene, bool is_loading, float dt);
@@ -113,8 +98,8 @@ class Renderer : public npr_core::NonCopyable {
                    const uint set_idx) const;
 
   void RecordSwap(vk::CommandBuffer cmd_buff, uint image_idx,
-                  const uint frame_idx, float camera_aspect, bool is_loading,
-                  float dt);
+                  const uint frame_idx, const npr_scene::Camera& camera,
+                  bool is_loading, float dt);
 
  private:
   static uint mat_at;   // cycling through material descriptor sets
@@ -130,8 +115,7 @@ class Renderer : public npr_core::NonCopyable {
   Sync sync_{ctx_, swapchain_.GetProps().image_count};
   GraphicsCommandPool cmd_pool_{ctx_, sync_.GetFrameCount(), "renderer"};
 
-  Resources resrc_{ctx_, cmd_pool_, settings_.target_size,
-                   sync_.GetFrameCount()};
+  Resources resrc_{ctx_, cmd_pool_, settings_, sync_.GetFrameCount()};
   DescriptorPool desc_pool_{ctx_, resrc_};
 
   PassManager passes_{ctx_, swapchain_, resrc_};

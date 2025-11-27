@@ -7,6 +7,36 @@ namespace npr_graphics {
 uint Renderer::mat_at{0};
 uint Renderer::inst_at{0};
 
+void Renderer::Update() {
+  bool dirty = shaders_.IsDirty() || settings_.dirty_target_size ||
+               settings_.dirty_abuff_size;
+  if (!dirty) return;
+
+  WaitIdle();
+
+  if (shaders_.IsDirty()) pipelines_.RebuildPipes();
+  if (settings_.dirty_target_size) {
+    INFO("recreaing offscreent targets");
+    resrc_.frame_props_.extent = settings_.target_size;
+
+    resrc_.CreateImages();
+    desc_pool_.UpdateDescriptors(resrc_);
+    passes_.RecreateFramebuffers();
+
+    settings_.dirty_target_size = false;
+    settings_.dirty_abuff_size = true;
+  }
+
+  if (settings_.dirty_abuff_size) {
+    INFO("recreaing abuff");
+    resrc_.frame_props_.abuff_avg_nodes = settings_.abuff_avg_nodes;
+
+    resrc_.CreateABuffers();
+    desc_pool_.GetABufferSets().Update(resrc_);
+    settings_.dirty_abuff_size = false;
+  }
+}
+
 void Renderer::SwapTargetResize() {
   WaitIdle();
 
@@ -14,24 +44,9 @@ void Renderer::SwapTargetResize() {
   passes_.swap_.CreateFramebuffers();
 }
 
-void Renderer::RenderTargetResize() {
-  WaitIdle();
-
-  resrc_.RecreateFrame(settings_.target_size);
-  desc_pool_.UpdateDescriptors(resrc_);
-  passes_.RecreateFramebuffers();
-}
-
-void Renderer::UpdatePipelines() {
-  if (shaders_.IsDirty()) {
-    WaitIdle();
-    pipelines_.RebuildPipes();
-  }
-}
-
 void Renderer::Render(npr_core::FrameTimer& timer, Camera& camera, Scene& scene,
                       bool is_loading) {
-  if (!scene.IsValid() || !scene.IsInit()) return;
+  if (!scene.IsLoaded() || !scene.IsInit()) return;
   auto device = ctx_.GetDevice();
 
   // wait for in flight fence
@@ -66,7 +81,7 @@ void Renderer::Render(npr_core::FrameTimer& timer, Camera& camera, Scene& scene,
 
   // record & submit commands
   vk::CommandBuffer cmd_buff;
-  if (scene.IsValid() && scene.IsInit()) {
+  if (scene.IsLoaded() && scene.IsInit()) {
     gui_.NewFrame(settings_, timer, camera, scene);
     cmd_buff = Record(image_idx, camera, scene, is_loading, timer.GetElapsed());
   }
@@ -104,11 +119,6 @@ void Renderer::Render(npr_core::FrameTimer& timer, Camera& camera, Scene& scene,
                              vk::to_string(res_present));
   }
 
-  if (settings_.dirty_target_size) {
-    settings_.dirty_target_size = false;
-    RenderTargetResize();
-  }
-
   sync_.Increment();
 }
 
@@ -118,7 +128,7 @@ vk::CommandBuffer Renderer::Record(uint image_idx, const Camera& camera,
   auto cmd_buff = cmd_pool_.GetCmdBuff(frame_idx);
 
   const auto& frame_resrc = resrc_.GetResrc()[frame_idx];
-  auto resrc_extent = resrc_.GetProps().extent;
+  auto resrc_extent = resrc_.frame_props_.extent;
 
   const auto& cam_ubo = camera.GetCameraUnif();
   frame_resrc.camera_ubo->Write(cam_ubo);
@@ -150,8 +160,7 @@ vk::CommandBuffer Renderer::Record(uint image_idx, const Camera& camera,
   else if (settings_.trans_mode == TransparencyMode::kWBoit)
     RecordWBoit(cmd_buff, frame_idx, frame_resrc, resrc_extent, camera, scene);
 
-  RecordSwap(cmd_buff, image_idx, frame_idx, camera.GetAspect(), is_loading,
-             dt);
+  RecordSwap(cmd_buff, image_idx, frame_idx, camera, is_loading, dt);
 
   cmd_buff.end();
   return cmd_buff;
@@ -643,12 +652,13 @@ void Renderer::RecordABuff(vk::CommandBuffer cmd_buff, const uint frame_idx,
         vk::PipelineBindPoint::eGraphics, pipelines_.abuff_fill_.GetLayout(), 2,
         desc_pool_.GetABufferSets().GetSet(frame_idx), {});
 
-    ABuffFillPushConst push_const{
-        resrc_extent.width, resrc_.frame_props_.max_abuff_nodes, {}};
+    ABuffFillPushConst pc{.width = resrc_extent.width,
+                          .max_nodes = resrc_.frame_props_.abuff_max_nodes,
+                          .alpha_cutoff = settings_.alpha_cutoff};
 
     cmd_buff.pushConstants(pipelines_.abuff_fill_.GetLayout(),
-                           vk::ShaderStageFlagBits::eFragment, 0,
-                           sizeof(push_const), &push_const);
+                           vk::ShaderStageFlagBits::eFragment, 0, sizeof(pc),
+                           &pc);
 
     RecordTrans(cmd_buff, frame_idx, frame_resrc, scene, camera.GetFrustum(),
                 pipelines_.abuff_fill_.GetLayout(), 3);
@@ -668,9 +678,12 @@ void Renderer::RecordABuff(vk::CommandBuffer cmd_buff, const uint frame_idx,
         vk::PipelineBindPoint::eGraphics, pipelines_.abuff_res_.GetLayout(), 1,
         desc_pool_.GetABufferSets().GetSet(frame_idx), {});
 
+    ABuffResPushConst pc{.width = resrc_extent.width,
+                         .sorted_nodes = settings_.abuff_sorted_nodes};
+
     cmd_buff.pushConstants(pipelines_.abuff_res_.GetLayout(),
-                           vk::ShaderStageFlagBits::eFragment, 0,
-                           sizeof(resrc_extent.width), &resrc_extent.width);
+                           vk::ShaderStageFlagBits::eFragment, 0, sizeof(pc),
+                           &pc);
 
     cmd_buff.draw(3, 1, 0, 0);
   }
@@ -696,6 +709,18 @@ void Renderer::RecordWBoit(vk::CommandBuffer cmd_buff, const uint frame_idx,
     cmd_buff.bindDescriptorSets(  // textures
         vk::PipelineBindPoint::eGraphics, pipelines_.wboit_acc_.GetLayout(), 1,
         scene.GetResrc().desc_pool.GetTextureSet().GetSet(0), {});
+
+    WBoitPushConst pc{.alpha_multiplier = settings_.wboit_alpha_multiplier,
+                      .alpha_power = settings_.wboit_alpha_power,
+                      .depth_factor = settings_.wboit_depth_factor,
+                      .depth_power = settings_.wboit_depth_power,
+                      .weight_min = settings_.wboit_weight_min,
+                      .weight_max = settings_.wboit_weight_max,
+                      .alpha_cutoff = settings_.alpha_cutoff};
+
+    cmd_buff.pushConstants(pipelines_.wboit_acc_.GetLayout(),
+                           vk::ShaderStageFlagBits::eFragment, 0, sizeof(pc),
+                           &pc);
 
     RecordTrans(cmd_buff, frame_idx, frame_resrc, scene, camera.GetFrustum(),
                 pipelines_.wboit_acc_.GetLayout(), 2);
@@ -794,10 +819,10 @@ void Renderer::RecordTrans(vk::CommandBuffer cmd_buff, const uint frame_idx,
 }
 
 void Renderer::RecordSwap(vk::CommandBuffer cmd_buff, uint image_idx,
-                          const uint frame_idx, float camera_aspect,
+                          const uint frame_idx, const npr_scene::Camera& camera,
                           bool is_loading, float dt) {
   auto swap_extent = swapchain_.GetProps().extent;
-  auto [viewport, scissor] = CalcViewportScissor(swap_extent, camera_aspect);
+  auto [viewport, scissor] = CalcViewportScissor(swap_extent, camera);
 
   LoadPushConst load_data{};
   if (is_loading) {
@@ -842,25 +867,33 @@ void Renderer::RecordSwap(vk::CommandBuffer cmd_buff, uint image_idx,
 }
 
 std::pair<vk::Viewport, vk::Rect2D> Renderer::CalcViewportScissor(
-    vk::Extent2D swap_extent, float camera_aspect) const {
-  float win_aspect = static_cast<float>(swap_extent.width) / swap_extent.height;
+    vk::Extent2D extent, const npr_scene::Camera& camera) const {
+  if (!camera.IsFocused()) {
+    auto viewport =
+        vk::Viewport(0.0f, 0.0f, extent.width, extent.height, 0.0f, 1.0f);
+    auto scissor = vk::Rect2D{{0, 0}, extent};
+    return {viewport, scissor};
+  }
 
-  if (win_aspect > camera_aspect) {
-    // Window is wider: letterbox (black bars on left/right)
-    uint32_t width = swap_extent.height * camera_aspect;
-    int32_t offset = (swap_extent.width - width) / 2;
+  float win_aspect = static_cast<float>(extent.width) / extent.height;
+  float cam_aspect = camera.GetAspect();
 
-    vk::Viewport viewport(offset, 0, width, swap_extent.height, 0.0f, 1.0f);
-    vk::Rect2D scissor{{offset, 0}, {width, swap_extent.height}};
+  if (win_aspect > cam_aspect) {
+    // window is wider: letterbox (black bars on left/right)
+    uint32_t width = extent.height * cam_aspect;
+    int32_t offset = (extent.width - width) / 2;
+
+    vk::Viewport viewport(offset, 0, width, extent.height, 0.0f, 1.0f);
+    vk::Rect2D scissor{{offset, 0}, {width, extent.height}};
 
     return {viewport, scissor};
   } else {
-    // Window is taller: pillarbox (black bars on top/bottom)
-    uint32_t height = swap_extent.width / camera_aspect;
-    int32_t offset = (swap_extent.height - height) / 2;
+    // window is taller: pillarbox (black bars on top/bottom)
+    uint32_t height = extent.width / cam_aspect;
+    int32_t offset = (extent.height - height) / 2;
 
-    vk::Viewport viewport(0, offset, swap_extent.width, height, 0.0f, 1.0f);
-    vk::Rect2D scissor{{0, offset}, {swap_extent.width, height}};
+    vk::Viewport viewport(0, offset, extent.width, height, 0.0f, 1.0f);
+    vk::Rect2D scissor{{0, offset}, {extent.width, height}};
 
     return {viewport, scissor};
   }

@@ -4,6 +4,8 @@ layout(early_fragment_tests) in; // force early depth test
 layout(constant_id = 0) const uint SAMPLES = 4;
 layout(constant_id = 1) const uint MAX_TEXTURES = 128;
 
+const float EPSILON = 0.01;
+
 layout(location = 0) in vec2 frag_uv;
 layout(location = 1) in vec3 frag_pos;
 layout(location = 2) in mat3 TBN;
@@ -42,6 +44,7 @@ layout(set = 3, binding = 0) uniform MaterialUnif {
 layout(push_constant) uniform PushConst {
   uint width;
   uint max_nodes;
+  float alpha_cutoff;
 };
 
 void main() {
@@ -49,7 +52,7 @@ void main() {
   if (material.maps.x != -1)
     albedo *= texture(textures[material.maps.x], frag_uv);
 
-  if (albedo.a < 0.01) return; // insignificant
+  if (albedo.a < alpha_cutoff || albedo.a < EPSILON) return; // insignificant
 
   uint coverage_mask = gl_SampleMaskIn[0];
   uint pixel_idx = (uint(gl_FragCoord.y) * width + uint(gl_FragCoord.x)) * SAMPLES;

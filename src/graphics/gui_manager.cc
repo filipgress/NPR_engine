@@ -1,5 +1,4 @@
 #include "gui_manager.h"
-#include "renderer.h"
 
 using namespace npr_scene;
 
@@ -228,6 +227,50 @@ void GuiManager::GlobalSettingsWindow(npr_graphics::RenderSettings& settings,
       selected_mode = 2;
       settings.trans_mode = static_cast<TransparencyMode>(selected_mode);
     }
+
+    if (settings.trans_mode == TransparencyMode::kABuff) {
+      ImGui::Spacing();
+      ImGui::Separator();
+      ImGui::Spacing();
+
+      ImGui::SliderFloat("alpha cutoff", &settings.alpha_cutoff, 0.0f, 1.0f);
+
+      int avg_nodes = static_cast<int>(settings.abuff_avg_nodes);
+      if (ImGui::SliderInt("fragments", &avg_nodes, 1, 16))
+        settings.abuff_avg_nodes = static_cast<uint32_t>(avg_nodes);
+      if (ImGui::IsItemDeactivatedAfterEdit()) settings.dirty_abuff_size = true;
+      if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+        ImGui::SetTooltip(
+            "memory allocation per sample. triggers buffer resize");
+
+      int max_sorted = static_cast<int>(settings.abuff_sorted_nodes);
+      if (ImGui::SliderInt("sorted", &max_sorted, 1, 16))
+        settings.abuff_sorted_nodes = static_cast<uint32_t>(max_sorted);
+
+      if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+        ImGui::SetTooltip("maximum number of fragments to sort per sample");
+    }
+
+    if (settings.trans_mode == TransparencyMode::kWBoit) {
+      ImGui::Spacing();
+      ImGui::Separator();
+      ImGui::Spacing();
+
+      ImGui::SliderFloat("alpha cutoff", &settings.alpha_cutoff, 0.0f, 1.0f);
+      ImGui::SliderFloat("alpha multiplier", &settings.wboit_alpha_multiplier,
+                         1.0f, 20.0f);
+      ImGui::SliderFloat("alpha power", &settings.wboit_alpha_power, 1.0f,
+                         5.0f);
+      ImGui::SliderFloat("depth factor", &settings.wboit_depth_factor, 0.0f,
+                         2.0f);
+      ImGui::SliderFloat("depth power", &settings.wboit_depth_power, 0.5f,
+                         6.0f);
+      ImGui::SliderFloat("weight min", &settings.wboit_weight_min, 1e-4f, 1e-1f,
+                         "%.5f", ImGuiSliderFlags_Logarithmic);
+      ImGui::SliderFloat("weight max", &settings.wboit_weight_max, 1e2f, 1e4f,
+                         "%.0f", ImGuiSliderFlags_Logarithmic);
+    }
+
     ImGui::Spacing();
   }
 

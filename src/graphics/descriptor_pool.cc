@@ -150,7 +150,6 @@ void DescriptorPool::UpdateDescriptors(const Resources& resrc) {
   ao_res_sets_.Update(resrc);
   ao_temp_sets_.Update(resrc);
 
-  abuff_sets_.Update(resrc);
   wboit_input_sets_.Update(resrc);
 
   color_sets_.Update(resrc);

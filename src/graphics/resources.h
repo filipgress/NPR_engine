@@ -1,6 +1,7 @@
 #ifndef RESOURCES_H_
 #define RESOURCES_H_
 
+#include "settings.h"
 #include "context.h"
 #include "command_pool.h"
 #include "image.h"
@@ -15,7 +16,7 @@ constexpr uint32_t kMaxDirLights = 3;
 constexpr uint32_t kMaxPointLights = 4;
 constexpr uint32_t kMaxSpotLights = 4;
 
-constexpr uint32_t kABuffInitSize = 8;  // avg fragments per sample
+constexpr uint32_t kABuffMaxSortedNodes = 16;
 
 constexpr uint32_t kAONoiseDim = 4;
 constexpr uint32_t kAOKernelSize = 64;
@@ -103,8 +104,23 @@ struct LightPushConst {
 struct ABuffFillPushConst {
   uint32_t width;
   uint32_t max_nodes;
+  float alpha_cutoff;
+};
 
-  uint32_t _padding[2];
+struct ABuffResPushConst {
+  uint32_t width;
+  uint32_t sorted_nodes;
+};
+
+struct WBoitPushConst {
+  float alpha_multiplier{10.f};
+  float alpha_power{3.0};
+  float depth_factor{0.9};
+  float depth_power{3.0};
+  float weight_min{1e-2};
+  float weight_max{3e3};
+
+  float alpha_cutoff;
 };
 
 struct BlurPushConst {
@@ -122,8 +138,8 @@ struct FrameProps {
   vk::SampleCountFlagBits samples;
   vk::Extent2D extent;
 
-  uint32_t max_abuff_nodes;
-  uint32_t total_samples;  // extent.width * extent.height * samples
+  uint32_t abuff_avg_nodes{};  // average count of nodes per pixel
+  uint32_t abuff_max_nodes{};
 
   vk::Format color_format = vk::Format::eR16G16B16A16Sfloat;
   vk::Format ds_format;
@@ -205,7 +221,7 @@ class Resources : public npr_core::NonCopyable {
 
  public:
   Resources(const Context& ctx, const CommandPool& cmd_pool,
-            vk::Extent2D extent, uint frame_count);
+            const RenderSettings& settings, uint frame_count);
 
   uint GetFrameCount() const { return frame_count_; }
   const FrameProps& GetProps() const { return frame_props_; }
@@ -218,11 +234,7 @@ class Resources : public npr_core::NonCopyable {
   const Texture& GetAONoiseTex() const { return *ao_noise_tex_; }
   const UniformBuffer<AOKernel>& GetAOKernel() const { return *ao_kernel_; }
 
-  const std::vector<FrameResources>& GetResrc() const {
-    return frame_resources_;
-  }
-
-  void RecreateFrame(vk::Extent2D extent);
+  const std::vector<FrameResources>& GetResrc() const { return frame_resrc_; }
 
  private:
   void CreateImages();
@@ -244,7 +256,7 @@ class Resources : public npr_core::NonCopyable {
   const Context& ctx_;
 
   FrameProps frame_props_;
-  std::vector<FrameResources> frame_resources_;
+  std::vector<FrameResources> frame_resrc_;
   uint frame_count_;
 
   std::unique_ptr<Texture> default_color_tex_;

@@ -1,6 +1,7 @@
 #version 450
 
 layout(constant_id = 0) const uint SAMPLES = 4;
+layout(constant_id = 1) const uint MAX_SORTED_NODES = 16;
 
 layout(location = 0) in vec2 frag_uv;
 layout(location = 0) out vec4 out_color;
@@ -26,10 +27,10 @@ layout(set = 1, binding = 1) buffer HeadPointers {
 
 layout(push_constant) uniform PushConst {
   uint width;
+  uint sorted_nodes;
 };
 
 const uint NULL_PTR = 0xFFFFFFFF;
-const uint MAX_FRAGMENTS = 16; // fragments to sort per pixel
 
 void main() {
   uint pixel_idx = (uint(gl_FragCoord.y) * width + uint(gl_FragCoord.x)) * SAMPLES;
@@ -38,12 +39,14 @@ void main() {
   for (uint sample_id = 0; sample_id < SAMPLES; ++sample_id) {
     uint node_idx = heads[pixel_idx + sample_id];
 
-    float depths[MAX_FRAGMENTS];
-    vec4 colors[MAX_FRAGMENTS];
+    float depths[MAX_SORTED_NODES];
+    vec4 colors[MAX_SORTED_NODES];
     int count = 0;
 
+    uint max_sorted = min(sorted_nodes, MAX_SORTED_NODES);
+
     // collect fragments for this sample
-    while (node_idx != NULL_PTR && count < MAX_FRAGMENTS) {
+    while (node_idx != NULL_PTR && count < max_sorted) {
       ABuffNode node = nodes[node_idx];
       depths[count] = node.depth;
       colors[count] = node.color;

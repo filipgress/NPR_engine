@@ -18,7 +18,7 @@ void SceneLoader::LoadAsync(const npr_graphics::Renderer& renderer,
                             const std::string& scene_name) {
   if (scene.handle_.valid()) return;  // skip if already loading
 
-  scene.valid_ = false;
+  scene.success_ = false;
   scene.stop_async_ = false;
 
   scene.handle_ =
@@ -28,8 +28,8 @@ void SceneLoader::LoadAsync(const npr_graphics::Renderer& renderer,
   tasks.Add([&scene, &tasks, on_loaded]() {
     if (scene.IsLoading()) return false;
 
-    scene.Complete();
-    if (!scene.IsValid()) return true;
+    scene.StopLoading();
+    if (!scene.success_) return true;
 
     scene.Init(tasks, on_loaded);
     return true;
@@ -39,8 +39,8 @@ void SceneLoader::LoadAsync(const npr_graphics::Renderer& renderer,
 void SceneLoader::Load(const Renderer& renderer, Scene& scene,
                        const std::string& filepath,
                        const std::string& scene_name) {
-  scene.Complete();
-  scene.valid_ = LoadScene(renderer, scene, filepath, scene_name);
+  scene.StopLoading();
+  scene.success_ = LoadScene(renderer, scene, filepath, scene_name);
 }
 
 bool SceneLoader::LoadScene(const Renderer& renderer, Scene& scene,

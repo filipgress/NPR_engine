@@ -383,13 +383,15 @@ void PipeManager::BuildABuffRes(const VertexShader& vert_shader,
                                 const FragmentShader& frag_shader,
                                 vk::SampleCountFlagBits samples,
                                 const DescriptorPool& desc_pool) {
-  abuff_res_.CreateLayout(
-      {desc_pool.GetColorSets().GetLayout(),
-       desc_pool.GetABufferSets().GetLayout()},
-      {Pipeline::MakePushConst<uint32_t>(vk::ShaderStageFlagBits::eFragment)});
+  abuff_res_.CreateLayout({desc_pool.GetColorSets().GetLayout(),
+                           desc_pool.GetABufferSets().GetLayout()},
+                          {Pipeline::MakePushConst<ABuffResPushConst>(
+                              vk::ShaderStageFlagBits::eFragment)});
 
   abuff_res_.AddShader(vert_shader);
-  abuff_res_.AddShader(frag_shader, {Pipeline::MakeSpecConst(0, samples)});
+  abuff_res_.AddShader(frag_shader,
+                       {Pipeline::MakeSpecConst(0, samples),
+                        Pipeline::MakeSpecConst(1, kABuffMaxSortedNodes)});
 
   // present_color, bright_color
   auto& state = abuff_res_.state_;
@@ -415,7 +417,7 @@ void PipeManager::BuildWBoitAcc(const VertexShader& vert_shader,
           TextureArraySet(wboit_acc_.ctx_).GetLayout(),
           desc_pool.GetMaterialSets().GetLayout(),
       },
-      {Pipeline::MakePushConst<ABuffFillPushConst>(
+      {Pipeline::MakePushConst<WBoitPushConst>(
           vk::ShaderStageFlagBits::eFragment)});
 
   wboit_acc_.AddShader(vert_shader);

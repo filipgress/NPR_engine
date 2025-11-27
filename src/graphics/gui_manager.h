@@ -1,6 +1,7 @@
 #ifndef GUI_MANAGER_H_
 #define GUI_MANAGER_H_
 
+#include "settings.h"
 #include "context.h"
 #include "swapchain.h"
 #include "render_pass.h"
@@ -18,8 +19,6 @@
 #include <imgui_impl_vulkan.h>
 
 namespace npr_graphics {
-struct RenderSettings;
-
 struct VulkanHandles {
   vk::Instance instance;
   vk::Device device;

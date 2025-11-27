@@ -11,7 +11,7 @@ App::App()
   npr_scene::SceneLoader::LoadAsync(
       renderer_, *loading_scene_, tasks_,
       [this]() { loading_scene_.swap(active_scene_); },
-      "../assets/ds_3/scene.gltf");
+      "../assets/scenes/ds_3/scene.gltf");
 }
 
 void App::Run() {
@@ -30,11 +30,10 @@ void App::Run() {
 void App::Update() {
   timer_.Update();
 
-  // gather inputs and process tasks
+  // gather & process input
   inputs_.key_pressed.clear();
   window_.PollEvents();
   inputs_.Update(window_.GetSize());
-  tasks_.Process();
 
   ProcessInput();
 
@@ -107,7 +106,9 @@ void App::OnEvent(npr_window::Event& e) {
 
   // app events
   dispatcher.Dispatch<AppTickEvent>([this](AppTickEvent&) {
-    renderer_.UpdatePipelines();
+    tasks_.Process();
+    renderer_.Update();
+
     return true;
   });
 
