@@ -103,6 +103,10 @@ struct ABuffFillPushConst {
   uint32_t width;
   uint32_t max_nodes;
   float alpha_cutoff;
+
+  float diff_int;
+  float spec_int;
+  uint32_t is_pbr;  // 0 = blinn-phong, 1 = pbr
 };
 
 struct ABuffResPushConst {
@@ -119,6 +123,9 @@ struct WBoitPushConst {
   float weight_max{3e3};
 
   float alpha_cutoff;
+  float diff_int;
+  float spec_int;
+  uint32_t is_pbr;  // 0 = blinn-phong, 1 = pbr
 };
 
 struct BlurPushConst {

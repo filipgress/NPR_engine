@@ -4,7 +4,7 @@ layout(constant_id = 0) const uint SAMPLES = 4;
 layout(constant_id = 1) const uint MAX_TEXTURES = 128;
 
 layout(location = 0) in vec2 frag_uv;
-layout(location = 1) in vec3 frag_pos;
+layout(location = 1) in vec3 frag_pos; // view space position
 layout(location = 2) in mat3 TBN;
 
 layout(location = 0) out vec4 out_albedo; // rgb = albedo, a = metallic
@@ -42,7 +42,7 @@ void main() {
   vec3 normal;
   if (material.maps.y != -1) {
     vec3 normal_map =
-      texture(textures[material.maps.y], frag_uv).rgb * 2.0f - 1.0f;
+      texture(textures[material.maps.y], frag_uv).rgb * 2.0 - 1.0;
     normal = normalize(TBN * normal_map);
   } else {
     normal = normalize(TBN[2]);

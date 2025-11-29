@@ -657,16 +657,23 @@ void Renderer::RecordABuff(vk::CommandBuffer cmd_buff, const uint frame_idx,
         vk::PipelineBindPoint::eGraphics, pipelines_.abuff_fill_.GetLayout(), 2,
         desc_pool_.GetABufferSets().GetSet(frame_idx), {});
 
+    cmd_buff.bindDescriptorSets(  // dir lights
+        vk::PipelineBindPoint::eGraphics, pipelines_.abuff_fill_.GetLayout(), 3,
+        desc_pool_.GetDirLightSets().GetSet(frame_idx), {});
+
     ABuffFillPushConst pc{.width = resrc_extent.width,
                           .max_nodes = resrc_.frame_props_.abuff_max_nodes,
-                          .alpha_cutoff = settings_.alpha_cutoff};
+                          .alpha_cutoff = settings_.alpha_cutoff,
+                          .diff_int = settings_.diff_int,
+                          .spec_int = settings_.spec_int,
+                          .is_pbr = settings_.is_pbr};
 
     cmd_buff.pushConstants(pipelines_.abuff_fill_.GetLayout(),
                            vk::ShaderStageFlagBits::eFragment, 0, sizeof(pc),
                            &pc);
 
     RecordTrans(cmd_buff, frame_idx, frame_resrc, scene, camera.GetFrustum(),
-                pipelines_.abuff_fill_.GetLayout(), 3);
+                pipelines_.abuff_fill_.GetLayout(), 4);
   }
 
   cmd_buff.nextSubpass(vk::SubpassContents::eInline);
@@ -715,20 +722,27 @@ void Renderer::RecordWBoit(vk::CommandBuffer cmd_buff, const uint frame_idx,
         vk::PipelineBindPoint::eGraphics, pipelines_.wboit_acc_.GetLayout(), 1,
         scene.GetResrc().desc_pool.GetTextureSet().GetSet(0), {});
 
+    cmd_buff.bindDescriptorSets(  // dir lights
+        vk::PipelineBindPoint::eGraphics, pipelines_.wboit_acc_.GetLayout(), 2,
+        desc_pool_.GetDirLightSets().GetSet(frame_idx), {});
+
     WBoitPushConst pc{.alpha_multiplier = settings_.wboit_alpha_multiplier,
                       .alpha_power = settings_.wboit_alpha_power,
                       .depth_factor = settings_.wboit_depth_factor,
                       .depth_power = settings_.wboit_depth_power,
                       .weight_min = settings_.wboit_weight_min,
                       .weight_max = settings_.wboit_weight_max,
-                      .alpha_cutoff = settings_.alpha_cutoff};
+                      .alpha_cutoff = settings_.alpha_cutoff,
+                      .diff_int = settings_.diff_int,
+                      .spec_int = settings_.spec_int,
+                      .is_pbr = settings_.is_pbr};
 
     cmd_buff.pushConstants(pipelines_.wboit_acc_.GetLayout(),
                            vk::ShaderStageFlagBits::eFragment, 0, sizeof(pc),
                            &pc);
 
     RecordTrans(cmd_buff, frame_idx, frame_resrc, scene, camera.GetFrustum(),
-                pipelines_.wboit_acc_.GetLayout(), 2);
+                pipelines_.wboit_acc_.GetLayout(), 3);
   }
 
   cmd_buff.nextSubpass(vk::SubpassContents::eInline);

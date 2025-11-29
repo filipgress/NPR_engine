@@ -87,7 +87,7 @@ void main() {
   vec4 transparent = acc_color / float(SAMPLES);
   vec4 opaque = texture(opaque_color, frag_uv);
 
-  vec3 blended = mix(opaque.rgb, transparent.rgb, transparent.a);
+  vec3 blended = opaque.rgb * (1.0 - transparent.a) + transparent.rgb;
   out_color = vec4(blended, 1.0);
 
   float brightness = dot(blended, vec3(0.2126, 0.7152, 0.0722));

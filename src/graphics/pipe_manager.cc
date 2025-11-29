@@ -357,6 +357,7 @@ void PipeManager::BuildABuffFill(const VertexShader& vert_shader,
           desc_pool.GetCameraSets().GetLayout(),
           TextureArraySet(abuff_fill_.ctx_).GetLayout(),
           desc_pool.GetABufferSets().GetLayout(),
+          desc_pool.GetDirLightSets().GetLayout(),
           desc_pool.GetMaterialSets().GetLayout(),
       },
       {Pipeline::MakePushConst<ABuffFillPushConst>(
@@ -365,7 +366,8 @@ void PipeManager::BuildABuffFill(const VertexShader& vert_shader,
   abuff_fill_.AddShader(vert_shader);
   abuff_fill_.AddShader(frag_shader,
                         {Pipeline::MakeSpecConst(0, samples),
-                         Pipeline::MakeSpecConst(1, kMaxTextures)});
+                         Pipeline::MakeSpecConst(1, kMaxTextures),
+                         Pipeline::MakeSpecConst(2, kMaxDirLights)});
 
   abuff_fill_.AddObjectInstanceAttribs();
 
@@ -418,14 +420,17 @@ void PipeManager::BuildWBoitAcc(const VertexShader& vert_shader,
       {
           desc_pool.GetCameraSets().GetLayout(),
           TextureArraySet(wboit_acc_.ctx_).GetLayout(),
+          desc_pool.GetDirLightSets().GetLayout(),
           desc_pool.GetMaterialSets().GetLayout(),
       },
       {Pipeline::MakePushConst<WBoitPushConst>(
           vk::ShaderStageFlagBits::eFragment)});
 
   wboit_acc_.AddShader(vert_shader);
-  wboit_acc_.AddShader(frag_shader, {Pipeline::MakeSpecConst(0, samples),
-                                     Pipeline::MakeSpecConst(1, kMaxTextures)});
+  wboit_acc_.AddShader(frag_shader,
+                       {Pipeline::MakeSpecConst(0, samples),
+                        Pipeline::MakeSpecConst(1, kMaxTextures),
+                        Pipeline::MakeSpecConst(2, kMaxDirLights)});
 
   wboit_acc_.AddObjectInstanceAttribs();
 
