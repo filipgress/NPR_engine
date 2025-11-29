@@ -128,6 +128,12 @@ struct WBoitPushConst {
   uint32_t is_pbr;  // 0 = blinn-phong, 1 = pbr
 };
 
+struct BrightPushConst {
+  float threshold;
+  float soft_threshold;
+  float intensity;
+};
+
 struct BlurPushConst {
   glm::ivec4 flags;  // x = horizontal(1) / vertical(0), y = radius, zw = unused
   float weights[kMaxGaussianRadius + 1];  // weights[0] to weights[radius]

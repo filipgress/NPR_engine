@@ -129,7 +129,7 @@ void GuiManager::FpsOverlay(float fps) {
 void GuiManager::GlobalSettingsWindow(npr_graphics::RenderSettings& settings,
                                       npr_core::FrameTimer& timer,
                                       float cam_aspect) {
-  ImVec2 win_size{300, 250};
+  ImVec2 win_size{350, 350};
   ImVec2 display_size = ImGui::GetIO().DisplaySize;
 
   ImGui::SetNextWindowPos(ImVec2(display_size.x - win_size.x - 10, 40),
@@ -329,8 +329,8 @@ void GuiManager::GlobalSettingsWindow(npr_graphics::RenderSettings& settings,
     ImGui::Spacing();
 
     ImGui::ColorEdit3("color", &settings.ambient_color.x);
-    ImGui::DragFloat("intensity", &settings.ambient_intensity, 0.005f, 0.0f,
-                     1.0f);
+    ImGui::DragFloat("intensity##ambient", &settings.ambient_intensity, 0.005f,
+                     0.0f, 1.0f);
 
     if (settings.ambient_intensity < 0.05f) settings.enable_ssao = false;
 
@@ -349,6 +349,42 @@ void GuiManager::GlobalSettingsWindow(npr_graphics::RenderSettings& settings,
     ImGui::DragFloat("radius", &settings.ssao_radius, 0.01f, 0.1f, 2.0f);
     ImGui::DragFloat("bias", &settings.ssao_bias, 0.001f, 0.001f, 0.1f);
     ImGui::EndDisabled();
+  }
+
+  if (ImGui::CollapsingHeader("bloom")) {
+    ImGui::Spacing();
+
+    ImGui::Checkbox("enable bloom", &settings.enable_bloom);
+
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    ImGui::BeginDisabled(!settings.enable_bloom);
+
+    ImGui::DragFloat("threshold", &settings.bloom_threshold, 0.01f, 0.0f, 5.0f);
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+      ImGui::SetTooltip("brightness level above which colors are extracted");
+
+    ImGui::DragFloat("soft threshold", &settings.bloom_soft_threshold, 0.01f,
+                     0.0f, 1.0f);
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+      ImGui::SetTooltip(
+          "smoothness of threshold transition (0=hard, 1=very soft)");
+
+    ImGui::DragFloat("intensity##bloom", &settings.bloom_intensity, 0.01f, 0.0f,
+                     3.0f);
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+      ImGui::SetTooltip("overall bloom strength multiplier");
+
+    ImGui::EndDisabled();
+
+    if (!settings.enable_bloom) {
+      ImGui::SameLine();
+      ImGui::TextDisabled("(disabled)");
+    }
+
+    ImGui::Spacing();
   }
 
   ImGui::End();
@@ -727,7 +763,7 @@ void GuiManager::DrawLightComp() {
   ImGui::SeparatorText("light");
 
   ImGui::ColorEdit3("color", &light.color.x);
-  ImGui::DragFloat("intensity", &light.intensity, 0.1f, 0.0f, 100.0f);
+  ImGui::DragFloat("intensity##light", &light.intensity, 0.1f, 0.0f, 100.0f);
 
   ImGui::Spacing();
 }

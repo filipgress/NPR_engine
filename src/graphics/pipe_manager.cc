@@ -8,7 +8,7 @@ PipeManager::PipeManager(const Context& ctx, const Resources& resrc,
     : pipe_cache_{ctx},
       gbuff_{ctx, pipe_cache_, passes.gbuff_, "gbuff_pipe"},
       ao_{ctx, pipe_cache_, passes.ao_, "ao_pipe"},
-      ao_blur_{ctx, pipe_cache_, passes.ao_blur_h_, "ao_blur_pipe"},
+      blur_ao_{ctx, pipe_cache_, passes.ao_blur_h_, "ao_blur_pipe"},
       glob_light_{ctx, pipe_cache_, passes.glob_light_, "global_light_pipe"},
       local_light_{ctx, pipe_cache_, passes.local_light_, "local_light_pipe"},
       point_light_{ctx, pipe_cache_, passes.local_light_, "point_light_pipe"},
@@ -17,12 +17,14 @@ PipeManager::PipeManager(const Context& ctx, const Resources& resrc,
       abuff_res_{ctx, pipe_cache_, passes.abuff_, "abuff_resolve_pipe"},
       wboit_acc_{ctx, pipe_cache_, passes.wboit_, "wboit_acc_pipe"},
       wboit_res_{ctx, pipe_cache_, passes.wboit_, "wboit_resolve_pipe"},
+      bright_{ctx, pipe_cache_, passes.bright_, "bright_extract_pipe"},
+      blur_color_{ctx, pipe_cache_, passes.blur_color_, "blur_color_pipe"},
       swap_{ctx, pipe_cache_, passes.swap_, "swap_pipe"} {
   BuildGBuff(shaders.gbuff_vert_, shaders.gbuff_frag_, resrc.GetProps().samples,
              desc_pool);
   BuildAO(shaders.quad_vert_, shaders.ao_frag_, resrc.GetProps().samples,
           desc_pool);
-  BuildAOBlur(shaders.quad_vert_, shaders.blur_frag_, desc_pool);
+  BuildBlurAO(shaders.quad_vert_, shaders.blur_frag_, desc_pool);
   BuildGlobLight(shaders.quad_vert_, shaders.dir_light_frag_,
                  resrc.GetProps().samples, desc_pool);
   BuildLocalLight(shaders.light_vert_, resrc.GetProps().samples, desc_pool);
@@ -37,13 +39,15 @@ PipeManager::PipeManager(const Context& ctx, const Resources& resrc,
   BuildWBoitAcc(shaders.gbuff_vert_, shaders.wboit_acc_frag_,
                 resrc.GetProps().samples, desc_pool);
   BuildWBoitRes(shaders.quad_vert_, shaders.wboit_res_frag_, desc_pool);
+  BuildBright(shaders.quad_vert_, shaders.bright_frag_, desc_pool);
+  BuildBlurColor(shaders.quad_vert_, shaders.blur_frag_, desc_pool);
   BuildSwap(shaders.quad_vert_, shaders.swap_frag_, desc_pool);
 }
 
 void PipeManager::RebuildPipes() {
   if (!gbuff_.IsUpToDate()) gbuff_.BuildPipeline();
   if (!ao_.IsUpToDate()) ao_.BuildPipeline();
-  if (!ao_blur_.IsUpToDate()) ao_blur_.BuildPipeline();
+  if (!blur_ao_.IsUpToDate()) blur_ao_.BuildPipeline();
   if (!glob_light_.IsUpToDate()) glob_light_.BuildPipeline();
   if (!local_light_.IsUpToDate()) local_light_.BuildPipeline();
   if (!point_light_.IsUpToDate()) point_light_.BuildPipeline();
@@ -52,6 +56,8 @@ void PipeManager::RebuildPipes() {
   if (!abuff_res_.IsUpToDate()) abuff_res_.BuildPipeline();
   if (!wboit_acc_.IsUpToDate()) wboit_acc_.BuildPipeline();
   if (!wboit_res_.IsUpToDate()) wboit_res_.BuildPipeline();
+  if (!bright_.IsUpToDate()) bright_.BuildPipeline();
+  if (!blur_color_.IsUpToDate()) bright_.BuildPipeline();
   if (!swap_.IsUpToDate()) swap_.BuildPipeline();
 }
 
@@ -144,24 +150,24 @@ void PipeManager::BuildAO(const VertexShader& vert_shader,
   ao_.BuildPipeline();
 }
 
-void PipeManager::BuildAOBlur(const VertexShader& vert_shader,
+void PipeManager::BuildBlurAO(const VertexShader& vert_shader,
                               const FragmentShader& frag_shader,
                               const DescriptorPool& desc_pool) {
-  ao_blur_.CreateLayout({desc_pool.GetAOResSets().GetLayout()},
+  blur_ao_.CreateLayout({desc_pool.GetAOResSets().GetLayout()},
                         {Pipeline::MakePushConst<BlurPushConst>(
                             vk::ShaderStageFlagBits::eFragment)});
 
-  ao_blur_.AddShader(vert_shader);
-  ao_blur_.AddShader(frag_shader,
+  blur_ao_.AddShader(vert_shader);
+  blur_ao_.AddShader(frag_shader,
                      {Pipeline::MakeSpecConst(0, kMaxGaussianRadius)});
 
-  auto& state = ao_blur_.state_;
+  auto& state = blur_ao_.state_;
   state.color_attachments.resize(1);
   state.color_attachments[0].blendEnable = VK_FALSE;
   state.color_attachments[0].colorWriteMask = vk::ColorComponentFlagBits::eR;
   state.subpass = 0;
 
-  ao_blur_.BuildPipeline();
+  blur_ao_.BuildPipeline();
 }
 
 void PipeManager::BuildGlobLight(const VertexShader& vert_shader,
@@ -507,6 +513,53 @@ void PipeManager::BuildWBoitRes(const VertexShader& vert_shader,
 
   state.subpass = 1;
   wboit_res_.BuildPipeline();
+}
+
+void PipeManager::BuildBright(const VertexShader& vert_shader,
+                              const FragmentShader& frag_shader,
+                              const DescriptorPool& desc_pool) {
+  bright_.CreateLayout({desc_pool.GetBrightColorSets().GetLayout()},
+                       {Pipeline::MakePushConst<BrightPushConst>(
+                           vk::ShaderStageFlagBits::eFragment)});
+
+  bright_.AddShader(vert_shader);
+  bright_.AddShader(frag_shader);
+
+  auto& state = bright_.state_;
+  state.color_attachments.resize(1);
+
+  auto& att = state.color_attachments[0];
+  att.blendEnable = VK_FALSE;
+  att.colorWriteMask =
+      vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+      vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+
+  state.subpass = 0;
+  bright_.BuildPipeline();
+}
+
+void PipeManager::BuildBlurColor(const VertexShader& vert_shader,
+                                 const FragmentShader& frag_shader,
+                                 const DescriptorPool& desc_pool) {
+  blur_color_.CreateLayout({desc_pool.GetAOResSets().GetLayout()},
+                           {Pipeline::MakePushConst<BlurPushConst>(
+                               vk::ShaderStageFlagBits::eFragment)});
+
+  blur_color_.AddShader(vert_shader);
+  blur_color_.AddShader(frag_shader,
+                        {Pipeline::MakeSpecConst(0, kMaxGaussianRadius)});
+
+  auto& state = blur_color_.state_;
+  state.color_attachments.resize(1);
+
+  state.color_attachments[0].blendEnable = VK_FALSE;
+  state.color_attachments[0].colorWriteMask =
+      vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+      vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+
+  state.subpass = 0;
+
+  blur_color_.BuildPipeline();
 }
 
 void PipeManager::BuildSwap(const VertexShader& vert_shader,

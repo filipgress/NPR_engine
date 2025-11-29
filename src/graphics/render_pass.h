@@ -100,9 +100,9 @@ class AOPass : public RenderPass {
   vk::AttachmentReference depth_ref_{};
 };
 
-class BlurPass : public RenderPass {
+class SingleColorPass : public RenderPass {
  public:
-  BlurPass(const Context& ctx, const Resources& resrc, vk::Format format)
+  SingleColorPass(const Context& ctx, const Resources& resrc, vk::Format format)
       : RenderPass(ctx, resrc), format_{format} {}
 
  private:
@@ -116,10 +116,10 @@ class BlurPass : public RenderPass {
   vk::AttachmentReference color_ref_{};
 };
 
-class AOBlurHPass : public BlurPass {
+class AOBlurHPass : public SingleColorPass {
  public:
   AOBlurHPass(const Context& ctx, const Resources& resrc)
-      : BlurPass(ctx, resrc, resrc.GetProps().ao_format) {
+      : SingleColorPass(ctx, resrc, resrc.GetProps().ao_format) {
     Init();
   }
 
@@ -128,16 +128,42 @@ class AOBlurHPass : public BlurPass {
   const std::string GetDbgName() const override { return "ao_blur_h_pass"; }
 };
 
-class AOBlurVPass : public BlurPass {
+class AOBlurVPass : public SingleColorPass {
  public:
   AOBlurVPass(const Context& ctx, const Resources& resrc)
-      : BlurPass(ctx, resrc, resrc.GetProps().ao_format) {
+      : SingleColorPass(ctx, resrc, resrc.GetProps().ao_format) {
     Init();
   }
 
  private:
   std::vector<vk::ImageView> GetAttachmentViews(int frame_idx) const override;
   const std::string GetDbgName() const override { return "ao_blur_v_pass"; }
+};
+
+class BrightPass : public SingleColorPass {
+ public:
+  BrightPass(const Context& ctx, const Resources& resrc)
+      : SingleColorPass(ctx, resrc, resrc.GetProps().color_format) {
+    Init();
+  }
+
+ private:
+  std::vector<vk::ImageView> GetAttachmentViews(int frame_idx) const override;
+  const std::string GetDbgName() const override {
+    return "extract_bright_pass";
+  }
+};
+
+class BlurHPass : public SingleColorPass {
+ public:
+  BlurHPass(const Context& ctx, const Resources& resrc)
+      : SingleColorPass(ctx, resrc, resrc.GetProps().color_format) {
+    Init();
+  }
+
+ private:
+  std::vector<vk::ImageView> GetAttachmentViews(int frame_idx) const override;
+  const std::string GetDbgName() const override { return "blur_h_pass"; }
 };
 
 class GlobLightPass : public RenderPass {

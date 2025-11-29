@@ -97,6 +97,9 @@ class Renderer : public npr_core::NonCopyable {
                    const npr_scene::Frustum& frustum, vk::PipelineLayout layout,
                    const uint set_idx) const;
 
+  void RecordBloom(vk::CommandBuffer cmd_buff, const uint frame_idx,
+                   const vk::Extent2D& resrc_extent);
+
   void RecordSwap(vk::CommandBuffer cmd_buff, uint image_idx,
                   const uint frame_idx, const npr_scene::Camera& camera,
                   bool is_loading, float dt);

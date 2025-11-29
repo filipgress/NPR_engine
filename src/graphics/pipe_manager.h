@@ -28,7 +28,7 @@ class PipeManager : public npr_core::NonCopyable {
                const FragmentShader& frag_shader,
                vk::SampleCountFlagBits samples,
                const DescriptorPool& desc_pool);
-  void BuildAOBlur(const VertexShader& vert_shader,
+  void BuildBlurAO(const VertexShader& vert_shader,
                    const FragmentShader& frag_shader,
                    const DescriptorPool& desc_pool);
   void BuildGlobLight(const VertexShader& vert_shader,
@@ -61,6 +61,12 @@ class PipeManager : public npr_core::NonCopyable {
   void BuildWBoitRes(const VertexShader& vert_shader,
                      const FragmentShader& frag_shader,
                      const DescriptorPool& desc_pool);
+  void BuildBright(const VertexShader& vert_shader,
+                   const FragmentShader& frag_shader,
+                   const DescriptorPool& desc_pool);
+  void BuildBlurColor(const VertexShader& vert_shader,
+                      const FragmentShader& frag_shader,
+                      const DescriptorPool& desc_pool);
   void BuildSwap(const VertexShader& vert_shader,
                  const FragmentShader& frag_shader,
                  const DescriptorPool& desc_pool);
@@ -70,7 +76,7 @@ class PipeManager : public npr_core::NonCopyable {
 
   Pipeline gbuff_;
   Pipeline ao_;
-  Pipeline ao_blur_;
+  Pipeline blur_ao_;
   Pipeline glob_light_;
   Pipeline local_light_;
   Pipeline point_light_;
@@ -79,6 +85,8 @@ class PipeManager : public npr_core::NonCopyable {
   Pipeline abuff_res_;
   Pipeline wboit_acc_;
   Pipeline wboit_res_;
+  Pipeline bright_;
+  Pipeline blur_color_;
   Pipeline swap_;
 };
 

@@ -35,6 +35,11 @@ struct RenderSettings {
   float wboit_weight_min{1e-2};
   float wboit_weight_max{3e3};
 
+  bool enable_bloom{true};
+  float bloom_threshold{1.0f};
+  float bloom_soft_threshold{0.5f};
+  float bloom_intensity{1.0f};
+
   bool dirty_target_size{false};
   bool dirty_abuff_size{false};
 };

@@ -350,9 +350,9 @@ std::vector<vk::ImageView> AOPass::GetAttachmentViews(int frame_idx) const {
 /*
  * BlurPass
  */
-void BlurPass::SetClearValues() { clear_values_.resize(1); }
+void SingleColorPass::SetClearValues() { clear_values_.resize(1); }
 
-std::vector<vk::AttachmentDescription> BlurPass::GetAttachments() const {
+std::vector<vk::AttachmentDescription> SingleColorPass::GetAttachments() const {
   std::vector<vk::AttachmentDescription> attachments(1);
 
   attachments[0].format = format_;
@@ -364,7 +364,7 @@ std::vector<vk::AttachmentDescription> BlurPass::GetAttachments() const {
   return attachments;
 }
 
-std::vector<vk::SubpassDependency> BlurPass::GetDependencies() const {
+std::vector<vk::SubpassDependency> SingleColorPass::GetDependencies() const {
   std::vector<vk::SubpassDependency> deps(2);
 
   {
@@ -402,7 +402,7 @@ std::vector<vk::SubpassDependency> BlurPass::GetDependencies() const {
   return deps;
 }
 
-std::vector<vk::SubpassDescription> BlurPass::GetSubpasses() {
+std::vector<vk::SubpassDescription> SingleColorPass::GetSubpasses() {
   color_ref_ = {0, vk::ImageLayout::eColorAttachmentOptimal};
 
   vk::SubpassDescription subpass{};
@@ -431,6 +431,24 @@ std::vector<vk::ImageView> AOBlurVPass::GetAttachmentViews(
     throw std::runtime_error("missing required resources for: " + GetDbgName());
 
   return {resrc.ao_res->GetImageView()};
+}
+
+std::vector<vk::ImageView> BrightPass::GetAttachmentViews(int frame_idx) const {
+  auto& resrc = resrc_.GetResrc()[frame_idx];
+
+  if (!resrc.bright_color)
+    throw std::runtime_error("missing required resources for: " + GetDbgName());
+
+  return {resrc.bright_color->GetImageView()};
+}
+
+std::vector<vk::ImageView> BlurHPass::GetAttachmentViews(int frame_idx) const {
+  auto& resrc = resrc_.GetResrc()[frame_idx];
+
+  if (!resrc.temp_color)
+    throw std::runtime_error("missing required resources for: " + GetDbgName());
+
+  return {resrc.temp_color->GetImageView()};
 }
 
 /*
