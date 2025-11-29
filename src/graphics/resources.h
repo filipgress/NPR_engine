@@ -59,15 +59,10 @@ struct DirLightUnif {
   glm::vec4 ambient;  // rgb = color * intensity, a = intensity
   glm::vec4 rim;      // rgb = color * intensity, a = intensity
 
-  float diff_int;
-  float spec_int;
   float rim_power;
-  uint32_t inv_rim;  // 0 or 1
-
+  uint32_t inv_rim;  // 0 = normal, 1 = inverse
   uint32_t count;
   uint32_t use_ssao;
-  uint32_t pad0;
-  uint32_t pad1;
 
   DirLight dir_lights[kMaxDirLights];
 };
@@ -78,8 +73,8 @@ struct PointLightUnif {
 };
 
 struct SpotLightUnif {
-  glm::vec4 pos;     // xyz = view-space position, w = range
-  glm::vec4 dir;     // xyz = normalized direction, w = unused
+  glm::vec4 pos;  // xyz = view-space position, w = range
+  glm::vec4 dir;  // xyz = normalized view-space direction to light, w = unused
   glm::vec4 color;   // rgb = color, a = unused
   glm::vec4 params;  // x = angle_scale, y = angle_offset, zw = unused
 };
@@ -99,6 +94,9 @@ struct AOPushConst {
 
 struct LightPushConst {
   glm::mat4 model;
+  float diff_int;
+  float spec_int;
+  uint32_t is_pbr;  // 0 = blinn-phong, 1 = pbr
 };
 
 struct ABuffFillPushConst {

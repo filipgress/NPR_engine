@@ -274,7 +274,58 @@ void GuiManager::GlobalSettingsWindow(npr_graphics::RenderSettings& settings,
     ImGui::Spacing();
   }
 
-  if (ImGui::CollapsingHeader("ambient")) {
+  if (ImGui::CollapsingHeader("lighting")) {
+    ImGui::Spacing();
+    ImGui::SeparatorText("shading model");
+    ImGui::Spacing();
+
+    static int selected_shading = settings.is_pbr ? 1 : 0;
+
+    if (ImGui::Selectable("Blinn-Phong", selected_shading == 0)) {
+      selected_shading = 0;
+      settings.is_pbr = false;
+    }
+
+    if (ImGui::Selectable("PBR (Physically Based Rendering)",
+                          selected_shading == 1)) {
+      selected_shading = 1;
+      settings.is_pbr = true;
+    }
+
+    // Blinn-Phong specific settings
+    if (!settings.is_pbr) {
+      ImGui::Spacing();
+      ImGui::Separator();
+      ImGui::Spacing();
+
+      ImGui::DragFloat("diffuse intensity", &settings.diff_int, 0.01f, 0.0f,
+                       2.0f);
+      ImGui::DragFloat("specular intensity", &settings.spec_int, 0.01f, 0.0f,
+                       2.0f);
+
+      ImGui::Spacing();
+      ImGui::SeparatorText("rim light");
+      ImGui::Spacing();
+
+      ImGui::ColorEdit3("rim color", &settings.rim_color.x);
+      ImGui::DragFloat("rim intensity", &settings.rim_intensity, 0.005f, 0.0f,
+                       1.0f);
+
+      if (settings.rim_intensity < 0.05f) settings.inv_rim = false;
+
+      ImGui::BeginDisabled(settings.rim_intensity < 0.05f);
+      ImGui::DragFloat("power", &settings.rim_power, 0.1f, 0.1f, 20.0f);
+      ImGui::Checkbox("invert", &settings.inv_rim);
+      ImGui::EndDisabled();
+
+      if (settings.rim_intensity < 0.05f) {
+        ImGui::SameLine();
+        ImGui::Text("(ineffective)");
+      }
+    }
+
+    ImGui::Spacing();
+    ImGui::SeparatorText("ambient");
     ImGui::Spacing();
 
     ImGui::ColorEdit3("color", &settings.ambient_color.x);
@@ -298,8 +349,6 @@ void GuiManager::GlobalSettingsWindow(npr_graphics::RenderSettings& settings,
     ImGui::DragFloat("radius", &settings.ssao_radius, 0.01f, 0.1f, 2.0f);
     ImGui::DragFloat("bias", &settings.ssao_bias, 0.001f, 0.001f, 0.1f);
     ImGui::EndDisabled();
-
-    ImGui::Spacing();
   }
 
   ImGui::End();
@@ -546,9 +595,10 @@ void GuiManager::DrawTransformComp(npr_scene::Camera& camera) {
   changed |= ImGui::DragFloat3("pos", &tf.pos.x, 0.1f);
 
   glm::vec3 euler = glm::degrees(glm::eulerAngles(tf.rot));
-  euler.y = glm::clamp(euler.y, -89.0f, 89.0f);
-  if (ImGui::DragFloat3("rot", &euler.x, 1.0f)) {
-    tf.rot = glm::quat(glm::radians(euler));
+  euler.y = glm::clamp(euler.y, -180.0f, 180.0f);  // Prevent gimbal lock
+  if (ImGui::DragFloat3("rot", &euler.x, 0.5f)) {
+    euler.y = glm::clamp(euler.y, -89.0f, 89.0f);
+    tf.rot = glm::normalize(glm::quat(glm::radians(euler)));
     changed = true;
   }
 
@@ -726,11 +776,11 @@ void GuiManager::DrawSpotComp() {
   float inner_degrees = glm::degrees(spot_comp.inner_cone_angle);
   float outer_degrees = glm::degrees(spot_comp.outer_cone_angle);
 
-  if (ImGui::SliderFloat("inner", &inner_degrees, 0.0f, 90.0f, "%.1f°"))
+  if (ImGui::SliderFloat("inner", &inner_degrees, 0.0f, 60.0f, "%.1f°"))
     spot_comp.inner_cone_angle = glm::radians(inner_degrees);
 
   bool changed = false;
-  if (ImGui::SliderFloat("outer", &outer_degrees, 0.0f, 90.0f, "%.1f°")) {
+  if (ImGui::SliderFloat("outer", &outer_degrees, 0.0f, 60.0f, "%.1f°")) {
     spot_comp.outer_cone_angle = glm::radians(outer_degrees);
     changed = true;
   }

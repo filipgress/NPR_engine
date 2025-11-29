@@ -8,15 +8,15 @@ uint Renderer::mat_at{0};
 uint Renderer::inst_at{0};
 
 void Renderer::Update() {
-  bool dirty = shaders_.IsDirty() || settings_.dirty_target_size ||
+  bool shaders_dirty = shaders_.IsDirty();
+  bool dirty = shaders_dirty || settings_.dirty_target_size ||
                settings_.dirty_abuff_size;
   if (!dirty) return;
 
   WaitIdle();
 
-  if (shaders_.IsDirty()) pipelines_.RebuildPipes();
+  if (shaders_dirty) pipelines_.RebuildPipes();
   if (settings_.dirty_target_size) {
-    INFO("recreaing offscreent targets");
     resrc_.frame_props_.extent = settings_.target_size;
 
     resrc_.CreateImages();
@@ -28,7 +28,6 @@ void Renderer::Update() {
   }
 
   if (settings_.dirty_abuff_size) {
-    INFO("recreaing abuff");
     resrc_.frame_props_.abuff_avg_nodes = settings_.abuff_avg_nodes;
 
     resrc_.CreateABuffers();
@@ -81,10 +80,8 @@ void Renderer::Render(npr_core::FrameTimer& timer, Camera& camera, Scene& scene,
 
   // record & submit commands
   vk::CommandBuffer cmd_buff;
-  if (scene.IsLoaded() && scene.IsInit()) {
-    gui_.NewFrame(settings_, timer, camera, scene);
-    cmd_buff = Record(image_idx, camera, scene, is_loading, timer.GetElapsed());
-  }
+  gui_.NewFrame(settings_, timer, camera, scene);
+  cmd_buff = Record(image_idx, camera, scene, is_loading, timer.GetElapsed());
 
   auto render_finished = sync_.GetRenderFinished(image_idx);
 
@@ -339,14 +336,11 @@ void Renderer::RecordGlobLight(vk::CommandBuffer cmd_buff, const uint frame_idx,
       glm::vec4(settings_.ambient_color * settings_.ambient_intensity,
                 settings_.ambient_intensity);
 
-  float rim_intensity = 0.0f;
-  glm::vec3 rim_color = glm::vec3{1.0f, 1.0f, 1.0f} * rim_intensity;
-  dir_lights.rim = glm::vec4{rim_color, rim_intensity};
+  dir_lights.rim = glm::vec4{settings_.rim_color * settings_.rim_intensity,
+                             settings_.rim_intensity};
 
-  dir_lights.diff_int = 1.0f;
-  dir_lights.spec_int = 1.0f;
-  dir_lights.rim_power = 4.0f;
-  dir_lights.inv_rim = 0;
+  dir_lights.rim_power = settings_.rim_power;
+  dir_lights.inv_rim = settings_.inv_rim ? 1 : 0;
 
   uint32_t i{0};
   scene.GetDirLightQuery().each([&](const DirLightTag&, const TransformComp& tf,
@@ -387,6 +381,13 @@ void Renderer::RecordGlobLight(vk::CommandBuffer cmd_buff, const uint frame_idx,
   cmd_buff.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,  // gbuff
                               pipelines_.glob_light_.GetLayout(), 1,
                               desc_pool_.GetGBuffSets().GetSet(frame_idx), {});
+
+  LightPushConst light_pc{
+      {}, settings_.diff_int, settings_.spec_int, settings_.is_pbr};
+
+  cmd_buff.pushConstants(pipelines_.glob_light_.GetLayout(),
+                         vk::ShaderStageFlagBits::eFragment, 0,
+                         sizeof(light_pc), &light_pc);
 
   cmd_buff.bindDescriptorSets(  // dir lights
       vk::PipelineBindPoint::eGraphics, pipelines_.glob_light_.GetLayout(), 2,
@@ -438,7 +439,8 @@ void Renderer::RecordPointLights(
           const RangeComp& range, BoundingBoxComp& bb) {
         if (point_at >= kMaxPointLights || !frustum.IsVisible(bb)) return;
 
-        LightPushConst light_pc{tf.glob_mat};
+        LightPushConst light_pc{tf.glob_mat, settings_.diff_int,
+                                settings_.spec_int, settings_.is_pbr};
 
         glm::vec3 world_pos = glm::vec3(tf.glob_mat[3]);
         glm::vec3 view_pos = cam_ubo.view * glm::vec4(world_pos, 1.0f);
@@ -466,7 +468,7 @@ void Renderer::RecordPointLights(
 
           cmd_buff.pushConstants(pipelines_.local_light_.GetLayout(),
                                  vk::ShaderStageFlagBits::eVertex, 0,
-                                 sizeof(LightPushConst), &light_pc);
+                                 sizeof(light_pc), &light_pc);
 
           cmd_buff.bindVertexBuffers(0, 1, &vbo, &offset);
           cmd_buff.bindIndexBuffer(sphere_mesh.ibo.GetBuffer(), 0,
@@ -482,10 +484,6 @@ void Renderer::RecordPointLights(
           cmd_buff.bindPipeline(vk::PipelineBindPoint::eGraphics,
                                 pipelines_.point_light_.GetPipeline());
 
-          cmd_buff.pushConstants(pipelines_.point_light_.GetLayout(),
-                                 vk::ShaderStageFlagBits::eVertex, 0,
-                                 sizeof(LightPushConst), &light_pc);
-
           cmd_buff.bindDescriptorSets(  // camera
               vk::PipelineBindPoint::eGraphics,
               pipelines_.point_light_.GetLayout(), 0, cam_set, {});
@@ -498,6 +496,11 @@ void Renderer::RecordPointLights(
               vk::PipelineBindPoint::eGraphics,  // point light
               pipelines_.point_light_.GetLayout(), 2, point_set,
               point_ubo.GetElemOffset(point_at));
+
+          cmd_buff.pushConstants(pipelines_.point_light_.GetLayout(),
+                                 vk::ShaderStageFlagBits::eVertex |
+                                     vk::ShaderStageFlagBits::eFragment,
+                                 0, sizeof(light_pc), &light_pc);
 
           cmd_buff.bindVertexBuffers(0, 1, &vbo, &offset);
           cmd_buff.bindIndexBuffer(sphere_mesh.ibo.GetBuffer(), 0,
@@ -532,7 +535,8 @@ void Renderer::RecordSpotLights(vk::CommandBuffer cmd_buff,
           const RangeComp& range, const SpotComp& spot, BoundingBoxComp& bb) {
         if (spot_at >= kMaxSpotLights || !frustum.IsVisible(bb)) return;
 
-        LightPushConst light_pc{tf.glob_mat};
+        LightPushConst light_pc{tf.glob_mat, settings_.diff_int,
+                                settings_.spec_int, settings_.is_pbr};
 
         glm::vec3 world_pos = glm::vec3(tf.glob_mat[3]);
         glm::vec3 view_pos = cam_ubo.view * glm::vec4(world_pos, 1.0f);
@@ -577,7 +581,7 @@ void Renderer::RecordSpotLights(vk::CommandBuffer cmd_buff,
 
           cmd_buff.pushConstants(pipelines_.local_light_.GetLayout(),
                                  vk::ShaderStageFlagBits::eVertex, 0,
-                                 sizeof(LightPushConst), &light_pc);
+                                 sizeof(light_pc), &light_pc);
 
           cmd_buff.bindVertexBuffers(0, 1, &vbo, &offset);
           cmd_buff.bindIndexBuffer(cone_mesh.ibo.GetBuffer(), 0,
@@ -592,10 +596,6 @@ void Renderer::RecordSpotLights(vk::CommandBuffer cmd_buff,
           cmd_buff.bindPipeline(vk::PipelineBindPoint::eGraphics,
                                 pipelines_.spot_light_.GetPipeline());
 
-          cmd_buff.pushConstants(pipelines_.spot_light_.GetLayout(),
-                                 vk::ShaderStageFlagBits::eVertex, 0,
-                                 sizeof(LightPushConst), &light_pc);
-
           cmd_buff.bindDescriptorSets(  // camera
               vk::PipelineBindPoint::eGraphics,
               pipelines_.spot_light_.GetLayout(), 0, cam_set, {});
@@ -608,6 +608,11 @@ void Renderer::RecordSpotLights(vk::CommandBuffer cmd_buff,
               vk::PipelineBindPoint::eGraphics,  // spot light
               pipelines_.spot_light_.GetLayout(), 2, spot_set,
               spot_ubo.GetElemOffset(spot_at));
+
+          cmd_buff.pushConstants(pipelines_.spot_light_.GetLayout(),
+                                 vk::ShaderStageFlagBits::eVertex |
+                                     vk::ShaderStageFlagBits::eFragment,
+                                 0, sizeof(light_pc), &light_pc);
 
           cmd_buff.bindVertexBuffers(0, 1, &vbo, &offset);
           cmd_buff.bindIndexBuffer(cone_mesh.ibo.GetBuffer(), 0,

@@ -171,7 +171,8 @@ void PipeManager::BuildGlobLight(const VertexShader& vert_shader,
   glob_light_.CreateLayout({desc_pool.GetAOResSets().GetLayout(),
                             desc_pool.GetGBuffSets().GetLayout(),
                             desc_pool.GetDirLightSets().GetLayout()},
-                           {});
+                           {Pipeline::MakePushConst<LightPushConst>(
+                               vk::ShaderStageFlagBits::eFragment)});
 
   glob_light_.AddShader(vert_shader);
   glob_light_.AddShader(frag_shader,
@@ -248,7 +249,8 @@ void PipeManager::BuildPointLight(const VertexShader& vert_shader,
                              desc_pool.GetGBuffSets().GetLayout(),
                              desc_pool.GetPointLightSets().GetLayout()},
                             {Pipeline::MakePushConst<LightPushConst>(
-                                vk::ShaderStageFlagBits::eVertex)});
+                                vk::ShaderStageFlagBits::eVertex |
+                                vk::ShaderStageFlagBits::eFragment)});
 
   point_light_.AddShader(vert_shader);
   point_light_.AddShader(frag_shader, {Pipeline::MakeSpecConst(0, samples)});
@@ -300,7 +302,8 @@ void PipeManager::BuildSpotLight(const VertexShader& vert_shader,
                             desc_pool.GetGBuffSets().GetLayout(),
                             desc_pool.GetSpotLightSets().GetLayout()},
                            {Pipeline::MakePushConst<LightPushConst>(
-                               vk::ShaderStageFlagBits::eVertex)});
+                               vk::ShaderStageFlagBits::eVertex |
+                               vk::ShaderStageFlagBits::eFragment)});
 
   spot_light_.AddShader(vert_shader);
   spot_light_.AddShader(frag_shader, {Pipeline::MakeSpecConst(0, samples)});

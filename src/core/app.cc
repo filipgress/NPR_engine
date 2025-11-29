@@ -11,7 +11,7 @@ App::App()
   npr_scene::SceneLoader::LoadAsync(
       renderer_, *loading_scene_, tasks_,
       [this]() { loading_scene_.swap(active_scene_); },
-      "../assets/scenes/ds_3/scene.gltf");
+      "../assets/scenes/default/scene.gltf");
 }
 
 void App::Run() {

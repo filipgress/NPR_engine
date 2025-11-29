@@ -26,17 +26,19 @@ layout(set = 2, binding = 0) uniform DirLightUnif {
   vec4 ambient; // rgb = color * intensity, a = intensity
   vec4 rim; // rgb = color * intensity, a = intensity
 
-  float diff_int;
-  float spec_int;
   float rim_power;
-  uint inv_rim; // 0 = normal rim, 1 = inverse rim
-
+  uint inv_rim; // 0 = normal, 1 = inverse
   uint count;
   uint use_ssao;
-  uint pad0;
-  uint pad1;
 
   DirLight dir_lights[MAX_DIR_LIGHTS];
+};
+
+layout(push_constant) uniform PushConst {
+  mat4 model; // unused
+  float diff_int;
+  float spec_int;
+  uint is_pbr; // 0 = blinn-phong, 1 = pbr
 };
 
 float distribution_ggx(vec3 N, vec3 H, float roughness) {
@@ -150,7 +152,7 @@ vec3 calc_blinn_phong(int idx, ivec2 coord, vec3 ao) {
   vec3 rim_color = calc_rim_light(view_dir, normal, albedo);
 
   vec3 color = ao * albedo + rim_color + emissive; // ambient + rim + emissive
-  float shininess = (1.0 - roughness) * 256.0;
+  float shininess = max((1.0 - roughness) * 256.0, 1.0);
 
   if (diff_int < EPSILON && spec_int < EPSILON)
     return color;
@@ -182,18 +184,6 @@ vec3 calc_blinn_phong(int idx, ivec2 coord, vec3 ao) {
 }
 
 void main() {
-  // if (count == 0) {
-  //   out_color = vec4(1.0, 0.0, 0.0, 1.0); // Red = no lights
-  //   return;
-  // } else if (count == 1) {
-  //   out_color = vec4(0.0, 1.0, 0.0, 1.0); // Green = 1 light
-  //   return;
-  // } else if (count == 2) {
-  //   out_color = dir_lights[0].color;
-  //   // out_color = vec4(0.0, 0.0, 1.0, 1.0); // Blue = 2 lights
-  //   return;
-  // }
-
   ivec2 coord = ivec2(gl_FragCoord.xy);
 
   vec3 ao = ambient.rgb;
@@ -202,16 +192,21 @@ void main() {
 
   float coverage = texture(g_coverage, frag_uv).r;
   if (coverage == 1.0) { // simple pixel
-    out_color = vec4(calc_pbr(0, coord, ao), 1.0);
-    // out_color = vec4(calc_blinn_phong(0, coord, ao), 1.0);
+    if (is_pbr == 1u)
+      out_color = vec4(calc_pbr(0, coord, ao), 1.0);
+    else
+      out_color = vec4(calc_blinn_phong(0, coord, ao), 1.0);
     return;
   }
 
   // complex pixel
   vec3 final_color = vec3(0.0);
-  for (int s = 0; s < SAMPLES; ++s)
-    final_color += calc_pbr(s, coord, ao);
-  // final_color += calc_blinn_phong(s, coord, ao);
+  for (int s = 0; s < SAMPLES; ++s) {
+    if (is_pbr == 1u)
+      final_color += calc_pbr(s, coord, ao);
+    else
+      final_color += calc_blinn_phong(s, coord, ao);
+  }
 
   out_color = vec4(final_color / float(SAMPLES), 1.0);
 }

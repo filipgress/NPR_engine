@@ -9,6 +9,15 @@ struct RenderSettings {
   glm::vec3 ambient_color{0.3f, 0.3f, 0.3f};
   float ambient_intensity{0.225f};
 
+  glm::vec3 rim_color{1.0f, 1.0f, 1.0f};
+  float rim_intensity{0.0f};
+
+  float diff_int{1.0f};
+  float spec_int{1.0f};
+  float rim_power{4.0f};
+  bool inv_rim{false};
+  bool is_pbr{true};
+
   bool enable_ssao{true};
   float ssao_radius{0.5f};
   float ssao_bias{0.025f};
