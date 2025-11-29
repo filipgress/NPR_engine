@@ -388,8 +388,7 @@ void PipeManager::BuildABuffRes(const VertexShader& vert_shader,
                                 const FragmentShader& frag_shader,
                                 vk::SampleCountFlagBits samples,
                                 const DescriptorPool& desc_pool) {
-  abuff_res_.CreateLayout({desc_pool.GetColorSets().GetLayout(),
-                           desc_pool.GetABufferSets().GetLayout()},
+  abuff_res_.CreateLayout({desc_pool.GetABufferSets().GetLayout()},
                           {Pipeline::MakePushConst<ABuffResPushConst>(
                               vk::ShaderStageFlagBits::eFragment)});
 
@@ -398,15 +397,23 @@ void PipeManager::BuildABuffRes(const VertexShader& vert_shader,
                        {Pipeline::MakeSpecConst(0, samples),
                         Pipeline::MakeSpecConst(1, kABuffMaxSortedNodes)});
 
-  // present_color, bright_color
+  // color_res
   auto& state = abuff_res_.state_;
-  state.color_attachments.resize(2);
-  for (auto& att : state.color_attachments) {
-    att.blendEnable = VK_FALSE;
-    att.colorWriteMask =
-        vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
-        vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
-  }
+  state.color_attachments.resize(1);
+
+  auto& att = state.color_attachments[0];
+  att.blendEnable = VK_TRUE;
+  att.colorWriteMask =
+      vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+      vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+
+  att.srcColorBlendFactor = vk::BlendFactor::eOne;
+  att.dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha;
+  att.colorBlendOp = vk::BlendOp::eAdd;
+
+  att.srcAlphaBlendFactor = vk::BlendFactor::eOne;
+  att.dstAlphaBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha;
+  att.alphaBlendOp = vk::BlendOp::eAdd;
 
   state.subpass = 1;
   abuff_res_.BuildPipeline();
@@ -476,23 +483,27 @@ void PipeManager::BuildWBoitAcc(const VertexShader& vert_shader,
 void PipeManager::BuildWBoitRes(const VertexShader& vert_shader,
                                 const FragmentShader& frag_shader,
                                 const DescriptorPool& desc_pool) {
-  wboit_res_.CreateLayout({desc_pool.GetColorSets().GetLayout(),
-                           desc_pool.GetWBoitInputSets().GetLayout()},
-                          {});
+  wboit_res_.CreateLayout({desc_pool.GetWBoitInputSets().GetLayout()}, {});
 
   wboit_res_.AddShader(vert_shader);
   wboit_res_.AddShader(frag_shader);
 
-  // present_color, bright_color
+  // color_res
   auto& state = wboit_res_.state_;
+  state.color_attachments.resize(1);
 
-  state.color_attachments.resize(2);
-  for (auto& att : state.color_attachments) {
-    att.blendEnable = VK_FALSE;
-    att.colorWriteMask =
-        vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
-        vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
-  }
+  auto& att = state.color_attachments[0];
+  att.blendEnable = VK_TRUE;
+  att.colorWriteMask =
+      vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+      vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+
+  att.srcColorBlendFactor = vk::BlendFactor::eSrcAlpha;
+  att.dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha;
+  att.colorBlendOp = vk::BlendOp::eAdd;
+  att.srcAlphaBlendFactor = vk::BlendFactor::eOne;
+  att.dstAlphaBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha;
+  att.alphaBlendOp = vk::BlendOp::eAdd;
 
   state.subpass = 1;
   wboit_res_.BuildPipeline();

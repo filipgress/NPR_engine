@@ -199,7 +199,7 @@ class ABuffPass : public RenderPass {
   std::vector<vk::ImageView> GetAttachmentViews(int frame_idx) const override;
 
  private:
-  std::array<vk::AttachmentReference, 2> color_refs_{};
+  vk::AttachmentReference color_ref_{};
   vk::AttachmentReference depth_ref_{};
 };
 
@@ -224,7 +224,7 @@ class WBoitPass : public RenderPass {
   std::array<vk::AttachmentReference, 2> resolve_refs_{};
   vk::AttachmentReference depth_ref_{};
 
-  std::array<vk::AttachmentReference, 2> color_refs_{};
+  vk::AttachmentReference color_ref_{};
   std::array<vk::AttachmentReference, 2> input_refs_{};
 };
 

@@ -682,12 +682,8 @@ void Renderer::RecordABuff(vk::CommandBuffer cmd_buff, const uint frame_idx,
     cmd_buff.bindPipeline(vk::PipelineBindPoint::eGraphics,
                           pipelines_.abuff_res_.GetPipeline());
 
-    cmd_buff.bindDescriptorSets(  // color_res
-        vk::PipelineBindPoint::eGraphics, pipelines_.abuff_res_.GetLayout(), 0,
-        desc_pool_.GetColorSets().GetSet(frame_idx), {});
-
     cmd_buff.bindDescriptorSets(  // abuff
-        vk::PipelineBindPoint::eGraphics, pipelines_.abuff_res_.GetLayout(), 1,
+        vk::PipelineBindPoint::eGraphics, pipelines_.abuff_res_.GetLayout(), 0,
         desc_pool_.GetABufferSets().GetSet(frame_idx), {});
 
     ABuffResPushConst pc{.width = resrc_extent.width,
@@ -747,16 +743,12 @@ void Renderer::RecordWBoit(vk::CommandBuffer cmd_buff, const uint frame_idx,
 
   cmd_buff.nextSubpass(vk::SubpassContents::eInline);
 
-  {  // compose
+  {  // resolve
     cmd_buff.bindPipeline(vk::PipelineBindPoint::eGraphics,
                           pipelines_.wboit_res_.GetPipeline());
 
-    cmd_buff.bindDescriptorSets(  // color_res
-        vk::PipelineBindPoint::eGraphics, pipelines_.wboit_res_.GetLayout(), 0,
-        desc_pool_.GetColorSets().GetSet(frame_idx), {});
-
     cmd_buff.bindDescriptorSets(  // input attachments
-        vk::PipelineBindPoint::eGraphics, pipelines_.wboit_res_.GetLayout(), 1,
+        vk::PipelineBindPoint::eGraphics, pipelines_.wboit_res_.GetLayout(), 0,
         desc_pool_.GetWBoitInputSets().GetSet(frame_idx), {});
 
     cmd_buff.draw(3, 1, 0, 0);
@@ -867,15 +859,9 @@ void Renderer::RecordSwap(vk::CommandBuffer cmd_buff, uint image_idx,
   cmd_buff.bindPipeline(vk::PipelineBindPoint::eGraphics,
                         pipelines_.swap_.GetPipeline());
 
-  if (settings_.trans_mode == TransparencyMode::kNone) {
-    cmd_buff.bindDescriptorSets(  // color_res
-        vk::PipelineBindPoint::eGraphics, pipelines_.swap_.GetLayout(), 0,
-        desc_pool_.GetColorSets().GetSet(frame_idx), {});
-  } else {
-    cmd_buff.bindDescriptorSets(  // present_color
-        vk::PipelineBindPoint::eGraphics, pipelines_.swap_.GetLayout(), 0,
-        desc_pool_.GetPresentColorSets().GetSet(frame_idx), {});
-  }
+  cmd_buff.bindDescriptorSets(  // color_res
+      vk::PipelineBindPoint::eGraphics, pipelines_.swap_.GetLayout(), 0,
+      desc_pool_.GetColorSets().GetSet(frame_idx), {});
 
   cmd_buff.draw(3, 1, 0, 0);
   cmd_buff.nextSubpass(vk::SubpassContents::eInline);

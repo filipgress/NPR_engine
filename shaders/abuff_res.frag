@@ -5,9 +5,6 @@ layout(constant_id = 1) const uint MAX_SORTED_NODES = 16;
 
 layout(location = 0) in vec2 frag_uv;
 layout(location = 0) out vec4 out_color;
-layout(location = 1) out vec4 out_bright;
-
-layout(set = 0, binding = 0) uniform sampler2D opaque_color;
 
 struct ABuffNode {
   vec4 color;
@@ -17,11 +14,11 @@ struct ABuffNode {
   uint _padding[2];
 };
 
-layout(set = 1, binding = 0) buffer ABuffNodes {
+layout(set = 0, binding = 0) buffer ABuffNodes {
   ABuffNode nodes[];
 };
 
-layout(set = 1, binding = 1) buffer HeadPointers {
+layout(set = 0, binding = 1) buffer HeadPointers {
   uint heads[];
 };
 
@@ -84,13 +81,5 @@ void main() {
     acc_color += dest;
   }
 
-  vec4 transparent = acc_color / float(SAMPLES);
-  vec4 opaque = texture(opaque_color, frag_uv);
-
-  vec3 blended = opaque.rgb * (1.0 - transparent.a) + transparent.rgb;
-  out_color = vec4(blended, 1.0);
-
-  float brightness = dot(blended, vec3(0.2126, 0.7152, 0.0722));
-  float threshold = 0.2;
-  out_bright = brightness > threshold ? out_color : vec4(0.0);
+  out_color = acc_color / float(SAMPLES);
 }
