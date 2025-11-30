@@ -47,7 +47,6 @@ class Camera {
   Camera(float aspect) : Camera{{.aspect = aspect}} {}
 
   CameraMode GetMode() const { return props_.mode; }
-  bool IsOrbit() const { return props_.mode == CameraMode::kOrbit; }
   void SetMode(CameraMode mode) { props_.mode = mode; }
   void ToggleMode() {
     props_.mode = props_.mode == CameraMode::kFree ? CameraMode::kOrbit
@@ -55,9 +54,16 @@ class Camera {
   }
 
   bool IsFocused() const { return ent_.is_valid(); }
+  bool IsOrbit() const { return props_.mode == CameraMode::kOrbit; }
+  bool IsOrtho() const {
+    return ent_.is_valid() && ent_.has<OrthographicComp>();
+  }
 
   float GetAspect() const;
   void SetAspect(float aspect);
+
+  float GetNear() const;
+  float GetFar() const;
 
   const Frustum& GetFrustum() const { return frustum_; }
   npr_graphics::CameraUnif GetCameraUnif() const {

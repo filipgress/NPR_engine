@@ -31,6 +31,22 @@ void Camera::SetAspect(float aspect) {
   frustum_.Update(proj_ * view_);
 }
 
+float Camera::GetNear() const {
+  if (!ent_.is_valid()) return proj_props_.near;
+  if (ent_.has<PerspectiveComp>()) return ent_.get<PerspectiveComp>().near;
+  if (ent_.has<OrthographicComp>()) return ent_.get<OrthographicComp>().near;
+
+  assert(false);
+}
+
+float Camera::GetFar() const {
+  if (!ent_.is_valid()) return proj_props_.far;
+  if (ent_.has<PerspectiveComp>()) return ent_.get<PerspectiveComp>().far;
+  if (ent_.has<OrthographicComp>()) return ent_.get<OrthographicComp>().far;
+
+  assert(false);
+}
+
 void Camera::SetEntity(flecs::entity ent) {
   if (!ent.is_valid() || !ent.has<CameraTag>()) return;
 
