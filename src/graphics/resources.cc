@@ -26,6 +26,7 @@ Resources::Resources(const Context& ctx, const CommandPool& cmd_pool,
 
   CreateAOKernel();
   ssao_blur_ = CreateGaussianKernel(5);
+  bloom_blur_ = CreateGaussianKernel(8);
 
   auto cmd_buff = cmd_pool.BeginSingleTimeCmds();
   {

@@ -302,8 +302,8 @@ void Renderer::RecordAO(vk::CommandBuffer cmd_buff, const uint frame_idx,
   auto& blur_pc = resrc_.GetSSAOBlurPC();
   blur_pc.flags.x = 0;  // horizontal
   cmd_buff.pushConstants(pipelines_.blur_ao_.GetLayout(),
-                         vk::ShaderStageFlagBits::eFragment, 0,
-                         sizeof(BlurPushConst), &blur_pc);
+                         vk::ShaderStageFlagBits::eFragment, 0, sizeof(blur_pc),
+                         &blur_pc);
 
   cmd_buff.draw(3, 1, 0, 0);
   cmd_buff.endRenderPass();
@@ -322,8 +322,8 @@ void Renderer::RecordAO(vk::CommandBuffer cmd_buff, const uint frame_idx,
 
   blur_pc.flags.x = 1;  // vertical
   cmd_buff.pushConstants(pipelines_.blur_ao_.GetLayout(),
-                         vk::ShaderStageFlagBits::eFragment, 0,
-                         sizeof(BlurPushConst), &blur_pc);
+                         vk::ShaderStageFlagBits::eFragment, 0, sizeof(blur_pc),
+                         &blur_pc);
 
   cmd_buff.draw(3, 1, 0, 0);
   cmd_buff.endRenderPass();
@@ -868,11 +868,11 @@ void Renderer::RecordBloom(vk::CommandBuffer cmd_buff, const uint frame_idx,
       vk::PipelineBindPoint::eGraphics, pipelines_.blur_color_.GetLayout(), 0,
       desc_pool_.GetBrightColorSets().GetSet(frame_idx), {});
 
-  auto& blur_pc = resrc_.GetSSAOBlurPC();
+  auto& blur_pc = resrc_.GetBloomBlurPC();
   blur_pc.flags.x = 0;  // horizontal
   cmd_buff.pushConstants(pipelines_.blur_color_.GetLayout(),
-                         vk::ShaderStageFlagBits::eFragment, 0,
-                         sizeof(BlurPushConst), &blur_pc);
+                         vk::ShaderStageFlagBits::eFragment, 0, sizeof(blur_pc),
+                         &blur_pc);
 
   cmd_buff.draw(3, 1, 0, 0);
   cmd_buff.endRenderPass();
@@ -891,8 +891,8 @@ void Renderer::RecordBloom(vk::CommandBuffer cmd_buff, const uint frame_idx,
 
   blur_pc.flags.x = 1;  // vertical
   cmd_buff.pushConstants(pipelines_.blur_color_.GetLayout(),
-                         vk::ShaderStageFlagBits::eFragment, 0,
-                         sizeof(BlurPushConst), &blur_pc);
+                         vk::ShaderStageFlagBits::eFragment, 0, sizeof(blur_pc),
+                         &blur_pc);
 
   cmd_buff.draw(3, 1, 0, 0);
   cmd_buff.endRenderPass();

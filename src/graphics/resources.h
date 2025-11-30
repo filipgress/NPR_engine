@@ -241,6 +241,8 @@ class Resources : public npr_core::NonCopyable {
   const LightMesh& GetConeMesh() const { return *cone_mesh_; }
 
   BlurPushConst& GetSSAOBlurPC() { return ssao_blur_; }
+  BlurPushConst& GetBloomBlurPC() { return bloom_blur_; }
+
   const Texture& GetDefaultColorTex() const { return *default_color_tex_; }
   const Texture& GetAONoiseTex() const { return *ao_noise_tex_; }
   const UniformBuffer<AOKernel>& GetAOKernel() const { return *ao_kernel_; }
@@ -277,6 +279,7 @@ class Resources : public npr_core::NonCopyable {
   std::unique_ptr<UniformBuffer<AOKernel>> ao_kernel_;
 
   BlurPushConst ssao_blur_;
+  BlurPushConst bloom_blur_;
 
   // primitive meshes / light volumes
   std::unique_ptr<LightMesh> cone_mesh_;
