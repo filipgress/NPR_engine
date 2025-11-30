@@ -19,7 +19,7 @@ class PassManager : public npr_core::NonCopyable {
         local_light_{ctx, resrc},
         abuff_{ctx, resrc},
         wboit_{ctx, resrc},
-        bright_{ctx, resrc},
+        bright_extract_{ctx, resrc},
         blur_color_{ctx, resrc},
         swap_{ctx, swapchain} {}
   ~PassManager() = default;
@@ -33,7 +33,7 @@ class PassManager : public npr_core::NonCopyable {
     local_light_.CreateFramebuffers();
     abuff_.CreateFramebuffers();
     wboit_.CreateFramebuffers();
-    bright_.CreateFramebuffers();
+    bright_extract_.CreateFramebuffers();
     blur_color_.CreateFramebuffers();
   }
 
@@ -46,7 +46,7 @@ class PassManager : public npr_core::NonCopyable {
   LocalLightPass local_light_;
   ABuffPass abuff_;
   WBoitPass wboit_;
-  BrightPass bright_;
+  BrightPass bright_extract_;
   BlurHPass blur_color_;
   SwapPass swap_;
 };

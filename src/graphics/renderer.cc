@@ -834,21 +834,22 @@ void Renderer::RecordTrans(vk::CommandBuffer cmd_buff, const uint frame_idx,
 void Renderer::RecordBloom(vk::CommandBuffer cmd_buff, const uint frame_idx,
                            const vk::Extent2D& resrc_extent) {
   // extract bright
-  cmd_buff.beginRenderPass(passes_.bright_.BeginInfo(frame_idx, resrc_extent),
-                           vk::SubpassContents::eInline);
+  cmd_buff.beginRenderPass(
+      passes_.bright_extract_.BeginInfo(frame_idx, resrc_extent),
+      vk::SubpassContents::eInline);
 
   cmd_buff.bindPipeline(vk::PipelineBindPoint::eGraphics,
-                        pipelines_.bright_.GetPipeline());
+                        pipelines_.bright_extract_.GetPipeline());
 
   cmd_buff.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-                              pipelines_.bright_.GetLayout(), 0,
+                              pipelines_.bright_extract_.GetLayout(), 0,
                               desc_pool_.GetColorSets().GetSet(frame_idx), {});
 
   BrightPushConst bright_pc{.threshold = settings_.bloom_threshold,
                             .soft_threshold = settings_.bloom_soft_threshold,
                             .intensity = settings_.bloom_intensity};
 
-  cmd_buff.pushConstants(pipelines_.bright_.GetLayout(),
+  cmd_buff.pushConstants(pipelines_.bright_extract_.GetLayout(),
                          vk::ShaderStageFlagBits::eFragment, 0,
                          sizeof(bright_pc), &bright_pc);
 
@@ -877,8 +878,9 @@ void Renderer::RecordBloom(vk::CommandBuffer cmd_buff, const uint frame_idx,
   cmd_buff.endRenderPass();
 
   // vertical blur pass
-  cmd_buff.beginRenderPass(passes_.bright_.BeginInfo(frame_idx, resrc_extent),
-                           vk::SubpassContents::eInline);
+  cmd_buff.beginRenderPass(
+      passes_.bright_extract_.BeginInfo(frame_idx, resrc_extent),
+      vk::SubpassContents::eInline);
 
   cmd_buff.bindPipeline(vk::PipelineBindPoint::eGraphics,
                         pipelines_.blur_color_.GetPipeline());

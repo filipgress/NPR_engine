@@ -17,7 +17,8 @@ PipeManager::PipeManager(const Context& ctx, const Resources& resrc,
       abuff_res_{ctx, pipe_cache_, passes.abuff_, "abuff_resolve_pipe"},
       wboit_acc_{ctx, pipe_cache_, passes.wboit_, "wboit_acc_pipe"},
       wboit_res_{ctx, pipe_cache_, passes.wboit_, "wboit_resolve_pipe"},
-      bright_{ctx, pipe_cache_, passes.bright_, "bright_extract_pipe"},
+      bright_extract_{ctx, pipe_cache_, passes.bright_extract_,
+                      "bright_extract_pipe"},
       blur_color_{ctx, pipe_cache_, passes.blur_color_, "blur_color_pipe"},
       swap_{ctx, pipe_cache_, passes.swap_, "swap_pipe"} {
   BuildGBuff(shaders.gbuff_vert_, shaders.gbuff_frag_, resrc.GetProps().samples,
@@ -39,7 +40,8 @@ PipeManager::PipeManager(const Context& ctx, const Resources& resrc,
   BuildWBoitAcc(shaders.gbuff_vert_, shaders.wboit_acc_frag_,
                 resrc.GetProps().samples, desc_pool);
   BuildWBoitRes(shaders.quad_vert_, shaders.wboit_res_frag_, desc_pool);
-  BuildBright(shaders.quad_vert_, shaders.bright_frag_, desc_pool);
+  BuildBrightExtract(shaders.quad_vert_, shaders.bright_extract_frag_,
+                     desc_pool);
   BuildBlurColor(shaders.quad_vert_, shaders.blur_frag_, desc_pool);
   BuildSwap(shaders.quad_vert_, shaders.swap_frag_, desc_pool);
 }
@@ -56,8 +58,8 @@ void PipeManager::RebuildPipes() {
   if (!abuff_res_.IsUpToDate()) abuff_res_.BuildPipeline();
   if (!wboit_acc_.IsUpToDate()) wboit_acc_.BuildPipeline();
   if (!wboit_res_.IsUpToDate()) wboit_res_.BuildPipeline();
-  if (!bright_.IsUpToDate()) bright_.BuildPipeline();
-  if (!blur_color_.IsUpToDate()) bright_.BuildPipeline();
+  if (!bright_extract_.IsUpToDate()) bright_extract_.BuildPipeline();
+  if (!blur_color_.IsUpToDate()) bright_extract_.BuildPipeline();
   if (!swap_.IsUpToDate()) swap_.BuildPipeline();
 }
 
@@ -515,17 +517,17 @@ void PipeManager::BuildWBoitRes(const VertexShader& vert_shader,
   wboit_res_.BuildPipeline();
 }
 
-void PipeManager::BuildBright(const VertexShader& vert_shader,
-                              const FragmentShader& frag_shader,
-                              const DescriptorPool& desc_pool) {
-  bright_.CreateLayout({desc_pool.GetBrightColorSets().GetLayout()},
-                       {Pipeline::MakePushConst<BrightPushConst>(
-                           vk::ShaderStageFlagBits::eFragment)});
+void PipeManager::BuildBrightExtract(const VertexShader& vert_shader,
+                                     const FragmentShader& frag_shader,
+                                     const DescriptorPool& desc_pool) {
+  bright_extract_.CreateLayout({desc_pool.GetBrightColorSets().GetLayout()},
+                               {Pipeline::MakePushConst<BrightPushConst>(
+                                   vk::ShaderStageFlagBits::eFragment)});
 
-  bright_.AddShader(vert_shader);
-  bright_.AddShader(frag_shader);
+  bright_extract_.AddShader(vert_shader);
+  bright_extract_.AddShader(frag_shader);
 
-  auto& state = bright_.state_;
+  auto& state = bright_extract_.state_;
   state.color_attachments.resize(1);
 
   auto& att = state.color_attachments[0];
@@ -535,7 +537,7 @@ void PipeManager::BuildBright(const VertexShader& vert_shader,
       vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
 
   state.subpass = 0;
-  bright_.BuildPipeline();
+  bright_extract_.BuildPipeline();
 }
 
 void PipeManager::BuildBlurColor(const VertexShader& vert_shader,

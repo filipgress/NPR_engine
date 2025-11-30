@@ -61,9 +61,9 @@ class PipeManager : public npr_core::NonCopyable {
   void BuildWBoitRes(const VertexShader& vert_shader,
                      const FragmentShader& frag_shader,
                      const DescriptorPool& desc_pool);
-  void BuildBright(const VertexShader& vert_shader,
-                   const FragmentShader& frag_shader,
-                   const DescriptorPool& desc_pool);
+  void BuildBrightExtract(const VertexShader& vert_shader,
+                          const FragmentShader& frag_shader,
+                          const DescriptorPool& desc_pool);
   void BuildBlurColor(const VertexShader& vert_shader,
                       const FragmentShader& frag_shader,
                       const DescriptorPool& desc_pool);
@@ -85,7 +85,7 @@ class PipeManager : public npr_core::NonCopyable {
   Pipeline abuff_res_;
   Pipeline wboit_acc_;
   Pipeline wboit_res_;
-  Pipeline bright_;
+  Pipeline bright_extract_;
   Pipeline blur_color_;
   Pipeline swap_;
 };

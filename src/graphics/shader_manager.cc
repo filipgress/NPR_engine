@@ -22,13 +22,17 @@ ShaderManager::ShaderManager(const Context& ctx)
                       "../shaders/wboit_acc.frag"},
       wboit_res_frag_{ctx, "shaders/wboit_res.spv",
                       "../shaders/wboit_res.frag"},
-      bright_frag_{ctx, "shaders/bright_frag.spv", "../shaders/bright.frag"},
+      bright_extract_frag_{ctx, "shaders/bright_extract_frag.spv",
+                           "../shaders/bright_extract.frag"},
       swap_frag_{ctx, "shaders/swap_frag.spv", "../shaders/swap.frag"},
-      shaders_{&quad_vert_,       &gbuff_vert_,       &light_vert_,
-               &gbuff_frag_,      &ao_frag_,          &blur_frag_,
-               &dir_light_frag_,  &point_light_frag_, &spot_light_frag_,
-               &abuff_fill_frag_, &abuff_res_frag_,   &wboit_acc_frag_,
-               &wboit_res_frag_,  &bright_frag_,      &swap_frag_} {}
+      shaders_{&quad_vert_,       &gbuff_vert_,
+               &light_vert_,      &gbuff_frag_,
+               &ao_frag_,         &blur_frag_,
+               &dir_light_frag_,  &point_light_frag_,
+               &spot_light_frag_, &abuff_fill_frag_,
+               &abuff_res_frag_,  &wboit_acc_frag_,
+               &wboit_res_frag_,  &bright_extract_frag_,
+               &swap_frag_} {}
 
 void ShaderManager::Recompile() {
   if (!kEnableShaderReload) return;
