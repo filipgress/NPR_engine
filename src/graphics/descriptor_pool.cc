@@ -20,10 +20,11 @@ DescriptorPool::DescriptorPool(const Context& ctx, const Resources& resrc)
       abuff_sets_{ctx, resrc.GetFrameCount()},
       wboit_input_sets_{ctx, resrc.GetFrameCount()},
 
+      bright_sets_{ctx, resrc.GetFrameCount()},
+      bright_temp_sets_{ctx, resrc.GetFrameCount()},
+
       color_sets_{ctx, resrc.GetFrameCount()},
-      temp_sets_{ctx, resrc.GetFrameCount()},
-      present_sets_{ctx, resrc.GetFrameCount()},
-      bright_sets_{ctx, resrc.GetFrameCount()} {
+      present_sets_{ctx, resrc.GetFrameCount()} {
   CreateDescriptorPool();
 
   gbuff_sets_.AllocSets(pool_);
@@ -37,39 +38,36 @@ DescriptorPool::DescriptorPool(const Context& ctx, const Resources& resrc)
 
   dir_light_sets_.AllocSets(pool_);
   dir_light_sets_.Update(resrc);
-
   point_light_sets_.AllocSets(pool_);
   point_light_sets_.Update(resrc);
-
   spot_light_sets_.AllocSets(pool_);
   spot_light_sets_.Update(resrc);
 
+  // ao
   ao_set_.AllocSets(pool_);
   ao_set_.Update(resrc);
-
   ao_res_sets_.AllocSets(pool_);
   ao_res_sets_.Update(resrc);
-
   ao_temp_sets_.AllocSets(pool_);
   ao_temp_sets_.Update(resrc);
 
+  // abuff & wboit
   abuff_sets_.AllocSets(pool_);
   abuff_sets_.Update(resrc);
-
   wboit_input_sets_.AllocSets(pool_);
   wboit_input_sets_.Update(resrc);
 
-  color_sets_.AllocSets(pool_);
-  color_sets_.Update(resrc);
-
-  temp_sets_.AllocSets(pool_);
-  temp_sets_.Update(resrc);
-
-  present_sets_.AllocSets(pool_);
-  present_sets_.Update(resrc);
-
+  // bloom
   bright_sets_.AllocSets(pool_);
   bright_sets_.Update(resrc);
+  bright_temp_sets_.AllocSets(pool_);
+  bright_temp_sets_.Update(resrc);
+
+  // color
+  color_sets_.AllocSets(pool_);
+  color_sets_.Update(resrc);
+  present_sets_.AllocSets(pool_);
+  present_sets_.Update(resrc);
 };
 
 void DescriptorPool::CreateDescriptorPool() {
@@ -96,34 +94,34 @@ void DescriptorPool::CreateDescriptorPool() {
   pool_sizes.insert(pool_sizes.end(), spot_light_sizes.begin(),
                     spot_light_sizes.end());
 
+  // ao
   const auto& ao_sizes = ao_set_.GetPoolSizes();
   pool_sizes.insert(pool_sizes.end(), ao_sizes.begin(), ao_sizes.end());
-
   const auto& ao_res_sizes = ao_res_sets_.GetPoolSizes();
   pool_sizes.insert(pool_sizes.end(), ao_res_sizes.begin(), ao_res_sizes.end());
-
   const auto& ao_temp_sizes = ao_temp_sets_.GetPoolSizes();
   pool_sizes.insert(pool_sizes.end(), ao_temp_sizes.begin(),
                     ao_temp_sizes.end());
 
+  // abuff & wboit
   const auto& abuff_sizes = abuff_sets_.GetPoolSizes();
   pool_sizes.insert(pool_sizes.end(), abuff_sizes.begin(), abuff_sizes.end());
-
   const auto& wboit_sizes = wboit_input_sets_.GetPoolSizes();
   pool_sizes.insert(pool_sizes.end(), wboit_sizes.begin(), wboit_sizes.end());
 
+  // bloom
+  const auto& bright_sizes = bright_sets_.GetPoolSizes();
+  pool_sizes.insert(pool_sizes.end(), bright_sizes.begin(), bright_sizes.end());
+  const auto& bright_temp_sizes = bright_temp_sets_.GetPoolSizes();
+  pool_sizes.insert(pool_sizes.end(), bright_temp_sizes.begin(),
+                    bright_temp_sizes.end());
+
+  // color
   const auto& color_sizes = color_sets_.GetPoolSizes();
   pool_sizes.insert(pool_sizes.end(), color_sizes.begin(), color_sizes.end());
-
-  const auto& temp_sizes = temp_sets_.GetPoolSizes();
-  pool_sizes.insert(pool_sizes.end(), temp_sizes.begin(), temp_sizes.end());
-
   const auto& present_sizes = present_sets_.GetPoolSizes();
   pool_sizes.insert(pool_sizes.end(), present_sizes.begin(),
                     present_sizes.end());
-
-  const auto& bright_sizes = bright_sets_.GetPoolSizes();
-  pool_sizes.insert(pool_sizes.end(), bright_sizes.begin(), bright_sizes.end());
 
   uint32_t max_sets = gbuff_sets_.GetCount() + camera_sets_.GetCount() +
                       material_sets_.GetCount() + dir_light_sets_.GetCount() +
@@ -131,8 +129,8 @@ void DescriptorPool::CreateDescriptorPool() {
                       spot_light_sets_.GetCount() + ao_set_.GetCount() +
                       ao_res_sets_.GetCount() + ao_temp_sets_.GetCount() +
                       abuff_sets_.GetCount() + wboit_input_sets_.GetCount() +
-                      color_sets_.GetCount() + temp_sets_.GetCount() +
-                      present_sets_.GetCount() + bright_sets_.GetCount();
+                      bright_sets_.GetCount() + bright_temp_sets_.GetCount() +
+                      color_sets_.GetCount() + present_sets_.GetCount();
 
   vk::DescriptorPoolCreateInfo poolInfo{};
   poolInfo.poolSizeCount = pool_sizes.size();
@@ -152,10 +150,11 @@ void DescriptorPool::UpdateDescriptors(const Resources& resrc) {
 
   wboit_input_sets_.Update(resrc);
 
-  color_sets_.Update(resrc);
-  temp_sets_.Update(resrc);
-  present_sets_.Update(resrc);
   bright_sets_.Update(resrc);
+  bright_temp_sets_.Update(resrc);
+
+  color_sets_.Update(resrc);
+  present_sets_.Update(resrc);
 }
 
 /*

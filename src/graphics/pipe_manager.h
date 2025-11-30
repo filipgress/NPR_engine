@@ -24,6 +24,7 @@ class PipeManager : public npr_core::NonCopyable {
                   const FragmentShader& frag_shader,
                   vk::SampleCountFlagBits samples,
                   const DescriptorPool& desc_pool);
+
   void BuildAO(const VertexShader& vert_shader,
                const FragmentShader& frag_shader,
                vk::SampleCountFlagBits samples,
@@ -31,6 +32,7 @@ class PipeManager : public npr_core::NonCopyable {
   void BuildBlurAO(const VertexShader& vert_shader,
                    const FragmentShader& frag_shader,
                    const DescriptorPool& desc_pool);
+
   void BuildGlobLight(const VertexShader& vert_shader,
                       const FragmentShader& frag_shader,
                       vk::SampleCountFlagBits samples,
@@ -46,6 +48,7 @@ class PipeManager : public npr_core::NonCopyable {
                       const FragmentShader& frag_shader,
                       vk::SampleCountFlagBits samples,
                       const DescriptorPool& desc_pool);
+
   void BuildABuffFill(const VertexShader& vert_shader,
                       const FragmentShader& frag_shader,
                       vk::SampleCountFlagBits samples,
@@ -54,6 +57,7 @@ class PipeManager : public npr_core::NonCopyable {
                      const FragmentShader& frag_shader,
                      vk::SampleCountFlagBits samples,
                      const DescriptorPool& desc_pool);
+
   void BuildWBoitAcc(const VertexShader& vert_shader,
                      const FragmentShader& frag_shader,
                      vk::SampleCountFlagBits samples,
@@ -61,12 +65,14 @@ class PipeManager : public npr_core::NonCopyable {
   void BuildWBoitRes(const VertexShader& vert_shader,
                      const FragmentShader& frag_shader,
                      const DescriptorPool& desc_pool);
-  void BuildBrightExtract(const VertexShader& vert_shader,
-                          const FragmentShader& frag_shader,
-                          const DescriptorPool& desc_pool);
-  void BuildBlurColor(const VertexShader& vert_shader,
-                      const FragmentShader& frag_shader,
-                      const DescriptorPool& desc_pool);
+
+  void BuildBright(const VertexShader& vert_shader,
+                   const FragmentShader& frag_shader,
+                   const DescriptorPool& desc_pool);
+  void BuildBlurBright(const VertexShader& vert_shader,
+                       const FragmentShader& frag_shader,
+                       const DescriptorPool& desc_pool);
+
   void BuildSwap(const VertexShader& vert_shader,
                  const FragmentShader& frag_shader,
                  const DescriptorPool& desc_pool);
@@ -75,18 +81,24 @@ class PipeManager : public npr_core::NonCopyable {
   PipelineCache pipe_cache_;
 
   Pipeline gbuff_;
+
   Pipeline ao_;
   Pipeline blur_ao_;
+
   Pipeline glob_light_;
   Pipeline local_light_;
   Pipeline point_light_;
   Pipeline spot_light_;
+
   Pipeline abuff_fill_;
   Pipeline abuff_res_;
+
   Pipeline wboit_acc_;
   Pipeline wboit_res_;
-  Pipeline bright_extract_;
-  Pipeline blur_color_;
+
+  Pipeline bright_;
+  Pipeline blur_bright_;
+
   Pipeline swap_;
 };
 

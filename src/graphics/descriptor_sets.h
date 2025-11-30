@@ -41,7 +41,7 @@ class SingleTexSets : public BaseDescSets {
   }
   virtual ~SingleTexSets() = default;
 
-  void Update(const Resources& resrc) const;
+  virtual void Update(const Resources& resrc) const;
   std::vector<vk::DescriptorPoolSize> GetPoolSizes() const override {
     return {{vk::DescriptorType::eCombinedImageSampler, count_}};
   }
@@ -62,16 +62,6 @@ class ColorSets : public SingleTexSets {
   }
 };
 
-class TempColorSets : public SingleTexSets {
- public:
-  TempColorSets(const Context& ctx, uint count) : SingleTexSets{ctx, count} {}
-
-  const Texture* GetAttach(const Resources& resrc,
-                           int frame_idx) const override {
-    return resrc.GetResrc()[frame_idx].temp_color.get();
-  }
-};
-
 class PresentColorSets : public SingleTexSets {
  public:
   PresentColorSets(const Context& ctx, uint count)
@@ -83,16 +73,7 @@ class PresentColorSets : public SingleTexSets {
   }
 };
 
-class BrightColorSets : public SingleTexSets {
- public:
-  BrightColorSets(const Context& ctx, uint count) : SingleTexSets{ctx, count} {}
-
-  const Texture* GetAttach(const Resources& resrc,
-                           int frame_idx) const override {
-    return resrc.GetResrc()[frame_idx].bright_color.get();
-  }
-};
-
+// ao
 class AOResSets : public SingleTexSets {
  public:
   AOResSets(const Context& ctx, uint count) : SingleTexSets{ctx, count} {}
@@ -112,6 +93,28 @@ class AOTempSets : public SingleTexSets {
     return resrc.GetResrc()[frame_idx].ao_temp.get();
   }
 };
+
+// bloom
+class BrightColorSets : public SingleTexSets {
+ public:
+  BrightColorSets(const Context& ctx, uint count) : SingleTexSets{ctx, count} {}
+
+  const Texture* GetAttach(const Resources& resrc,
+                           int frame_idx) const override {
+    return resrc.GetResrc()[frame_idx].bright_color.get();
+  }
+};
+
+class BrightTempSets : public SingleTexSets {
+ public:
+  BrightTempSets(const Context& ctx, uint count) : SingleTexSets{ctx, count} {}
+
+  const Texture* GetAttach(const Resources& resrc,
+                           int frame_idx) const override {
+    return resrc.GetResrc()[frame_idx].bright_temp.get();
+  }
+};
+
 /*
  * SingleBuffSets
  */

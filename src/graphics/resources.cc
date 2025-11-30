@@ -62,14 +62,14 @@ void Resources::CreateImages() {
         vk::ImageUsageFlagBits::eColorAttachment |
             vk::ImageUsageFlagBits::eSampled,
         vk::ImageAspectFlagBits::eColor, frame_props_.samples,
-        "position_ms" + std::to_string(idx));
+        "position_ms_" + std::to_string(idx));
 
     resrc.normal_ms = std::make_unique<Texture>(
         ctx_, frame_props_.normal_format, frame_props_.extent,
         vk::ImageUsageFlagBits::eColorAttachment |
             vk::ImageUsageFlagBits::eSampled,
         vk::ImageAspectFlagBits::eColor, frame_props_.samples,
-        "normal_ms" + std::to_string(idx));
+        "normal_ms_" + std::to_string(idx));
 
     resrc.coverage_ms = std::make_unique<Image>(
         ctx_, frame_props_.coverage_format, frame_props_.extent,
@@ -77,21 +77,21 @@ void Resources::CreateImages() {
             vk::ImageUsageFlagBits::eTransientAttachment |
             vk::ImageUsageFlagBits::eInputAttachment,
         vk::ImageAspectFlagBits::eColor, vk::SharingMode::eExclusive,
-        frame_props_.samples, 1, "coverage_ms" + std::to_string(idx));
+        frame_props_.samples, 1, "coverage_ms_" + std::to_string(idx));
 
     resrc.coverage_res = std::make_unique<Texture>(
         ctx_, frame_props_.coverage_format, frame_props_.extent,
         vk::ImageUsageFlagBits::eColorAttachment |
             vk::ImageUsageFlagBits::eSampled,
         vk::ImageAspectFlagBits::eColor, vk::SampleCountFlagBits::e1,
-        "coverage_res" + std::to_string(idx));
+        "coverage_res_" + std::to_string(idx));
 
     resrc.ds_ms = std::make_unique<Texture>(
         ctx_, frame_props_.ds_format, frame_props_.extent,
         vk::ImageUsageFlagBits::eDepthStencilAttachment |
             vk::ImageUsageFlagBits::eSampled,
-        vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil,
-        frame_props_.samples, "depth_stencil_ms" + std::to_string(idx));
+        vk::ImageAspectFlagBits::eDepth, frame_props_.samples,
+        "depth_stencil_ms_" + std::to_string(idx));
 
     // ao pass
     resrc.ao_ms = std::make_unique<Image>(
@@ -147,6 +147,21 @@ void Resources::CreateImages() {
         vk::SampleCountFlagBits::e1, 1,
         "acc_weight_res_" + std::to_string(idx));
 
+    // bloom
+    resrc.bright_color = std::make_unique<Texture>(
+        ctx_, frame_props_.color_format, frame_props_.extent,
+        vk::ImageUsageFlagBits::eColorAttachment |
+            vk::ImageUsageFlagBits::eSampled,
+        vk::ImageAspectFlagBits::eColor, vk::SampleCountFlagBits::e1,
+        "bright_color_" + std::to_string(idx));
+
+    resrc.bright_temp = std::make_unique<Texture>(
+        ctx_, frame_props_.color_format, frame_props_.extent,
+        vk::ImageUsageFlagBits::eColorAttachment |
+            vk::ImageUsageFlagBits::eSampled,
+        vk::ImageAspectFlagBits::eColor, vk::SampleCountFlagBits::e1,
+        "bright_temp_" + std::to_string(idx));
+
     // color targets
     resrc.color_ms = std::make_unique<Image>(
         ctx_, frame_props_.color_format, frame_props_.extent,
@@ -162,20 +177,6 @@ void Resources::CreateImages() {
             vk::ImageUsageFlagBits::eSampled,
         vk::ImageAspectFlagBits::eColor, vk::SampleCountFlagBits::e1,
         "color_res_" + std::to_string(idx));
-
-    resrc.temp_color = std::make_unique<Texture>(
-        ctx_, frame_props_.color_format, frame_props_.extent,
-        vk::ImageUsageFlagBits::eColorAttachment |
-            vk::ImageUsageFlagBits::eSampled,
-        vk::ImageAspectFlagBits::eColor, vk::SampleCountFlagBits::e1,
-        "temp_color_" + std::to_string(idx));
-
-    resrc.bright_color = std::make_unique<Texture>(
-        ctx_, frame_props_.color_format, frame_props_.extent,
-        vk::ImageUsageFlagBits::eColorAttachment |
-            vk::ImageUsageFlagBits::eSampled,
-        vk::ImageAspectFlagBits::eColor, vk::SampleCountFlagBits::e1,
-        "bright_color_" + std::to_string(idx));
 
     resrc.present_color = std::make_unique<Texture>(
         ctx_, frame_props_.color_format, frame_props_.extent,

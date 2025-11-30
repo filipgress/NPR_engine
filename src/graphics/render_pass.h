@@ -154,9 +154,9 @@ class BrightPass : public SingleColorPass {
   }
 };
 
-class BlurHPass : public SingleColorPass {
+class BlurBrightPass : public SingleColorPass {
  public:
-  BlurHPass(const Context& ctx, const Resources& resrc)
+  BlurBrightPass(const Context& ctx, const Resources& resrc)
       : SingleColorPass(ctx, resrc, resrc.GetProps().color_format) {
     Init();
   }

@@ -839,17 +839,17 @@ void Renderer::RecordBloom(vk::CommandBuffer cmd_buff, const uint frame_idx,
       vk::SubpassContents::eInline);
 
   cmd_buff.bindPipeline(vk::PipelineBindPoint::eGraphics,
-                        pipelines_.bright_extract_.GetPipeline());
+                        pipelines_.bright_.GetPipeline());
 
   cmd_buff.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-                              pipelines_.bright_extract_.GetLayout(), 0,
+                              pipelines_.bright_.GetLayout(), 0,
                               desc_pool_.GetColorSets().GetSet(frame_idx), {});
 
   BrightPushConst bright_pc{.threshold = settings_.bloom_threshold,
                             .soft_threshold = settings_.bloom_soft_threshold,
                             .intensity = settings_.bloom_intensity};
 
-  cmd_buff.pushConstants(pipelines_.bright_extract_.GetLayout(),
+  cmd_buff.pushConstants(pipelines_.bright_.GetLayout(),
                          vk::ShaderStageFlagBits::eFragment, 0,
                          sizeof(bright_pc), &bright_pc);
 
@@ -858,19 +858,19 @@ void Renderer::RecordBloom(vk::CommandBuffer cmd_buff, const uint frame_idx,
 
   // horizontal blur pass
   cmd_buff.beginRenderPass(
-      passes_.blur_color_.BeginInfo(frame_idx, resrc_extent),
+      passes_.blur_bright_.BeginInfo(frame_idx, resrc_extent),
       vk::SubpassContents::eInline);
 
   cmd_buff.bindPipeline(vk::PipelineBindPoint::eGraphics,
-                        pipelines_.blur_color_.GetPipeline());
+                        pipelines_.blur_bright_.GetPipeline());
 
   cmd_buff.bindDescriptorSets(  // bright_color
-      vk::PipelineBindPoint::eGraphics, pipelines_.blur_color_.GetLayout(), 0,
+      vk::PipelineBindPoint::eGraphics, pipelines_.blur_bright_.GetLayout(), 0,
       desc_pool_.GetBrightColorSets().GetSet(frame_idx), {});
 
   auto& blur_pc = resrc_.GetBloomBlurPC();
   blur_pc.flags.x = 0;  // horizontal
-  cmd_buff.pushConstants(pipelines_.blur_color_.GetLayout(),
+  cmd_buff.pushConstants(pipelines_.blur_bright_.GetLayout(),
                          vk::ShaderStageFlagBits::eFragment, 0, sizeof(blur_pc),
                          &blur_pc);
 
@@ -883,14 +883,14 @@ void Renderer::RecordBloom(vk::CommandBuffer cmd_buff, const uint frame_idx,
       vk::SubpassContents::eInline);
 
   cmd_buff.bindPipeline(vk::PipelineBindPoint::eGraphics,
-                        pipelines_.blur_color_.GetPipeline());
+                        pipelines_.blur_bright_.GetPipeline());
 
-  cmd_buff.bindDescriptorSets(  // temp_color
-      vk::PipelineBindPoint::eGraphics, pipelines_.blur_color_.GetLayout(), 0,
-      desc_pool_.GetTempColorSets().GetSet(frame_idx), {});
+  cmd_buff.bindDescriptorSets(  // bright_temp
+      vk::PipelineBindPoint::eGraphics, pipelines_.blur_bright_.GetLayout(), 0,
+      desc_pool_.GetBrightTempSets().GetSet(frame_idx), {});
 
   blur_pc.flags.x = 1;  // vertical
-  cmd_buff.pushConstants(pipelines_.blur_color_.GetLayout(),
+  cmd_buff.pushConstants(pipelines_.blur_bright_.GetLayout(),
                          vk::ShaderStageFlagBits::eFragment, 0, sizeof(blur_pc),
                          &blur_pc);
 

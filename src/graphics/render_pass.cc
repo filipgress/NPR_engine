@@ -442,13 +442,14 @@ std::vector<vk::ImageView> BrightPass::GetAttachmentViews(int frame_idx) const {
   return {resrc.bright_color->GetImageView()};
 }
 
-std::vector<vk::ImageView> BlurHPass::GetAttachmentViews(int frame_idx) const {
+std::vector<vk::ImageView> BlurBrightPass::GetAttachmentViews(
+    int frame_idx) const {
   auto& resrc = resrc_.GetResrc()[frame_idx];
 
-  if (!resrc.temp_color)
+  if (!resrc.bright_temp)
     throw std::runtime_error("missing required resources for: " + GetDbgName());
 
-  return {resrc.temp_color->GetImageView()};
+  return {resrc.bright_temp->GetImageView()};
 }
 
 /*

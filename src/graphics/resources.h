@@ -210,12 +210,13 @@ struct FrameResources {
   std::unique_ptr<Image> acc_weight_ms;
   std::unique_ptr<Image> acc_weight_res;
 
+  // bloom
+  std::unique_ptr<Texture> bright_color;
+  std::unique_ptr<Texture> bright_temp;
+
   // color targets
   std::unique_ptr<Image> color_ms;
   std::unique_ptr<Texture> color_res;
-
-  std::unique_ptr<Texture> temp_color;
-  std::unique_ptr<Texture> bright_color;
   std::unique_ptr<Texture> present_color;
 };
 
