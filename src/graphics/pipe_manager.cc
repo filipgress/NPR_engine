@@ -19,33 +19,38 @@ PipeManager::PipeManager(const Context& ctx, const Resources& resrc,
       wboit_res_{ctx, pipe_cache_, passes.wboit_, "wboit_resolve_pipe"},
       bright_{ctx, pipe_cache_, passes.bright_extract_, "bright_extract_pipe"},
       blur_bright_{ctx, pipe_cache_, passes.blur_bright_, "blur_color_pipe"},
+      coc_{ctx, pipe_cache_, passes.coc_, "coc_pipe"},
+      dof_{ctx, pipe_cache_, passes.dof_, "dof_pipe"},
       swap_{ctx, pipe_cache_, passes.swap_, "swap_pipe"} {
-  BuildGBuff(shaders.gbuff_vert_, shaders.gbuff_frag_, resrc.GetProps().samples,
-             desc_pool);
+  auto samples = resrc.GetProps().samples;
 
-  BuildAO(shaders.quad_vert_, shaders.ao_frag_, resrc.GetProps().samples,
-          desc_pool);
+  BuildGBuff(shaders.gbuff_vert_, shaders.gbuff_frag_, samples, desc_pool);
+
+  BuildAO(shaders.quad_vert_, shaders.ao_frag_, samples, desc_pool);
   BuildBlurAO(shaders.quad_vert_, shaders.blur_frag_, desc_pool);
 
-  BuildGlobLight(shaders.quad_vert_, shaders.dir_light_frag_,
-                 resrc.GetProps().samples, desc_pool);
-  BuildLocalLight(shaders.light_vert_, resrc.GetProps().samples, desc_pool);
-  BuildPointLight(shaders.light_vert_, shaders.point_light_frag_,
-                  resrc.GetProps().samples, desc_pool);
-  BuildSpotLight(shaders.light_vert_, shaders.spot_light_frag_,
-                 resrc.GetProps().samples, desc_pool);
+  BuildGlobLight(shaders.quad_vert_, shaders.dir_light_frag_, samples,
+                 desc_pool);
+  BuildLocalLight(shaders.light_vert_, samples, desc_pool);
+  BuildPointLight(shaders.light_vert_, shaders.point_light_frag_, samples,
+                  desc_pool);
+  BuildSpotLight(shaders.light_vert_, shaders.spot_light_frag_, samples,
+                 desc_pool);
 
-  BuildABuffFill(shaders.gbuff_vert_, shaders.abuff_fill_frag_,
-                 resrc.GetProps().samples, desc_pool);
-  BuildABuffRes(shaders.quad_vert_, shaders.abuff_res_frag_,
-                resrc.GetProps().samples, desc_pool);
+  BuildABuffFill(shaders.gbuff_vert_, shaders.abuff_fill_frag_, samples,
+                 desc_pool);
+  BuildABuffRes(shaders.quad_vert_, shaders.abuff_res_frag_, samples,
+                desc_pool);
 
-  BuildWBoitAcc(shaders.gbuff_vert_, shaders.wboit_acc_frag_,
-                resrc.GetProps().samples, desc_pool);
+  BuildWBoitAcc(shaders.gbuff_vert_, shaders.wboit_acc_frag_, samples,
+                desc_pool);
   BuildWBoitRes(shaders.quad_vert_, shaders.wboit_res_frag_, desc_pool);
 
   BuildBright(shaders.quad_vert_, shaders.bright_extract_frag_, desc_pool);
   BuildBlurBright(shaders.quad_vert_, shaders.blur_frag_, desc_pool);
+
+  BuildCoC(shaders.quad_vert_, shaders.coc_extract_frag_, samples, desc_pool);
+  BuildDof(shaders.quad_vert_, shaders.dof_poisson_frag_, desc_pool);
 
   BuildSwap(shaders.quad_vert_, shaders.swap_frag_, desc_pool);
 }
@@ -64,6 +69,8 @@ void PipeManager::RebuildPipes() {
   if (!wboit_res_.IsUpToDate()) wboit_res_.BuildPipeline();
   if (!bright_.IsUpToDate()) bright_.BuildPipeline();
   if (!blur_bright_.IsUpToDate()) bright_.BuildPipeline();
+  if (!coc_.IsUpToDate()) coc_.BuildPipeline();
+  if (!dof_.IsUpToDate()) dof_.BuildPipeline();
   if (!swap_.IsUpToDate()) swap_.BuildPipeline();
 }
 
@@ -566,6 +573,52 @@ void PipeManager::BuildBlurBright(const VertexShader& vert_shader,
   state.subpass = 0;
 
   blur_bright_.BuildPipeline();
+}
+
+void PipeManager::BuildCoC(const VertexShader& vert_shader,
+                           const FragmentShader& frag_shader,
+                           vk::SampleCountFlagBits samples,
+                           const DescriptorPool& desc_pool) {
+  coc_.CreateLayout({desc_pool.GetDepthSets().GetLayout()},
+                    {Pipeline::MakePushConst<CocPushConst>(
+                        vk::ShaderStageFlagBits::eFragment)});
+
+  coc_.AddShader(vert_shader);
+  coc_.AddShader(frag_shader, {Pipeline::MakeSpecConst(0, samples)});
+
+  auto& state = coc_.state_;
+  state.color_attachments.resize(1);
+  state.color_attachments[0].blendEnable = VK_FALSE;
+  state.color_attachments[0].colorWriteMask = vk::ColorComponentFlagBits::eR;
+
+  state.subpass = 0;
+  coc_.BuildPipeline();
+}
+
+void PipeManager::BuildDof(const VertexShader& vert_shader,
+                           const FragmentShader& frag_shader,
+                           const DescriptorPool& desc_pool) {
+  dof_.CreateLayout({desc_pool.GetColorSets().GetLayout(),
+                     desc_pool.GetCocMapSets().GetLayout(),
+                     desc_pool.GetDofSet().GetLayout()},
+                    {Pipeline::MakePushConst<DofPushConst>(
+                        vk::ShaderStageFlagBits::eFragment)});
+
+  dof_.AddShader(vert_shader);
+  dof_.AddShader(frag_shader, {Pipeline::MakeSpecConst(0, kMaxPoissonSize)});
+
+  auto& state = dof_.state_;
+
+  state.color_attachments.resize(1);
+  auto& att = state.color_attachments[0];
+
+  att.blendEnable = VK_FALSE;
+  att.colorWriteMask =
+      vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+      vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+
+  state.subpass = 0;
+  dof_.BuildPipeline();
 }
 
 void PipeManager::BuildSwap(const VertexShader& vert_shader,

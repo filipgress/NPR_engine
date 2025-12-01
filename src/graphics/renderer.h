@@ -99,6 +99,9 @@ class Renderer : public npr_core::NonCopyable {
 
   void RecordBloom(vk::CommandBuffer cmd_buff, const uint frame_idx,
                    const vk::Extent2D& resrc_extent);
+  void RecordDoF(vk::CommandBuffer cmd_buff, const uint frame_idx,
+                 const vk::Extent2D& resrc_extent,
+                 const npr_scene::Camera& camera);
 
   void RecordSwap(vk::CommandBuffer cmd_buff, uint image_idx,
                   const uint frame_idx, const npr_scene::Camera& camera,

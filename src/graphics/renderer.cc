@@ -158,6 +158,8 @@ vk::CommandBuffer Renderer::Record(uint image_idx, const Camera& camera,
     RecordWBoit(cmd_buff, frame_idx, frame_resrc, resrc_extent, camera, scene);
 
   if (settings_.enable_bloom) RecordBloom(cmd_buff, frame_idx, resrc_extent);
+  if (settings_.enable_dof)
+    RecordDoF(cmd_buff, frame_idx, resrc_extent, camera);
 
   RecordSwap(cmd_buff, image_idx, frame_idx, camera, is_loading, dt);
 
@@ -898,6 +900,74 @@ void Renderer::RecordBloom(vk::CommandBuffer cmd_buff, const uint frame_idx,
   cmd_buff.endRenderPass();
 }
 
+void Renderer::RecordDoF(vk::CommandBuffer cmd_buff, const uint frame_idx,
+                         const vk::Extent2D& resrc_extent,
+                         const npr_scene::Camera& camera) {
+  // calculate coc map
+  cmd_buff.beginRenderPass(passes_.coc_.BeginInfo(frame_idx, resrc_extent),
+                           vk::SubpassContents::eInline);
+
+  cmd_buff.bindPipeline(vk::PipelineBindPoint::eGraphics,
+                        pipelines_.coc_.GetPipeline());
+
+  cmd_buff.bindDescriptorSets(  // depth_tex
+      vk::PipelineBindPoint::eGraphics, pipelines_.coc_.GetLayout(), 0,
+      desc_pool_.GetDepthSets().GetSet(frame_idx), {});
+
+  CocPushConst coc_pc{};
+  coc_pc.focus_dist = settings_.dof_focus_distance;
+  coc_pc.focus_range = settings_.dof_focus_range;
+  coc_pc.near_int = settings_.dof_near_int;
+  coc_pc.far_int = settings_.dof_far_int;
+  coc_pc.near_falloff = settings_.dof_near_falloff;
+  coc_pc.far_falloff = settings_.dof_far_falloff;
+  coc_pc.near_plane = camera.GetNear();
+  coc_pc.far_plane = camera.GetFar();
+  coc_pc.is_persp = !camera.IsOrtho();
+
+  cmd_buff.pushConstants(pipelines_.coc_.GetLayout(),
+                         vk::ShaderStageFlagBits::eFragment, 0, sizeof(coc_pc),
+                         &coc_pc);
+
+  cmd_buff.draw(3, 1, 0, 0);
+  cmd_buff.endRenderPass();
+
+  // dof poisson blur
+  cmd_buff.beginRenderPass(passes_.dof_.BeginInfo(frame_idx, resrc_extent),
+                           vk::SubpassContents::eInline);
+
+  cmd_buff.bindPipeline(vk::PipelineBindPoint::eGraphics,
+                        pipelines_.dof_.GetPipeline());
+
+  // color_tex
+  cmd_buff.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                              pipelines_.dof_.GetLayout(), 0,
+                              desc_pool_.GetColorSets().GetSet(frame_idx), {});
+
+  // coc_map
+  cmd_buff.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                              pipelines_.dof_.GetLayout(), 1,
+                              desc_pool_.GetCocMapSets().GetSet(frame_idx), {});
+
+  // blue_noise + poisson
+  cmd_buff.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                              pipelines_.dof_.GetLayout(), 2,
+                              desc_pool_.GetDofSet().GetSet(), {});
+
+  DofPushConst dof_pc{};
+  dof_pc.blur_radius = settings_.dof_blur_radius;
+  dof_pc.coc_threshold = settings_.dof_coc_threshold;
+  dof_pc.coc_falloff = settings_.dof_coc_falloff;
+  dof_pc.debug_mode = settings_.dof_debug_mode;
+
+  cmd_buff.pushConstants(pipelines_.dof_.GetLayout(),
+                         vk::ShaderStageFlagBits::eFragment, 0, sizeof(dof_pc),
+                         &dof_pc);
+
+  cmd_buff.draw(3, 1, 0, 0);
+  cmd_buff.endRenderPass();
+}
+
 void Renderer::RecordSwap(vk::CommandBuffer cmd_buff, uint image_idx,
                           const uint frame_idx, const npr_scene::Camera& camera,
                           bool is_loading, float dt) {
@@ -928,13 +998,15 @@ void Renderer::RecordSwap(vk::CommandBuffer cmd_buff, uint image_idx,
   cmd_buff.bindPipeline(vk::PipelineBindPoint::eGraphics,
                         pipelines_.swap_.GetPipeline());
 
-  // cmd_buff.bindDescriptorSets(  // color_res
-  //     vk::PipelineBindPoint::eGraphics, pipelines_.swap_.GetLayout(), 0,
-  //     desc_pool_.GetColorSets().GetSet(frame_idx), {});
-
-  cmd_buff.bindDescriptorSets(  // bright_color
-      vk::PipelineBindPoint::eGraphics, pipelines_.swap_.GetLayout(), 0,
-      desc_pool_.GetBrightColorSets().GetSet(frame_idx), {});
+  if (settings_.enable_dof) {
+    cmd_buff.bindDescriptorSets(  // present color
+        vk::PipelineBindPoint::eGraphics, pipelines_.swap_.GetLayout(), 0,
+        desc_pool_.GetPresentColorSets().GetSet(frame_idx), {});
+  } else {
+    cmd_buff.bindDescriptorSets(  // color_res
+        vk::PipelineBindPoint::eGraphics, pipelines_.swap_.GetLayout(), 0,
+        desc_pool_.GetColorSets().GetSet(frame_idx), {});
+  }
 
   cmd_buff.draw(3, 1, 0, 0);
   cmd_buff.nextSubpass(vk::SubpassContents::eInline);

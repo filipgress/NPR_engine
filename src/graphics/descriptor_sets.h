@@ -115,6 +115,28 @@ class BrightTempSets : public SingleTexSets {
   }
 };
 
+// coc
+class DepthSets : public SingleTexSets {
+ public:
+  DepthSets(const Context& ctx, uint count) : SingleTexSets{ctx, count} {}
+
+  void Update(const Resources& resrc) const override final;
+  const Texture* GetAttach(const Resources& resrc,
+                           int frame_idx) const override {
+    return resrc.GetResrc()[frame_idx].ds_ms.get();
+  }
+};
+
+class CocMapSets : public SingleTexSets {
+ public:
+  CocMapSets(const Context& ctx, uint count) : SingleTexSets{ctx, count} {}
+
+  const Texture* GetAttach(const Resources& resrc,
+                           int frame_idx) const override {
+    return resrc.GetResrc()[frame_idx].coc_map.get();
+  }
+};
+
 /*
  * SingleBuffSets
  */
@@ -269,6 +291,23 @@ class WBoitInputSets : public BaseDescSets {
   void Update(const Resources& resrc) const;
   std::vector<vk::DescriptorPoolSize> GetPoolSizes() const override {
     return {{vk::DescriptorType::eInputAttachment, 2 * count_}};
+  }
+
+ private:
+  void CreateLayout() override;
+};
+
+/*
+ * DofSets
+ */
+class DofSet : public BaseDescSets {
+ public:
+  DofSet(const Context& ctx) : BaseDescSets{ctx, 1} { CreateLayout(); }
+
+  void Update(const Resources& resrc) const;
+  std::vector<vk::DescriptorPoolSize> GetPoolSizes() const override {
+    return {{vk::DescriptorType::eCombinedImageSampler, count_},  // blue_noise
+            {vk::DescriptorType::eUniformBuffer, count_}};  // poisson kernel
   }
 
  private:

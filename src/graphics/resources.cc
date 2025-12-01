@@ -1,5 +1,6 @@
 #include "resources.h"
 #include <random>
+#include <stb_image.h>
 
 namespace npr_graphics {
 
@@ -25,6 +26,8 @@ Resources::Resources(const Context& ctx, const CommandPool& cmd_pool,
   CreateABuffers();
 
   CreateAOKernel();
+  CreatePoissonKernels();
+
   ssao_blur_ = CreateGaussianKernel(5);
   bloom_blur_ = CreateGaussianKernel(8);
 
@@ -32,6 +35,13 @@ Resources::Resources(const Context& ctx, const CommandPool& cmd_pool,
   {
     CreateDefaultColorTex(cmd_buff);
     CreateAONoiseTex(cmd_buff);
+
+    LoadBlueNoiseTex(cmd_buff, "../assets/textures/blue_noise_64.png",
+                     blue_noise_tex_64_);
+    LoadBlueNoiseTex(cmd_buff, "../assets/textures/blue_noise_128.png",
+                     blue_noise_tex_128_);
+    LoadBlueNoiseTex(cmd_buff, "../assets/textures/blue_noise_256.png",
+                     blue_noise_tex_256_);
 
     CreateSphereMesh(cmd_buff);
     CreateConeMesh(cmd_buff);
@@ -161,6 +171,14 @@ void Resources::CreateImages() {
             vk::ImageUsageFlagBits::eSampled,
         vk::ImageAspectFlagBits::eColor, vk::SampleCountFlagBits::e1,
         "bright_temp_" + std::to_string(idx));
+
+    // dof
+    resrc.coc_map = std::make_unique<Texture>(
+        ctx_, frame_props_.coc_format, frame_props_.extent,
+        vk::ImageUsageFlagBits::eColorAttachment |
+            vk::ImageUsageFlagBits::eSampled,
+        vk::ImageAspectFlagBits::eColor, vk::SampleCountFlagBits::e1,
+        "coc_map_" + std::to_string(idx));
 
     // color targets
     resrc.color_ms = std::make_unique<Image>(
@@ -323,9 +341,94 @@ void Resources::CreateAOKernel() {
     kernel[i] = sample;
   }
 
-  ao_kernel_ =
+  ssao_kernel_ =
       std::make_unique<UniformBuffer<AOKernel>>(ctx_, "ao_kernel_unif");
-  ao_kernel_->Write(kernel);
+  ssao_kernel_->Write(kernel);
+}
+
+void Resources::LoadBlueNoiseTex(vk::CommandBuffer cmd_buff,
+                                 const std::string& filepath,
+                                 std::unique_ptr<Texture>& out_texture) {
+  int width, height, channels;
+  unsigned char* data =
+      stbi_load(filepath.c_str(), &width, &height, &channels, STBI_rgb_alpha);
+
+  if (!data) throw std::runtime_error("failed to load blue noise textures!");
+
+  SamplerProps props;
+  props.address_mode_U = vk::SamplerAddressMode::eRepeat;  // ✅ Tile it
+  props.address_mode_V = vk::SamplerAddressMode::eRepeat;
+  props.min_filter = props.mag_filter = vk::Filter::eNearest;
+
+  std::string name = "blue_noise_" + std::to_string(width);
+  out_texture = std::make_unique<Texture>(
+      ctx_, frame_props_.blue_noise_format, vk::Extent2D(width, height),
+      vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
+      vk::ImageAspectFlagBits::eColor, vk::SampleCountFlagBits::e1, name,
+      props);
+  out_texture->Write(cmd_buff, data, width * height * 4);
+
+  stbi_image_free(data);
+}
+
+PoissonDisk Resources::GeneratePoissonDisk(uint32_t sample_count,
+                                           uint32_t max_attempts) {
+  PoissonDisk kernel{};
+  kernel.count.x = sample_count;
+
+  std::mt19937 rng(std::random_device{}());
+  std::uniform_real_distribution<float> dist_radius(0.0f, 1.0f);
+  std::uniform_real_distribution<float> dist_angle(0.0f,
+                                                   2.0f * glm::pi<float>());
+
+  float min_dist = 0.8f / std::sqrt(static_cast<float>(sample_count));
+  kernel.samples[0] = glm::vec4(0.0f);
+
+  for (uint32_t i = 1; i < sample_count; ++i) {
+    bool found = false;
+
+    for (uint32_t attempt = 0; attempt < max_attempts; ++attempt) {
+      float r = std::sqrt(dist_radius(rng));
+      float theta = dist_angle(rng);
+      glm::vec2 candidate(r * std::cos(theta), r * std::sin(theta));
+
+      bool valid = true;
+      for (uint32_t j = 0; j < i; ++j) {
+        if (glm::length(candidate - glm::vec2(kernel.samples[j])) < min_dist) {
+          valid = false;
+          break;
+        }
+      }
+
+      if (valid) {
+        kernel.samples[i] = glm::vec4(candidate, 0.0f, 0.0f);
+        found = true;
+        break;
+      }
+    }
+
+    if (!found) {
+      float r = std::sqrt(dist_radius(rng));
+      float theta = dist_angle(rng);
+      kernel.samples[i] =
+          glm::vec4(r * std::cos(theta), r * std::sin(theta), 0.0f, 0.0f);
+    }
+  }
+
+  return kernel;
+}
+
+void Resources::CreatePoissonKernels() {
+  auto kernel_32 = GeneratePoissonDisk(32, 128);
+  auto kernel_64 = GeneratePoissonDisk(64, 128);
+
+  poisson_kernel_32_ =
+      std::make_unique<UniformBuffer<PoissonDisk>>(ctx_, "poisson_kernel_32");
+  poisson_kernel_32_->Write(kernel_32);
+
+  poisson_kernel_64_ =
+      std::make_unique<UniformBuffer<PoissonDisk>>(ctx_, "poisson_kernel_64");
+  poisson_kernel_64_->Write(kernel_64);
 }
 
 void Resources::CreateSphereMesh(vk::CommandBuffer cmd_buff) {

@@ -362,7 +362,8 @@ void GuiManager::GlobalSettingsWindow(npr_graphics::RenderSettings& settings,
 
     ImGui::BeginDisabled(!settings.enable_bloom);
 
-    ImGui::DragFloat("threshold", &settings.bloom_threshold, 0.01f, 0.0f, 5.0f);
+    ImGui::DragFloat("threshold##bloom", &settings.bloom_threshold, 0.01f, 0.0f,
+                     5.0f);
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
       ImGui::SetTooltip("brightness level above which colors are extracted");
 
@@ -383,6 +384,94 @@ void GuiManager::GlobalSettingsWindow(npr_graphics::RenderSettings& settings,
       ImGui::SameLine();
       ImGui::TextDisabled("(disabled)");
     }
+
+    ImGui::Spacing();
+  }
+
+  if (ImGui::CollapsingHeader("depth of field")) {
+    ImGui::Spacing();
+
+    ImGui::Checkbox("enable", &settings.enable_dof);
+
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    ImGui::BeginDisabled(!settings.enable_dof);
+
+    static int selected_debug = static_cast<int>(settings.dof_debug_mode);
+
+    if (ImGui::Selectable("normal##debug", selected_debug == 0)) {
+      selected_debug = 0;
+      settings.dof_debug_mode = static_cast<uint>(selected_debug);
+    }
+
+    if (ImGui::Selectable("show coc##debug", selected_debug == 1)) {
+      selected_debug = 1;
+      settings.dof_debug_mode = static_cast<uint>(selected_debug);
+    }
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+      ImGui::SetTooltip("red = foreground, blue = background");
+
+    if (ImGui::Selectable("split screen##debug", selected_debug == 2)) {
+      selected_debug = 2;
+      settings.dof_debug_mode = static_cast<uint>(selected_debug);
+    }
+
+    if (ImGui::Selectable("coc_weight##debug", selected_debug == 3)) {
+      selected_debug = 3;
+      settings.dof_debug_mode = static_cast<uint>(selected_debug);
+    }
+
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    ImGui::DragFloat("distance", &settings.dof_focus_distance, 0.1f, 0.1f,
+                     100.0f);
+    ImGui::DragFloat("range", &settings.dof_focus_range, 0.01f, 0.01f, 20.0f);
+    ImGui::SliderFloat("blur radius", &settings.dof_blur_radius, 1.0f, 20.0f);
+
+    ImGui::Spacing();
+    ImGui::SeparatorText("intensity");
+    ImGui::Spacing();
+
+    ImGui::SliderFloat("fg##intensity", &settings.dof_near_int, 0.0f, 2.0f);
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+      ImGui::SetTooltip("maximum blur intensity for objects closer than focus");
+
+    ImGui::SliderFloat("bg##intesity", &settings.dof_far_int, 0.0f, 2.0f);
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+      ImGui::SetTooltip(
+          "maximum blur intensity for objects farther than focus");
+
+    ImGui::Spacing();
+    ImGui::SeparatorText("falloff");
+    ImGui::Spacing();
+
+    ImGui::DragFloat("fg##falloff", &settings.dof_near_falloff, 0.05f, 0.1f,
+                     50.0f);
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+      ImGui::SetTooltip(
+          "smaller = steeper gradient, larger = gentler gradient");
+
+    ImGui::DragFloat("bg##falloff", &settings.dof_far_falloff, 0.05f, 0.1f,
+                     50.0f);
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+      ImGui::SetTooltip(
+          "smaller = steeper gradient, larger = gentler gradient");
+
+    ImGui::Spacing();
+    ImGui::SeparatorText("bilateral filter");
+    ImGui::Spacing();
+
+    ImGui::SliderFloat("threshold##filter", &settings.dof_coc_threshold, 0.0f,
+                       0.2f, "%.3f");
+
+    ImGui::SliderFloat("falloff", &settings.dof_coc_falloff, 1.0f, 1000.0f,
+                       "%.1f");
+
+    ImGui::EndDisabled();
 
     ImGui::Spacing();
   }

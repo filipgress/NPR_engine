@@ -30,6 +30,8 @@ class ShaderManager : public npr_core::NonCopyable {
   FragmentShader wboit_acc_frag_;
   FragmentShader wboit_res_frag_;
   FragmentShader bright_extract_frag_;
+  FragmentShader coc_extract_frag_;
+  FragmentShader dof_poisson_frag_;
   FragmentShader swap_frag_;
 
   std::vector<Shader*> shaders_;

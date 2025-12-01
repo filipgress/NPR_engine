@@ -40,6 +40,19 @@ struct RenderSettings {
   float bloom_soft_threshold{0.5f};
   float bloom_intensity{1.0f};
 
+  bool enable_dof{true};
+  uint dof_debug_mode{0};
+  float dof_focus_distance{10.0f};
+  float dof_focus_range{1.8f};
+  float dof_near_int{1.0f};
+  float dof_far_int{1.0f};
+  float dof_near_falloff{4.0f};
+  float dof_far_falloff{4.0f};
+
+  float dof_blur_radius{5.0f};
+  float dof_coc_threshold{0.05f};
+  float dof_coc_falloff{10.0f};
+
   bool dirty_target_size{false};
   bool dirty_abuff_size{false};
 };

@@ -452,6 +452,26 @@ std::vector<vk::ImageView> BlurBrightPass::GetAttachmentViews(
   return {resrc.bright_temp->GetImageView()};
 }
 
+std::vector<vk::ImageView> CocPass::GetAttachmentViews(int frame_idx) const {
+  auto& resrc = resrc_.GetResrc()[frame_idx];
+
+  if (!resrc.coc_map) {
+    throw std::runtime_error("missing required resources for: " + GetDbgName());
+  }
+
+  return {resrc.coc_map->GetImageView()};
+}
+
+std::vector<vk::ImageView> DofPass::GetAttachmentViews(int frame_idx) const {
+  auto& resrc = resrc_.GetResrc()[frame_idx];
+
+  if (!resrc.present_color) {
+    throw std::runtime_error("missing required resources for: " + GetDbgName());
+  }
+
+  return {resrc.present_color->GetImageView()};
+}
+
 /*
  * GlobLightPass
  */

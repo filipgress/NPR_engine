@@ -166,6 +166,30 @@ class BlurBrightPass : public SingleColorPass {
   const std::string GetDbgName() const override { return "blur_h_pass"; }
 };
 
+class CocPass : public SingleColorPass {
+ public:
+  CocPass(const Context& ctx, const Resources& resrc)
+      : SingleColorPass(ctx, resrc, resrc.GetProps().coc_format) {
+    Init();
+  }
+
+ private:
+  std::vector<vk::ImageView> GetAttachmentViews(int frame_idx) const override;
+  const std::string GetDbgName() const override { return "coc_pass"; }
+};
+
+class DofPass : public SingleColorPass {
+ public:
+  DofPass(const Context& ctx, const Resources& resrc)
+      : SingleColorPass(ctx, resrc, resrc.GetProps().color_format) {
+    Init();
+  }
+
+ private:
+  std::vector<vk::ImageView> GetAttachmentViews(int frame_idx) const override;
+  const std::string GetDbgName() const override { return "dof_pass"; }
+};
+
 class GlobLightPass : public RenderPass {
  public:
   GlobLightPass(const Context& ctx, const Resources& resrc)

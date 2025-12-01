@@ -33,6 +33,10 @@ class DescriptorPool : public npr_core::NonCopyable {
   const BrightColorSets& GetBrightColorSets() const { return bright_sets_; }
   const BrightTempSets& GetBrightTempSets() const { return bright_temp_sets_; }
 
+  const DepthSets& GetDepthSets() const { return depth_sets_; }
+  const CocMapSets& GetCocMapSets() const { return coc_sets_; }
+  const DofSet& GetDofSet() const { return dof_set_; }
+
   const ColorSets& GetColorSets() const { return color_sets_; }
   const PresentColorSets& GetPresentColorSets() const { return present_sets_; }
 
@@ -63,6 +67,10 @@ class DescriptorPool : public npr_core::NonCopyable {
 
   BrightColorSets bright_sets_;
   BrightTempSets bright_temp_sets_;
+
+  DepthSets depth_sets_;
+  CocMapSets coc_sets_;
+  DofSet dof_set_;
 
   ColorSets color_sets_;
   PresentColorSets present_sets_;

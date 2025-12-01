@@ -92,6 +92,28 @@ void SingleTexSets::Update(const Resources& resrc) const {
   }
 }
 
+void DepthSets::Update(const Resources& resrc) const {
+  for (size_t i = 0; i < resrc.GetResrc().size(); i++) {
+    auto* tex = GetAttach(resrc, i);
+
+    vk::DescriptorImageInfo image_info{};
+    image_info.imageLayout = vk::ImageLayout::eDepthStencilReadOnlyOptimal;
+    image_info.imageView = tex->GetImageView();
+    image_info.sampler = tex->GetSampler();
+
+    vk::WriteDescriptorSet desc_write{};
+
+    desc_write.dstSet = sets_[i];
+    desc_write.dstBinding = 0;
+    desc_write.dstArrayElement = 0;
+    desc_write.descriptorType = vk::DescriptorType::eCombinedImageSampler;
+    desc_write.descriptorCount = 1;
+    desc_write.pImageInfo = &image_info;
+
+    ctx_.GetDevice().updateDescriptorSets(1, &desc_write, 0, nullptr);
+  }
+}
+
 void CameraUnifSets::Update(const Resources& resrc) const {
   const auto& per_frame_resrc = resrc.GetResrc();
   assert(count_ == per_frame_resrc.size());
@@ -331,7 +353,7 @@ void AOSet::CreateLayout() {
 void AOSet::Update(const Resources& resrc) const {
   // ao_kernel
   vk::DescriptorBufferInfo kernel_info{};
-  kernel_info.buffer = resrc.GetAOKernel().GetBuffer();
+  kernel_info.buffer = resrc.GetSSAOKernel().GetBuffer();
   kernel_info.offset = 0;
   kernel_info.range = VK_WHOLE_SIZE;
 
@@ -493,6 +515,66 @@ void WBoitInputSets::Update(const Resources& resrc) const {
     ctx_.GetDevice().updateDescriptorSets(desc_writes.size(),
                                           desc_writes.data(), 0, nullptr);
   }
+}
+
+/*
+ * DofSets
+ */
+void DofSet::CreateLayout() {
+  std::array<vk::DescriptorSetLayoutBinding, 2> bindings;
+
+  // blue_noise_tex
+  bindings[0].binding = 0;
+  bindings[0].descriptorType = vk::DescriptorType::eCombinedImageSampler;
+  bindings[0].descriptorCount = 1;
+  bindings[0].stageFlags = vk::ShaderStageFlagBits::eFragment;
+
+  // poisson kernel
+  bindings[1].binding = 1;
+  bindings[1].descriptorType = vk::DescriptorType::eUniformBuffer;
+  bindings[1].descriptorCount = 1;
+  bindings[1].stageFlags = vk::ShaderStageFlagBits::eFragment;
+
+  vk::DescriptorSetLayoutCreateInfo layout_info{};
+  layout_info.bindingCount = bindings.size();
+  layout_info.pBindings = bindings.data();
+
+  layout_ = ctx_.GetDevice().createDescriptorSetLayout(layout_info);
+  ctx_.SetDbgName((uint64_t)(VkDescriptorSetLayout)layout_,
+                  vk::ObjectType::eDescriptorSetLayout, "dof_set_layout");
+}
+
+void DofSet::Update(const Resources& resrc) const {
+  const auto& blue_noise = resrc.GetBlueNoiseTex128();
+  vk::DescriptorImageInfo blue_noise_info{};
+  blue_noise_info.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+  blue_noise_info.imageView = blue_noise.GetImageView();
+  blue_noise_info.sampler = blue_noise.GetSampler();
+
+  const auto& poisson = resrc.GetPoissonKernel64();
+  vk::DescriptorBufferInfo poisson_info{};
+  poisson_info.buffer = poisson.GetBuffer();
+  poisson_info.offset = 0;
+  poisson_info.range = VK_WHOLE_SIZE;
+
+  std::array<vk::WriteDescriptorSet, 2> desc_writes;
+
+  desc_writes[0].dstSet = sets_[0];
+  desc_writes[0].dstBinding = 0;
+  desc_writes[0].dstArrayElement = 0;
+  desc_writes[0].descriptorType = vk::DescriptorType::eCombinedImageSampler;
+  desc_writes[0].descriptorCount = 1;
+  desc_writes[0].pImageInfo = &blue_noise_info;
+
+  desc_writes[1].dstSet = sets_[0];
+  desc_writes[1].dstBinding = 1;
+  desc_writes[1].dstArrayElement = 0;
+  desc_writes[1].descriptorType = vk::DescriptorType::eUniformBuffer;
+  desc_writes[1].descriptorCount = 1;
+  desc_writes[1].pBufferInfo = &poisson_info;
+
+  ctx_.GetDevice().updateDescriptorSets(desc_writes.size(), desc_writes.data(),
+                                        0, nullptr);
 }
 
 }  // namespace npr_graphics

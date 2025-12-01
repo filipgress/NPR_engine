@@ -20,10 +20,16 @@ constexpr uint32_t kABuffMaxSortedNodes = 16;
 
 constexpr uint32_t kAONoiseDim = 4;
 constexpr uint32_t kAOKernelSize = 64;
+constexpr uint32_t kMaxPoissonSize = 64;
 
-constexpr uint32_t kMaxGaussianRadius = 10;
+constexpr uint32_t kMaxGaussianRadius = 16;
 
 using AOKernel = std::array<glm::vec4, kAOKernelSize>;
+
+struct PoissonDisk {
+  glm::uvec4 count;                    // x = count, yzw = unused
+  glm::vec4 samples[kMaxPoissonSize];  // xy = offset, zw = unused
+};
 
 enum MaterialFlags : uint32_t {
   kNone = BIT(0),
@@ -135,8 +141,31 @@ struct BrightPushConst {
 };
 
 struct BlurPushConst {
-  glm::ivec4 flags;  // x = horizontal(1) / vertical(0), y = radius, zw = unused
+  glm::ivec4 flags;                       // x = dir, y = radius, zw = unused
   float weights[kMaxGaussianRadius + 1];  // weights[0] to weights[radius]
+};
+
+struct CocPushConst {
+  float focus_dist;
+  float focus_range;
+
+  float near_int;
+  float far_int;
+
+  float near_falloff;
+  float far_falloff;
+
+  float near_plane;
+  float far_plane;
+
+  uint32_t is_persp;  // 1 = persp, 0 = ortho
+};
+
+struct DofPushConst {
+  float blur_radius;
+  float coc_threshold;
+  float coc_falloff;
+  uint32_t debug_mode;
 };
 
 struct LoadPushConst {
@@ -167,6 +196,10 @@ struct FrameProps {
   // ao
   const vk::Format ao_noise_format = vk::Format::eR16G16Sfloat;
   const vk::Format ao_format = vk::Format::eR16Unorm;
+
+  // dof
+  const vk::Format blue_noise_format = vk::Format::eR8G8B8A8Unorm;
+  const vk::Format coc_format = vk::Format::eR16Sfloat;
 
   // wboit layout
   const vk::Format acc_color_format = vk::Format::eR16G16B16A16Sfloat;
@@ -214,6 +247,9 @@ struct FrameResources {
   std::unique_ptr<Texture> bright_color;
   std::unique_ptr<Texture> bright_temp;
 
+  // dof
+  std::unique_ptr<Texture> coc_map;
+
   // color targets
   std::unique_ptr<Image> color_ms;
   std::unique_ptr<Texture> color_res;
@@ -246,7 +282,17 @@ class Resources : public npr_core::NonCopyable {
 
   const Texture& GetDefaultColorTex() const { return *default_color_tex_; }
   const Texture& GetAONoiseTex() const { return *ao_noise_tex_; }
-  const UniformBuffer<AOKernel>& GetAOKernel() const { return *ao_kernel_; }
+  const Texture& GetBlueNoiseTex64() const { return *blue_noise_tex_64_; }
+  const Texture& GetBlueNoiseTex128() const { return *blue_noise_tex_128_; }
+  const Texture& GetBlueNoiseTex256() const { return *blue_noise_tex_256_; }
+
+  const UniformBuffer<AOKernel>& GetSSAOKernel() const { return *ssao_kernel_; }
+  const UniformBuffer<PoissonDisk>& GetPoissonKernel32() const {
+    return *poisson_kernel_32_;
+  }
+  const UniformBuffer<PoissonDisk>& GetPoissonKernel64() const {
+    return *poisson_kernel_64_;
+  }
 
   const std::vector<FrameResources>& GetResrc() const { return frame_resrc_; }
 
@@ -255,14 +301,18 @@ class Resources : public npr_core::NonCopyable {
   void CreateBuffers();
   void CreateABuffers();
 
-  void CreateAONoiseTex(vk::CommandBuffer cmd_buff);
   void CreateAOKernel();
+  BlurPushConst CreateGaussianKernel(uint32_t radius);
+  void CreatePoissonKernels();
+  PoissonDisk GeneratePoissonDisk(uint32_t sample_count, uint32_t max_attempts);
+
+  void CreateAONoiseTex(vk::CommandBuffer cmd_buff);
+  void CreateDefaultColorTex(vk::CommandBuffer cmd_buff);
+  void LoadBlueNoiseTex(vk::CommandBuffer cmd_buff, const std::string& filepath,
+                        std::unique_ptr<Texture>& out_texture);
 
   void CreateSphereMesh(vk::CommandBuffer cmd_buff);
   void CreateConeMesh(vk::CommandBuffer cmd_buff);
-
-  void CreateDefaultColorTex(vk::CommandBuffer cmd_buff);
-  BlurPushConst CreateGaussianKernel(uint32_t radius);
 
   vk::SampleCountFlagBits GetMaxSamples();
 
@@ -273,11 +323,16 @@ class Resources : public npr_core::NonCopyable {
   std::vector<FrameResources> frame_resrc_;
   uint frame_count_;
 
-  std::unique_ptr<Texture> default_color_tex_;
+  std::unique_ptr<UniformBuffer<AOKernel>> ssao_kernel_;
+  std::unique_ptr<UniformBuffer<PoissonDisk>> poisson_kernel_32_;
+  std::unique_ptr<UniformBuffer<PoissonDisk>> poisson_kernel_64_;
 
-  // ao resources
+  std::unique_ptr<Texture> default_color_tex_;
   std::unique_ptr<Texture> ao_noise_tex_;
-  std::unique_ptr<UniformBuffer<AOKernel>> ao_kernel_;
+
+  std::unique_ptr<Texture> blue_noise_tex_64_;
+  std::unique_ptr<Texture> blue_noise_tex_128_;
+  std::unique_ptr<Texture> blue_noise_tex_256_;
 
   BlurPushConst ssao_blur_;
   BlurPushConst bloom_blur_;
