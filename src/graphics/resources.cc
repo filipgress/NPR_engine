@@ -25,29 +25,26 @@ Resources::Resources(const Context& ctx, const CommandPool& cmd_pool,
   CreateBuffers();
   CreateABuffers();
 
-  CreateAOKernel();
-  CreatePoissonKernels();
+  CreateSSAOKernel();
+  CreatePoisKernels();
 
-  ssao_blur_ = CreateGaussianKernel(5);
-  bloom_blur_ = CreateGaussianKernel(8);
+  blur_ssao_pc_ = GenGausKernel(5);
+  blur_bloom_pc_ = GenGausKernel(8);
 
   auto cmd_buff = cmd_pool.BeginSingleTimeCmds();
   {
     CreateDefaultColorTex(cmd_buff);
+    CreateWhiteNoiseTex(cmd_buff);
     CreateAONoiseTex(cmd_buff);
-
-    LoadBlueNoiseTex(cmd_buff, "../assets/textures/blue_noise_64.png",
-                     blue_noise_tex_64_);
-    LoadBlueNoiseTex(cmd_buff, "../assets/textures/blue_noise_128.png",
-                     blue_noise_tex_128_);
-    LoadBlueNoiseTex(cmd_buff, "../assets/textures/blue_noise_256.png",
-                     blue_noise_tex_256_);
+    LoadBlueTextures(cmd_buff);
 
     CreateSphereMesh(cmd_buff);
     CreateConeMesh(cmd_buff);
   }
   cmd_pool.EndSingleTimeCmds(cmd_buff);
 }
+
+// === create frame resources ===
 
 void Resources::CreateImages() {
   uint idx{0};
@@ -248,82 +245,10 @@ void Resources::CreateBuffers() {
   }
 }
 
-void Resources::CreateDefaultColorTex(vk::CommandBuffer cmd_buff) {
-  TextureProps tex_data;
-  tex_data.name = "default_texture";
-  tex_data.width = 1;
-  tex_data.height = 1;
-  tex_data.type = TextureType::kColor;
+// === create kernels ===
 
-  default_color_tex_ = std::make_unique<Texture>(ctx_, tex_data);
-  default_color_tex_->Write(cmd_buff, {255, 255, 255, 255});
-}
-
-vk::SampleCountFlagBits Resources::GetMaxSamples() {
-  vk::PhysicalDeviceProperties props = ctx_.GetProperties();
-  vk::SampleCountFlags counts = props.limits.framebufferColorSampleCounts &
-                                props.limits.framebufferDepthSampleCounts;
-
-  if (counts & vk::SampleCountFlagBits::e64)
-    return vk::SampleCountFlagBits::e64;
-  if (counts & vk::SampleCountFlagBits::e32)
-    return vk::SampleCountFlagBits::e32;
-  if (counts & vk::SampleCountFlagBits::e16)
-    return vk::SampleCountFlagBits::e16;
-  if (counts & vk::SampleCountFlagBits::e8) return vk::SampleCountFlagBits::e8;
-  if (counts & vk::SampleCountFlagBits::e4) return vk::SampleCountFlagBits::e4;
-  if (counts & vk::SampleCountFlagBits::e2) return vk::SampleCountFlagBits::e2;
-
-  return vk::SampleCountFlagBits::e1;
-}
-
-BlurPushConst Resources::CreateGaussianKernel(uint32_t radius) {
-  BlurPushConst blur_pc;
-
-  radius = std::clamp(radius, 1u, kMaxGaussianRadius);
-  blur_pc.flags.y = radius;
-
-  float sigma = radius / 3.0f;
-  float sigma_sq = 2.0f * sigma * sigma;
-
-  float sum = 0.0f;
-
-  for (uint32_t i = 0; i <= radius; ++i) {
-    float w = std::exp(-float(i * i) / sigma_sq);
-    blur_pc.weights[i] = w;
-    sum += (i == 0) ? w : 2.0f * w;
-  }
-
-  for (uint32_t i = 0; i <= radius; ++i) blur_pc.weights[i] /= sum;
-
-  return blur_pc;
-}
-
-void Resources::CreateAONoiseTex(vk::CommandBuffer cmd_buff) {
-  std::vector<glm::vec2> noise(kAONoiseDim * kAONoiseDim);
-
-  std::mt19937 rng(std::random_device{}());
-  std::uniform_real_distribution<float> dist(-1.0f, 1.0f);
-
-  for (auto& n : noise) n = glm::normalize(glm::vec2(dist(rng), dist(rng)));
-
-  SamplerProps props;
-  props.address_mode_U = vk::SamplerAddressMode::eRepeat;
-  props.address_mode_V = vk::SamplerAddressMode::eRepeat;
-
-  ao_noise_tex_ = std::make_unique<Texture>(
-      ctx_, frame_props_.ao_noise_format,
-      vk::Extent2D{kAONoiseDim, kAONoiseDim},
-      vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
-      vk::ImageAspectFlagBits::eColor, vk::SampleCountFlagBits::e1,
-      "ao_noise_tex", props);
-
-  ao_noise_tex_->Write(cmd_buff, noise.data(),
-                       sizeof(glm::vec2) * noise.size());
-}
-
-void Resources::CreateAOKernel() {
-  AOKernel kernel;
+void Resources::CreateSSAOKernel() {
+  SSAOKernel kernel;
 
   std::mt19937 rng(std::random_device{}());
   std::uniform_real_distribution<float> rand01(0.0f, 1.0f);
@@ -342,38 +267,53 @@ void Resources::CreateAOKernel() {
   }
 
   ssao_kernel_ =
-      std::make_unique<UniformBuffer<AOKernel>>(ctx_, "ao_kernel_unif");
+      std::make_unique<UniformBuffer<SSAOKernel>>(ctx_, "ao_kernel_unif");
   ssao_kernel_->Write(kernel);
 }
 
-void Resources::LoadBlueNoiseTex(vk::CommandBuffer cmd_buff,
-                                 const std::string& filepath,
-                                 std::unique_ptr<Texture>& out_texture) {
-  int width, height, channels;
-  unsigned char* data =
-      stbi_load(filepath.c_str(), &width, &height, &channels, STBI_rgb_alpha);
+void Resources::CreatePoisKernels() {
+  auto kernel_32 = GenPoisKernel(32, 128);
+  auto kernel_64 = GenPoisKernel(64, 128);
+  auto kernel_128 = GenPoisKernel(128, 128);
 
-  if (!data) throw std::runtime_error("failed to load blue noise textures!");
+  pois_kernel_32_ = std::make_unique<UniformBuffer<PoisKernelUnif>>(
+      ctx_, "poisson_kernel_32");
+  pois_kernel_32_->Write(kernel_32);
 
-  SamplerProps props;
-  props.address_mode_U = vk::SamplerAddressMode::eRepeat;  // ✅ Tile it
-  props.address_mode_V = vk::SamplerAddressMode::eRepeat;
-  props.min_filter = props.mag_filter = vk::Filter::eNearest;
+  pois_kernel_64_ = std::make_unique<UniformBuffer<PoisKernelUnif>>(
+      ctx_, "poisson_kernel_64");
+  pois_kernel_64_->Write(kernel_64);
 
-  std::string name = "blue_noise_" + std::to_string(width);
-  out_texture = std::make_unique<Texture>(
-      ctx_, frame_props_.blue_noise_format, vk::Extent2D(width, height),
-      vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
-      vk::ImageAspectFlagBits::eColor, vk::SampleCountFlagBits::e1, name,
-      props);
-  out_texture->Write(cmd_buff, data, width * height * 4);
-
-  stbi_image_free(data);
+  pois_kernel_128_ = std::make_unique<UniformBuffer<PoisKernelUnif>>(
+      ctx_, "poisson_kernel_128");
+  pois_kernel_128_->Write(kernel_128);
 }
 
-PoissonDisk Resources::GeneratePoissonDisk(uint32_t sample_count,
-                                           uint32_t max_attempts) {
-  PoissonDisk kernel{};
+GausKernelPC Resources::GenGausKernel(uint32_t radius) {
+  GausKernelPC blur_pc;
+
+  radius = std::clamp(radius, 1u, kMaxGausRadius);
+  blur_pc.flags.y = radius;
+
+  float sigma = radius / 3.0f;
+  float sigma_sq = 2.0f * sigma * sigma;
+
+  float sum = 0.0f;
+
+  for (uint32_t i = 0; i <= radius; ++i) {
+    float w = std::exp(-float(i * i) / sigma_sq);
+    blur_pc.weights[i] = w;
+    sum += (i == 0) ? w : 2.0f * w;
+  }
+
+  for (uint32_t i = 0; i <= radius; ++i) blur_pc.weights[i] /= sum;
+
+  return blur_pc;
+}
+
+PoisKernelUnif Resources::GenPoisKernel(uint32_t sample_count,
+                                        uint32_t max_attempts) {
+  PoisKernelUnif kernel{};
   kernel.count.x = sample_count;
 
   std::mt19937 rng(std::random_device{}());
@@ -418,18 +358,126 @@ PoissonDisk Resources::GeneratePoissonDisk(uint32_t sample_count,
   return kernel;
 }
 
-void Resources::CreatePoissonKernels() {
-  auto kernel_32 = GeneratePoissonDisk(32, 128);
-  auto kernel_64 = GeneratePoissonDisk(64, 128);
+// === create textures ===
 
-  poisson_kernel_32_ =
-      std::make_unique<UniformBuffer<PoissonDisk>>(ctx_, "poisson_kernel_32");
-  poisson_kernel_32_->Write(kernel_32);
+void Resources::CreateDefaultColorTex(vk::CommandBuffer cmd_buff) {
+  TextureProps tex_data;
+  tex_data.name = "default_texture";
+  tex_data.width = 1;
+  tex_data.height = 1;
+  tex_data.type = TextureType::kColor;
 
-  poisson_kernel_64_ =
-      std::make_unique<UniformBuffer<PoissonDisk>>(ctx_, "poisson_kernel_64");
-  poisson_kernel_64_->Write(kernel_64);
+  default_color_tex_ = std::make_unique<Texture>(ctx_, tex_data);
+  default_color_tex_->Write(cmd_buff, {255, 255, 255, 255});
 }
+
+vk::SampleCountFlagBits Resources::GetMaxSamples() {
+  vk::PhysicalDeviceProperties props = ctx_.GetProperties();
+  vk::SampleCountFlags counts = props.limits.framebufferColorSampleCounts &
+                                props.limits.framebufferDepthSampleCounts;
+
+  if (counts & vk::SampleCountFlagBits::e64)
+    return vk::SampleCountFlagBits::e64;
+  if (counts & vk::SampleCountFlagBits::e32)
+    return vk::SampleCountFlagBits::e32;
+  if (counts & vk::SampleCountFlagBits::e16)
+    return vk::SampleCountFlagBits::e16;
+  if (counts & vk::SampleCountFlagBits::e8) return vk::SampleCountFlagBits::e8;
+  if (counts & vk::SampleCountFlagBits::e4) return vk::SampleCountFlagBits::e4;
+  if (counts & vk::SampleCountFlagBits::e2) return vk::SampleCountFlagBits::e2;
+
+  return vk::SampleCountFlagBits::e1;
+}
+
+void Resources::CreateWhiteNoiseTex(vk::CommandBuffer cmd_buff) {
+  std::vector<uint8_t> noise(kWhiteNoiseDim * kWhiteNoiseDim);
+
+  std::mt19937 rng(std::random_device{}());
+  std::uniform_int_distribution<uint16_t> dist(0, 255);
+
+  for (auto& n : noise) n = dist(rng);
+
+  SamplerProps props;
+  props.address_mode_U = vk::SamplerAddressMode::eRepeat;
+  props.address_mode_V = vk::SamplerAddressMode::eRepeat;
+  props.min_filter = props.mag_filter = vk::Filter::eNearest;
+
+  white_noise_tex_ = std::make_unique<Texture>(
+      ctx_, frame_props_.white_noise_format,
+      vk::Extent2D{kWhiteNoiseDim, kWhiteNoiseDim},
+      vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
+      vk::ImageAspectFlagBits::eColor, vk::SampleCountFlagBits::e1,
+      "white_noise_tex", props);
+  white_noise_tex_->Write(cmd_buff, noise.data(),
+                          sizeof(uint8_t) * noise.size());
+}
+
+void Resources::CreateAONoiseTex(vk::CommandBuffer cmd_buff) {
+  std::vector<glm::vec2> noise(kAONoiseDim * kAONoiseDim);
+
+  std::mt19937 rng(std::random_device{}());
+  std::uniform_real_distribution<float> dist(-1.0f, 1.0f);
+
+  for (auto& n : noise) n = glm::normalize(glm::vec2(dist(rng), dist(rng)));
+
+  SamplerProps props;
+  props.address_mode_U = vk::SamplerAddressMode::eRepeat;
+  props.address_mode_V = vk::SamplerAddressMode::eRepeat;
+
+  ao_noise_tex_ = std::make_unique<Texture>(
+      ctx_, frame_props_.ao_noise_format,
+      vk::Extent2D{kAONoiseDim, kAONoiseDim},
+      vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
+      vk::ImageAspectFlagBits::eColor, vk::SampleCountFlagBits::e1,
+      "ao_noise_tex", props);
+
+  ao_noise_tex_->Write(cmd_buff, noise.data(),
+                       sizeof(glm::vec2) * noise.size());
+}
+
+void Resources::LoadBlueTextures(vk::CommandBuffer cmd_buff) {
+  LoadTex(cmd_buff, "../assets/textures/blue_noise_64.png", blue_noise_tex_64_,
+          "blue_noise_64");
+  LoadTex(cmd_buff, "../assets/textures/blue_noise_128.png",
+          blue_noise_tex_128_, "blue_noise_128");
+  LoadTex(cmd_buff, "../assets/textures/blue_noise_256.png",
+          blue_noise_tex_256_, "blue_noise_256");
+
+  LoadTex(cmd_buff, "../assets/textures/blue_noise_64_1.png",
+          blue_noise_tex_64_1, "blue_noise_64_1");
+  LoadTex(cmd_buff, "../assets/textures/blue_noise_64_2.png",
+          blue_noise_tex_64_2, "blue_noise_64_2");
+  LoadTex(cmd_buff, "../assets/textures/blue_noise_64_3.png",
+          blue_noise_tex_64_3, "blue_noise_64_3");
+}
+
+void Resources::LoadTex(vk::CommandBuffer cmd_buff, const std::string& filepath,
+                        std::unique_ptr<Texture>& out_texture,
+                        const std::string& name) {
+  int width, height, channels;
+  unsigned char* data =
+      stbi_load(filepath.c_str(), &width, &height, &channels, STBI_rgb_alpha);
+
+  if (!data)
+    throw std::runtime_error("failed to load texture: " +
+                             npr_core::GetFilename(filepath));
+
+  SamplerProps props;
+  props.address_mode_U = vk::SamplerAddressMode::eRepeat;
+  props.address_mode_V = vk::SamplerAddressMode::eRepeat;
+  props.min_filter = props.mag_filter = vk::Filter::eNearest;
+
+  out_texture = std::make_unique<Texture>(
+      ctx_, frame_props_.blue_noise_format, vk::Extent2D(width, height),
+      vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
+      vk::ImageAspectFlagBits::eColor, vk::SampleCountFlagBits::e1, name,
+      props);
+  out_texture->Write(cmd_buff, data, width * height * 4);
+
+  stbi_image_free(data);
+}
+
+// === create meshes ===
 
 void Resources::CreateSphereMesh(vk::CommandBuffer cmd_buff) {
   const int segments = 16;

@@ -18,7 +18,7 @@ layout(set = 2, binding = 0) uniform PointLightUnif {
   vec4 color; // rgb = color * intensity, a = unused
 };
 
-layout(push_constant) uniform PushConst {
+layout(push_constant) uniform LightPC {
   mat4 model; // unused
   float diff_int;
   float spec_int;

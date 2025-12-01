@@ -5,7 +5,7 @@ layout(location = 0) out vec4 out_color;
 
 layout(set = 0, binding = 0) uniform sampler2D image_tex;
 
-layout(push_constant) uniform PushConst {
+layout(push_constant) uniform LoadPC {
   uvec2 res;
   vec3 t;
   bool is_loading;

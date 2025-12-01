@@ -130,8 +130,7 @@ void PipeManager::BuildAO(const VertexShader& vert_shader,
   ao_.CreateLayout(
       {desc_pool.GetCameraSets().GetLayout(),
        desc_pool.GetGBuffSets().GetLayout(), desc_pool.GetAOSet().GetLayout()},
-      {Pipeline::MakePushConst<AOPushConst>(
-          vk::ShaderStageFlagBits::eFragment)});
+      {Pipeline::MakePushConst<SSAOPC>(vk::ShaderStageFlagBits::eFragment)});
 
   ao_.AddShader(vert_shader);
   ao_.AddShader(frag_shader, {Pipeline::MakeSpecConst(0, kAONoiseDim),
@@ -167,12 +166,11 @@ void PipeManager::BuildBlurAO(const VertexShader& vert_shader,
                               const FragmentShader& frag_shader,
                               const DescriptorPool& desc_pool) {
   blur_ao_.CreateLayout({desc_pool.GetAOResSets().GetLayout()},
-                        {Pipeline::MakePushConst<BlurPushConst>(
+                        {Pipeline::MakePushConst<GausKernelPC>(
                             vk::ShaderStageFlagBits::eFragment)});
 
   blur_ao_.AddShader(vert_shader);
-  blur_ao_.AddShader(frag_shader,
-                     {Pipeline::MakeSpecConst(0, kMaxGaussianRadius)});
+  blur_ao_.AddShader(frag_shader, {Pipeline::MakeSpecConst(0, kMaxGausRadius)});
 
   auto& state = blur_ao_.state_;
   state.color_attachments.resize(1);
@@ -187,11 +185,11 @@ void PipeManager::BuildGlobLight(const VertexShader& vert_shader,
                                  const FragmentShader& frag_shader,
                                  vk::SampleCountFlagBits samples,
                                  const DescriptorPool& desc_pool) {
-  glob_light_.CreateLayout({desc_pool.GetAOResSets().GetLayout(),
-                            desc_pool.GetGBuffSets().GetLayout(),
-                            desc_pool.GetDirLightSets().GetLayout()},
-                           {Pipeline::MakePushConst<LightPushConst>(
-                               vk::ShaderStageFlagBits::eFragment)});
+  glob_light_.CreateLayout(
+      {desc_pool.GetAOResSets().GetLayout(),
+       desc_pool.GetGBuffSets().GetLayout(),
+       desc_pool.GetDirLightSets().GetLayout()},
+      {Pipeline::MakePushConst<LightPC>(vk::ShaderStageFlagBits::eFragment)});
 
   glob_light_.AddShader(vert_shader);
   glob_light_.AddShader(frag_shader,
@@ -230,9 +228,9 @@ void PipeManager::BuildGlobLight(const VertexShader& vert_shader,
 void PipeManager::BuildLocalLight(const VertexShader& vert_shader,
                                   vk::SampleCountFlagBits samples,
                                   const DescriptorPool& desc_pool) {
-  local_light_.CreateLayout({desc_pool.GetCameraSets().GetLayout()},
-                            {Pipeline::MakePushConst<LightPushConst>(
-                                vk::ShaderStageFlagBits::eVertex)});
+  local_light_.CreateLayout(
+      {desc_pool.GetCameraSets().GetLayout()},
+      {Pipeline::MakePushConst<LightPC>(vk::ShaderStageFlagBits::eVertex)});
 
   local_light_.AddShader(vert_shader);
 
@@ -264,12 +262,12 @@ void PipeManager::BuildPointLight(const VertexShader& vert_shader,
                                   const FragmentShader& frag_shader,
                                   vk::SampleCountFlagBits samples,
                                   const DescriptorPool& desc_pool) {
-  point_light_.CreateLayout({desc_pool.GetCameraSets().GetLayout(),
-                             desc_pool.GetGBuffSets().GetLayout(),
-                             desc_pool.GetPointLightSets().GetLayout()},
-                            {Pipeline::MakePushConst<LightPushConst>(
-                                vk::ShaderStageFlagBits::eVertex |
-                                vk::ShaderStageFlagBits::eFragment)});
+  point_light_.CreateLayout(
+      {desc_pool.GetCameraSets().GetLayout(),
+       desc_pool.GetGBuffSets().GetLayout(),
+       desc_pool.GetPointLightSets().GetLayout()},
+      {Pipeline::MakePushConst<LightPC>(vk::ShaderStageFlagBits::eVertex |
+                                        vk::ShaderStageFlagBits::eFragment)});
 
   point_light_.AddShader(vert_shader);
   point_light_.AddShader(frag_shader, {Pipeline::MakeSpecConst(0, samples)});
@@ -317,12 +315,12 @@ void PipeManager::BuildSpotLight(const VertexShader& vert_shader,
                                  const FragmentShader& frag_shader,
                                  vk::SampleCountFlagBits samples,
                                  const DescriptorPool& desc_pool) {
-  spot_light_.CreateLayout({desc_pool.GetCameraSets().GetLayout(),
-                            desc_pool.GetGBuffSets().GetLayout(),
-                            desc_pool.GetSpotLightSets().GetLayout()},
-                           {Pipeline::MakePushConst<LightPushConst>(
-                               vk::ShaderStageFlagBits::eVertex |
-                               vk::ShaderStageFlagBits::eFragment)});
+  spot_light_.CreateLayout(
+      {desc_pool.GetCameraSets().GetLayout(),
+       desc_pool.GetGBuffSets().GetLayout(),
+       desc_pool.GetSpotLightSets().GetLayout()},
+      {Pipeline::MakePushConst<LightPC>(vk::ShaderStageFlagBits::eVertex |
+                                        vk::ShaderStageFlagBits::eFragment)});
 
   spot_light_.AddShader(vert_shader);
   spot_light_.AddShader(frag_shader, {Pipeline::MakeSpecConst(0, samples)});
@@ -379,7 +377,7 @@ void PipeManager::BuildABuffFill(const VertexShader& vert_shader,
           desc_pool.GetDirLightSets().GetLayout(),
           desc_pool.GetMaterialSets().GetLayout(),
       },
-      {Pipeline::MakePushConst<ABuffFillPushConst>(
+      {Pipeline::MakePushConst<ABuffFillPC>(
           vk::ShaderStageFlagBits::eFragment)});
 
   abuff_fill_.AddShader(vert_shader);
@@ -408,7 +406,7 @@ void PipeManager::BuildABuffRes(const VertexShader& vert_shader,
                                 vk::SampleCountFlagBits samples,
                                 const DescriptorPool& desc_pool) {
   abuff_res_.CreateLayout({desc_pool.GetABufferSets().GetLayout()},
-                          {Pipeline::MakePushConst<ABuffResPushConst>(
+                          {Pipeline::MakePushConst<ABuffResPC>(
                               vk::ShaderStageFlagBits::eFragment)});
 
   abuff_res_.AddShader(vert_shader);
@@ -449,8 +447,7 @@ void PipeManager::BuildWBoitAcc(const VertexShader& vert_shader,
           desc_pool.GetDirLightSets().GetLayout(),
           desc_pool.GetMaterialSets().GetLayout(),
       },
-      {Pipeline::MakePushConst<WBoitPushConst>(
-          vk::ShaderStageFlagBits::eFragment)});
+      {Pipeline::MakePushConst<WBoitPC>(vk::ShaderStageFlagBits::eFragment)});
 
   wboit_acc_.AddShader(vert_shader);
   wboit_acc_.AddShader(frag_shader,
@@ -531,9 +528,9 @@ void PipeManager::BuildWBoitRes(const VertexShader& vert_shader,
 void PipeManager::BuildBright(const VertexShader& vert_shader,
                               const FragmentShader& frag_shader,
                               const DescriptorPool& desc_pool) {
-  bright_.CreateLayout({desc_pool.GetBrightColorSets().GetLayout()},
-                       {Pipeline::MakePushConst<BrightPushConst>(
-                           vk::ShaderStageFlagBits::eFragment)});
+  bright_.CreateLayout(
+      {desc_pool.GetBrightColorSets().GetLayout()},
+      {Pipeline::MakePushConst<BrightPC>(vk::ShaderStageFlagBits::eFragment)});
 
   bright_.AddShader(vert_shader);
   bright_.AddShader(frag_shader);
@@ -555,12 +552,12 @@ void PipeManager::BuildBlurBright(const VertexShader& vert_shader,
                                   const FragmentShader& frag_shader,
                                   const DescriptorPool& desc_pool) {
   blur_bright_.CreateLayout({desc_pool.GetAOResSets().GetLayout()},
-                            {Pipeline::MakePushConst<BlurPushConst>(
+                            {Pipeline::MakePushConst<GausKernelPC>(
                                 vk::ShaderStageFlagBits::eFragment)});
 
   blur_bright_.AddShader(vert_shader);
   blur_bright_.AddShader(frag_shader,
-                         {Pipeline::MakeSpecConst(0, kMaxGaussianRadius)});
+                         {Pipeline::MakeSpecConst(0, kMaxGausRadius)});
 
   auto& state = blur_bright_.state_;
   state.color_attachments.resize(1);
@@ -579,9 +576,9 @@ void PipeManager::BuildCoC(const VertexShader& vert_shader,
                            const FragmentShader& frag_shader,
                            vk::SampleCountFlagBits samples,
                            const DescriptorPool& desc_pool) {
-  coc_.CreateLayout({desc_pool.GetDepthSets().GetLayout()},
-                    {Pipeline::MakePushConst<CocPushConst>(
-                        vk::ShaderStageFlagBits::eFragment)});
+  coc_.CreateLayout(
+      {desc_pool.GetDepthSets().GetLayout()},
+      {Pipeline::MakePushConst<CocPC>(vk::ShaderStageFlagBits::eFragment)});
 
   coc_.AddShader(vert_shader);
   coc_.AddShader(frag_shader, {Pipeline::MakeSpecConst(0, samples)});
@@ -598,14 +595,14 @@ void PipeManager::BuildCoC(const VertexShader& vert_shader,
 void PipeManager::BuildDof(const VertexShader& vert_shader,
                            const FragmentShader& frag_shader,
                            const DescriptorPool& desc_pool) {
-  dof_.CreateLayout({desc_pool.GetColorSets().GetLayout(),
-                     desc_pool.GetCocMapSets().GetLayout(),
-                     desc_pool.GetDofSet().GetLayout()},
-                    {Pipeline::MakePushConst<DofPushConst>(
-                        vk::ShaderStageFlagBits::eFragment)});
+  dof_.CreateLayout(
+      {desc_pool.GetColorSets().GetLayout(),
+       desc_pool.GetCocMapSets().GetLayout(),
+       desc_pool.GetDofSet().GetLayout()},
+      {Pipeline::MakePushConst<DofPC>(vk::ShaderStageFlagBits::eFragment)});
 
   dof_.AddShader(vert_shader);
-  dof_.AddShader(frag_shader, {Pipeline::MakeSpecConst(0, kMaxPoissonSize)});
+  dof_.AddShader(frag_shader, {Pipeline::MakeSpecConst(0, kMaxPoisSize)});
 
   auto& state = dof_.state_;
 
@@ -624,9 +621,9 @@ void PipeManager::BuildDof(const VertexShader& vert_shader,
 void PipeManager::BuildSwap(const VertexShader& vert_shader,
                             const FragmentShader& frag_shader,
                             const DescriptorPool& desc_pool) {
-  swap_.CreateLayout({desc_pool.GetPresentColorSets().GetLayout()},
-                     {Pipeline::MakePushConst<LoadPushConst>(
-                         vk::ShaderStageFlagBits::eFragment)});
+  swap_.CreateLayout(
+      {desc_pool.GetPresentColorSets().GetLayout()},
+      {Pipeline::MakePushConst<LoadPC>(vk::ShaderStageFlagBits::eFragment)});
 
   swap_.AddShader(vert_shader);
   swap_.AddShader(frag_shader);

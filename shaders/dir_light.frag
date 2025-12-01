@@ -34,7 +34,7 @@ layout(set = 2, binding = 0) uniform DirLightUnif {
   DirLight dir_lights[MAX_DIR_LIGHTS];
 };
 
-layout(push_constant) uniform PushConst {
+layout(push_constant) uniform LightPC {
   mat4 model; // unused
   float diff_int;
   float spec_int;

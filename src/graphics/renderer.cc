@@ -281,7 +281,7 @@ void Renderer::RecordAO(vk::CommandBuffer cmd_buff, const uint frame_idx,
       vk::PipelineBindPoint::eGraphics, pipelines_.ao_.GetLayout(), 2,
       desc_pool_.GetAOSet().GetSet(0), {});
 
-  AOPushConst ao_pc = {settings_.ssao_radius, settings_.ssao_bias};
+  SSAOPC ao_pc = {settings_.ssao_radius, settings_.ssao_bias};
   cmd_buff.pushConstants(pipelines_.ao_.GetLayout(),
                          vk::ShaderStageFlagBits::eFragment, 0, sizeof(ao_pc),
                          &ao_pc);
@@ -301,7 +301,7 @@ void Renderer::RecordAO(vk::CommandBuffer cmd_buff, const uint frame_idx,
       vk::PipelineBindPoint::eGraphics, pipelines_.blur_ao_.GetLayout(), 0,
       desc_pool_.GetAOResSets().GetSet(frame_idx), {});
 
-  auto& blur_pc = resrc_.GetSSAOBlurPC();
+  auto& blur_pc = resrc_.GetBlurSSAOPC();
   blur_pc.flags.x = 0;  // horizontal
   cmd_buff.pushConstants(pipelines_.blur_ao_.GetLayout(),
                          vk::ShaderStageFlagBits::eFragment, 0, sizeof(blur_pc),
@@ -386,7 +386,7 @@ void Renderer::RecordGlobLight(vk::CommandBuffer cmd_buff, const uint frame_idx,
                               pipelines_.glob_light_.GetLayout(), 1,
                               desc_pool_.GetGBuffSets().GetSet(frame_idx), {});
 
-  LightPushConst light_pc{
+  LightPC light_pc{
       {}, settings_.diff_int, settings_.spec_int, settings_.is_pbr};
 
   cmd_buff.pushConstants(pipelines_.glob_light_.GetLayout(),
@@ -443,8 +443,8 @@ void Renderer::RecordPointLights(
           const RangeComp& range, BoundingBoxComp& bb) {
         if (point_at >= kMaxPointLights || !frustum.IsVisible(bb)) return;
 
-        LightPushConst light_pc{tf.glob_mat, settings_.diff_int,
-                                settings_.spec_int, settings_.is_pbr};
+        LightPC light_pc{tf.glob_mat, settings_.diff_int, settings_.spec_int,
+                         settings_.is_pbr};
 
         glm::vec3 world_pos = glm::vec3(tf.glob_mat[3]);
         glm::vec3 view_pos = cam_ubo.view * glm::vec4(world_pos, 1.0f);
@@ -539,8 +539,8 @@ void Renderer::RecordSpotLights(vk::CommandBuffer cmd_buff,
           const RangeComp& range, const SpotComp& spot, BoundingBoxComp& bb) {
         if (spot_at >= kMaxSpotLights || !frustum.IsVisible(bb)) return;
 
-        LightPushConst light_pc{tf.glob_mat, settings_.diff_int,
-                                settings_.spec_int, settings_.is_pbr};
+        LightPC light_pc{tf.glob_mat, settings_.diff_int, settings_.spec_int,
+                         settings_.is_pbr};
 
         glm::vec3 world_pos = glm::vec3(tf.glob_mat[3]);
         glm::vec3 view_pos = cam_ubo.view * glm::vec4(world_pos, 1.0f);
@@ -665,12 +665,12 @@ void Renderer::RecordABuff(vk::CommandBuffer cmd_buff, const uint frame_idx,
         vk::PipelineBindPoint::eGraphics, pipelines_.abuff_fill_.GetLayout(), 3,
         desc_pool_.GetDirLightSets().GetSet(frame_idx), {});
 
-    ABuffFillPushConst pc{.width = resrc_extent.width,
-                          .max_nodes = resrc_.frame_props_.abuff_max_nodes,
-                          .alpha_cutoff = settings_.alpha_cutoff,
-                          .diff_int = settings_.diff_int,
-                          .spec_int = settings_.spec_int,
-                          .is_pbr = settings_.is_pbr};
+    ABuffFillPC pc{.width = resrc_extent.width,
+                   .max_nodes = resrc_.frame_props_.abuff_max_nodes,
+                   .alpha_cutoff = settings_.alpha_cutoff,
+                   .diff_int = settings_.diff_int,
+                   .spec_int = settings_.spec_int,
+                   .is_pbr = settings_.is_pbr};
 
     cmd_buff.pushConstants(pipelines_.abuff_fill_.GetLayout(),
                            vk::ShaderStageFlagBits::eFragment, 0, sizeof(pc),
@@ -690,8 +690,8 @@ void Renderer::RecordABuff(vk::CommandBuffer cmd_buff, const uint frame_idx,
         vk::PipelineBindPoint::eGraphics, pipelines_.abuff_res_.GetLayout(), 0,
         desc_pool_.GetABufferSets().GetSet(frame_idx), {});
 
-    ABuffResPushConst pc{.width = resrc_extent.width,
-                         .sorted_nodes = settings_.abuff_sorted_nodes};
+    ABuffResPC pc{.width = resrc_extent.width,
+                  .sorted_nodes = settings_.abuff_sorted_nodes};
 
     cmd_buff.pushConstants(pipelines_.abuff_res_.GetLayout(),
                            vk::ShaderStageFlagBits::eFragment, 0, sizeof(pc),
@@ -726,16 +726,16 @@ void Renderer::RecordWBoit(vk::CommandBuffer cmd_buff, const uint frame_idx,
         vk::PipelineBindPoint::eGraphics, pipelines_.wboit_acc_.GetLayout(), 2,
         desc_pool_.GetDirLightSets().GetSet(frame_idx), {});
 
-    WBoitPushConst pc{.alpha_multiplier = settings_.wboit_alpha_multiplier,
-                      .alpha_power = settings_.wboit_alpha_power,
-                      .depth_factor = settings_.wboit_depth_factor,
-                      .depth_power = settings_.wboit_depth_power,
-                      .weight_min = settings_.wboit_weight_min,
-                      .weight_max = settings_.wboit_weight_max,
-                      .alpha_cutoff = settings_.alpha_cutoff,
-                      .diff_int = settings_.diff_int,
-                      .spec_int = settings_.spec_int,
-                      .is_pbr = settings_.is_pbr};
+    WBoitPC pc{.alpha_multiplier = settings_.wboit_alpha_multiplier,
+               .alpha_power = settings_.wboit_alpha_power,
+               .depth_factor = settings_.wboit_depth_factor,
+               .depth_power = settings_.wboit_depth_power,
+               .weight_min = settings_.wboit_weight_min,
+               .weight_max = settings_.wboit_weight_max,
+               .alpha_cutoff = settings_.alpha_cutoff,
+               .diff_int = settings_.diff_int,
+               .spec_int = settings_.spec_int,
+               .is_pbr = settings_.is_pbr};
 
     cmd_buff.pushConstants(pipelines_.wboit_acc_.GetLayout(),
                            vk::ShaderStageFlagBits::eFragment, 0, sizeof(pc),
@@ -847,9 +847,9 @@ void Renderer::RecordBloom(vk::CommandBuffer cmd_buff, const uint frame_idx,
                               pipelines_.bright_.GetLayout(), 0,
                               desc_pool_.GetColorSets().GetSet(frame_idx), {});
 
-  BrightPushConst bright_pc{.threshold = settings_.bloom_threshold,
-                            .soft_threshold = settings_.bloom_soft_threshold,
-                            .intensity = settings_.bloom_intensity};
+  BrightPC bright_pc{.threshold = settings_.bloom_threshold,
+                     .soft_threshold = settings_.bloom_soft_threshold,
+                     .intensity = settings_.bloom_intensity};
 
   cmd_buff.pushConstants(pipelines_.bright_.GetLayout(),
                          vk::ShaderStageFlagBits::eFragment, 0,
@@ -870,7 +870,7 @@ void Renderer::RecordBloom(vk::CommandBuffer cmd_buff, const uint frame_idx,
       vk::PipelineBindPoint::eGraphics, pipelines_.blur_bright_.GetLayout(), 0,
       desc_pool_.GetBrightColorSets().GetSet(frame_idx), {});
 
-  auto& blur_pc = resrc_.GetBloomBlurPC();
+  auto& blur_pc = resrc_.GetBlurBloomPC();
   blur_pc.flags.x = 0;  // horizontal
   cmd_buff.pushConstants(pipelines_.blur_bright_.GetLayout(),
                          vk::ShaderStageFlagBits::eFragment, 0, sizeof(blur_pc),
@@ -914,7 +914,7 @@ void Renderer::RecordDoF(vk::CommandBuffer cmd_buff, const uint frame_idx,
       vk::PipelineBindPoint::eGraphics, pipelines_.coc_.GetLayout(), 0,
       desc_pool_.GetDepthSets().GetSet(frame_idx), {});
 
-  CocPushConst coc_pc{};
+  CocPC coc_pc{};
   coc_pc.focus_dist = settings_.dof_focus_distance;
   coc_pc.focus_range = settings_.dof_focus_range;
   coc_pc.near_int = settings_.dof_near_int;
@@ -954,7 +954,7 @@ void Renderer::RecordDoF(vk::CommandBuffer cmd_buff, const uint frame_idx,
                               pipelines_.dof_.GetLayout(), 2,
                               desc_pool_.GetDofSet().GetSet(), {});
 
-  DofPushConst dof_pc{};
+  DofPC dof_pc{};
   dof_pc.blur_radius = settings_.dof_blur_radius;
   dof_pc.coc_threshold = settings_.dof_coc_threshold;
   dof_pc.coc_falloff = settings_.dof_coc_falloff;
@@ -974,7 +974,7 @@ void Renderer::RecordSwap(vk::CommandBuffer cmd_buff, uint image_idx,
   auto swap_extent = swapchain_.GetProps().extent;
   auto [viewport, scissor] = CalcViewportScissor(swap_extent, camera);
 
-  LoadPushConst load_data{};
+  LoadPC load_data{};
   if (is_loading) {
     glm::ivec2 size = window_.GetSize();
     load_data.res = {size.x, size.y};

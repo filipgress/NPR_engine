@@ -22,7 +22,7 @@ layout(set = 0, binding = 1) buffer HeadPointers {
   uint heads[];
 };
 
-layout(push_constant) uniform PushConst {
+layout(push_constant) uniform ABuffResPC {
   uint width;
   uint sorted_nodes;
 };

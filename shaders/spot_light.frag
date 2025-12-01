@@ -20,7 +20,7 @@ layout(set = 2, binding = 0) uniform SpotLightUnif {
   vec4 params; // x = angle_scale, y = angle_offset, zw = unused
 } light;
 
-layout(push_constant) uniform PushConst {
+layout(push_constant) uniform LightPC {
   mat4 model; // unused
   float diff_int;
   float spec_int;

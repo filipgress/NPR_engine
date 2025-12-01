@@ -8,7 +8,7 @@ layout(set = 0, binding = 0) uniform CameraUnif {
   mat4 proj_view;
 };
 
-layout(push_constant) uniform LightPushConst {
+layout(push_constant) uniform LightPC {
   mat4 model;
 };
 

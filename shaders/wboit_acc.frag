@@ -45,7 +45,7 @@ layout(set = 3, binding = 0) uniform MaterialUnif {
   uint flags;
 } material;
 
-layout(push_constant) uniform PushConst {
+layout(push_constant) uniform WBoitPC {
   float alpha_multiplier;
   float alpha_power;
   float depth_factor;

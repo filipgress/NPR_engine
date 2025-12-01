@@ -61,10 +61,11 @@ layout(set = 4, binding = 0) uniform MaterialUnif {
   uint flags;
 } material;
 
-layout(push_constant) uniform PushConst {
+layout(push_constant) uniform ABuffFillPC {
   uint width;
   uint max_nodes;
   float alpha_cutoff;
+
   float diff_int;
   float spec_int;
   uint is_pbr; // 0 = blinn-phong, 1 = pbr

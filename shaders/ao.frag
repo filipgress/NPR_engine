@@ -20,7 +20,7 @@ layout(set = 2, binding = 0) uniform ssao_kernel {
 };
 layout(set = 2, binding = 1) uniform sampler2D noise_tex;
 
-layout(push_constant) uniform PushConst {
+layout(push_constant) uniform SSAOPC {
   float radius;
   float bias;
 };

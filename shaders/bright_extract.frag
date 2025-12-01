@@ -5,7 +5,7 @@ layout(location = 0) out vec4 out_bright;
 
 layout(set = 0, binding = 0) uniform sampler2D color_tex;
 
-layout(push_constant) uniform PushConst {
+layout(push_constant) uniform BrightPC {
   float threshold;
   float soft_threshold;
   float intensity;

@@ -17,18 +17,23 @@ constexpr uint32_t kMaxPointLights = 4;
 constexpr uint32_t kMaxSpotLights = 4;
 
 constexpr uint32_t kABuffMaxSortedNodes = 16;
-
 constexpr uint32_t kAONoiseDim = 4;
+constexpr uint32_t kWhiteNoiseDim = 64;
+
 constexpr uint32_t kAOKernelSize = 64;
-constexpr uint32_t kMaxPoissonSize = 64;
+constexpr uint32_t kMaxPoisSize = 128;
+constexpr uint32_t kMaxGausRadius = 16;
 
-constexpr uint32_t kMaxGaussianRadius = 16;
+using SSAOKernel = std::array<glm::vec4, kAOKernelSize>;
 
-using AOKernel = std::array<glm::vec4, kAOKernelSize>;
+struct PoisKernelUnif {
+  glm::uvec4 count;                 // x = count, yzw = unused
+  glm::vec4 samples[kMaxPoisSize];  // xy = offset, zw = unused
+};
 
-struct PoissonDisk {
-  glm::uvec4 count;                    // x = count, yzw = unused
-  glm::vec4 samples[kMaxPoissonSize];  // xy = offset, zw = unused
+struct GausKernelPC {
+  glm::ivec4 flags;                   // x = dir, y = radius, zw = unused
+  float weights[kMaxGausRadius + 1];  // weights[0] to weights[radius]
 };
 
 enum MaterialFlags : uint32_t {
@@ -93,19 +98,19 @@ struct ABuffNode {
   uint32_t _padding[2];
 };
 
-struct AOPushConst {
+struct SSAOPC {
   float radius;
   float bias;
 };
 
-struct LightPushConst {
+struct LightPC {
   glm::mat4 model;
   float diff_int;
   float spec_int;
   uint32_t is_pbr;  // 0 = blinn-phong, 1 = pbr
 };
 
-struct ABuffFillPushConst {
+struct ABuffFillPC {
   uint32_t width;
   uint32_t max_nodes;
   float alpha_cutoff;
@@ -115,12 +120,12 @@ struct ABuffFillPushConst {
   uint32_t is_pbr;  // 0 = blinn-phong, 1 = pbr
 };
 
-struct ABuffResPushConst {
+struct ABuffResPC {
   uint32_t width;
   uint32_t sorted_nodes;
 };
 
-struct WBoitPushConst {
+struct WBoitPC {
   float alpha_multiplier{10.f};
   float alpha_power{3.0};
   float depth_factor{0.9};
@@ -134,18 +139,13 @@ struct WBoitPushConst {
   uint32_t is_pbr;  // 0 = blinn-phong, 1 = pbr
 };
 
-struct BrightPushConst {
+struct BrightPC {
   float threshold;
   float soft_threshold;
   float intensity;
 };
 
-struct BlurPushConst {
-  glm::ivec4 flags;                       // x = dir, y = radius, zw = unused
-  float weights[kMaxGaussianRadius + 1];  // weights[0] to weights[radius]
-};
-
-struct CocPushConst {
+struct CocPC {
   float focus_dist;
   float focus_range;
 
@@ -161,14 +161,14 @@ struct CocPushConst {
   uint32_t is_persp;  // 1 = persp, 0 = ortho
 };
 
-struct DofPushConst {
+struct DofPC {
   float blur_radius;
   float coc_threshold;
   float coc_falloff;
   uint32_t debug_mode;
 };
 
-struct LoadPushConst {
+struct LoadPC {
   glm::uvec2 res{0};
   alignas(16) glm::vec3 t{0.0f};
   bool is_loading{false};
@@ -197,13 +197,16 @@ struct FrameProps {
   const vk::Format ao_noise_format = vk::Format::eR16G16Sfloat;
   const vk::Format ao_format = vk::Format::eR16Unorm;
 
-  // dof
-  const vk::Format blue_noise_format = vk::Format::eR8G8B8A8Unorm;
+  // bloom
   const vk::Format coc_format = vk::Format::eR16Sfloat;
 
   // wboit layout
   const vk::Format acc_color_format = vk::Format::eR16G16B16A16Sfloat;
   const vk::Format acc_weight_format = vk::Format::eR16Sfloat;
+
+  // noise textures
+  const vk::Format white_noise_format = vk::Format::eR8Unorm;
+  const vk::Format blue_noise_format = vk::Format::eR8G8B8A8Unorm;
 };
 
 struct FrameResources {
@@ -273,46 +276,53 @@ class Resources : public npr_core::NonCopyable {
 
   uint GetFrameCount() const { return frame_count_; }
   const FrameProps& GetProps() const { return frame_props_; }
+  const auto& GetResrc() const { return frame_resrc_; }
 
-  const LightMesh& GetSphereMesh() const { return *sphere_mesh_; }
-  const LightMesh& GetConeMesh() const { return *cone_mesh_; }
+  const auto& GetSSAOKernel() const { return *ssao_kernel_; }
+  const auto& GetPoisKernel32() const { return *pois_kernel_32_; }
+  const auto& GetPoisKernel64() const { return *pois_kernel_64_; }
+  const auto& GetPoisKernel128() const { return *pois_kernel_128_; }
 
-  BlurPushConst& GetSSAOBlurPC() { return ssao_blur_; }
-  BlurPushConst& GetBloomBlurPC() { return bloom_blur_; }
+  GausKernelPC& GetBlurSSAOPC() { return blur_ssao_pc_; }
+  GausKernelPC& GetBlurBloomPC() { return blur_bloom_pc_; }
 
-  const Texture& GetDefaultColorTex() const { return *default_color_tex_; }
+  const Texture& GetDefColorTex() const { return *default_color_tex_; }
+  const Texture& GetWhiteNoiseTex() const { return *white_noise_tex_; }
   const Texture& GetAONoiseTex() const { return *ao_noise_tex_; }
+
   const Texture& GetBlueNoiseTex64() const { return *blue_noise_tex_64_; }
   const Texture& GetBlueNoiseTex128() const { return *blue_noise_tex_128_; }
   const Texture& GetBlueNoiseTex256() const { return *blue_noise_tex_256_; }
 
-  const UniformBuffer<AOKernel>& GetSSAOKernel() const { return *ssao_kernel_; }
-  const UniformBuffer<PoissonDisk>& GetPoissonKernel32() const {
-    return *poisson_kernel_32_;
-  }
-  const UniformBuffer<PoissonDisk>& GetPoissonKernel64() const {
-    return *poisson_kernel_64_;
-  }
+  const Texture& GetBlueNoiseTex64_1() const { return *blue_noise_tex_64_1; }
+  const Texture& GetBlueNoiseTex64_2() const { return *blue_noise_tex_64_2; }
+  const Texture& GetBlueNoiseTex64_3() const { return *blue_noise_tex_64_3; }
 
-  const std::vector<FrameResources>& GetResrc() const { return frame_resrc_; }
+  const LightMesh& GetSphereMesh() const { return *sphere_mesh_; }
+  const LightMesh& GetConeMesh() const { return *cone_mesh_; }
 
  private:
   void CreateImages();
   void CreateBuffers();
   void CreateABuffers();
 
-  void CreateAOKernel();
-  BlurPushConst CreateGaussianKernel(uint32_t radius);
-  void CreatePoissonKernels();
-  PoissonDisk GeneratePoissonDisk(uint32_t sample_count, uint32_t max_attempts);
+  void CreateSSAOKernel();
+  void CreatePoisKernels();
 
-  void CreateAONoiseTex(vk::CommandBuffer cmd_buff);
   void CreateDefaultColorTex(vk::CommandBuffer cmd_buff);
-  void LoadBlueNoiseTex(vk::CommandBuffer cmd_buff, const std::string& filepath,
-                        std::unique_ptr<Texture>& out_texture);
+  void CreateWhiteNoiseTex(vk::CommandBuffer cmd_buff);
+  void CreateAONoiseTex(vk::CommandBuffer cmd_buff);
+  void LoadBlueTextures(vk::CommandBuffer cmd_buff);
 
   void CreateSphereMesh(vk::CommandBuffer cmd_buff);
   void CreateConeMesh(vk::CommandBuffer cmd_buff);
+
+  // helpers
+  GausKernelPC GenGausKernel(uint32_t radius);
+  PoisKernelUnif GenPoisKernel(uint32_t sample_count, uint32_t max_attempts);
+
+  void LoadTex(vk::CommandBuffer cmd_buff, const std::string& filepath,
+               std::unique_ptr<Texture>& out_texture, const std::string& name);
 
   vk::SampleCountFlagBits GetMaxSamples();
 
@@ -323,21 +333,26 @@ class Resources : public npr_core::NonCopyable {
   std::vector<FrameResources> frame_resrc_;
   uint frame_count_;
 
-  std::unique_ptr<UniformBuffer<AOKernel>> ssao_kernel_;
-  std::unique_ptr<UniformBuffer<PoissonDisk>> poisson_kernel_32_;
-  std::unique_ptr<UniformBuffer<PoissonDisk>> poisson_kernel_64_;
+  std::unique_ptr<UniformBuffer<SSAOKernel>> ssao_kernel_;
+  std::unique_ptr<UniformBuffer<PoisKernelUnif>> pois_kernel_32_;
+  std::unique_ptr<UniformBuffer<PoisKernelUnif>> pois_kernel_64_;
+  std::unique_ptr<UniformBuffer<PoisKernelUnif>> pois_kernel_128_;
+
+  GausKernelPC blur_ssao_pc_;
+  GausKernelPC blur_bloom_pc_;
 
   std::unique_ptr<Texture> default_color_tex_;
+  std::unique_ptr<Texture> white_noise_tex_;
   std::unique_ptr<Texture> ao_noise_tex_;
 
   std::unique_ptr<Texture> blue_noise_tex_64_;
   std::unique_ptr<Texture> blue_noise_tex_128_;
   std::unique_ptr<Texture> blue_noise_tex_256_;
 
-  BlurPushConst ssao_blur_;
-  BlurPushConst bloom_blur_;
+  std::unique_ptr<Texture> blue_noise_tex_64_1;
+  std::unique_ptr<Texture> blue_noise_tex_64_2;
+  std::unique_ptr<Texture> blue_noise_tex_64_3;
 
-  // primitive meshes / light volumes
   std::unique_ptr<LightMesh> cone_mesh_;
   std::unique_ptr<LightMesh> sphere_mesh_;
 };

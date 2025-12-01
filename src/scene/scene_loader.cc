@@ -76,7 +76,7 @@ bool SceneLoader::LoadScene(const Renderer& renderer, Scene& scene,
         LoadEntity(scene, flecs::entity::null(), model, node_idx, cache);
       }
 
-      scene.resrc_->UpdateTexDesc(renderer.GetResrc().GetDefaultColorTex());
+      scene.resrc_->UpdateTexDesc(renderer.GetResrc().GetDefColorTex());
       scene.resrc_->cmd_buff.end();
     }
 

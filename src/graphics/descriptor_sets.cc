@@ -551,7 +551,7 @@ void DofSet::Update(const Resources& resrc) const {
   blue_noise_info.imageView = blue_noise.GetImageView();
   blue_noise_info.sampler = blue_noise.GetSampler();
 
-  const auto& poisson = resrc.GetPoissonKernel64();
+  const auto& poisson = resrc.GetPoisKernel128();
   vk::DescriptorBufferInfo poisson_info{};
   poisson_info.buffer = poisson.GetBuffer();
   poisson_info.offset = 0;
