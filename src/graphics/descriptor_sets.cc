@@ -358,7 +358,7 @@ void AOSet::Update(const Resources& resrc) const {
   kernel_info.range = VK_WHOLE_SIZE;
 
   // ao_noise_tex
-  const auto& noise_tex = resrc.GetAONoiseTex();
+  const auto& noise_tex = resrc.GetSSAONoiseTex();
   vk::DescriptorImageInfo noise_info{};
   noise_info.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
   noise_info.imageView = noise_tex.GetImageView();

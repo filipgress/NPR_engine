@@ -17,14 +17,14 @@ constexpr uint32_t kMaxPointLights = 4;
 constexpr uint32_t kMaxSpotLights = 4;
 
 constexpr uint32_t kABuffMaxSortedNodes = 16;
-constexpr uint32_t kAONoiseDim = 4;
+constexpr uint32_t kSSAONoiseDim = 4;
 constexpr uint32_t kWhiteNoiseDim = 64;
 
-constexpr uint32_t kAOKernelSize = 64;
+constexpr uint32_t kSSAOKernelSize = 64;
 constexpr uint32_t kMaxPoisSize = 128;
 constexpr uint32_t kMaxGausRadius = 16;
 
-using SSAOKernel = std::array<glm::vec4, kAOKernelSize>;
+using SSAOKernel = std::array<glm::vec4, kSSAOKernelSize>;
 
 struct PoisKernelUnif {
   glm::uvec4 count;                 // x = count, yzw = unused
@@ -193,9 +193,9 @@ struct FrameProps {
   const vk::Format normal_format = vk::Format::eR16G16B16A16Sfloat;
   const vk::Format coverage_format = vk::Format::eR16Sfloat;
 
-  // ao
-  const vk::Format ao_noise_format = vk::Format::eR16G16Sfloat;
-  const vk::Format ao_format = vk::Format::eR16Unorm;
+  // ssao
+  const vk::Format ssao_noise_format = vk::Format::eR16G16Sfloat;
+  const vk::Format ssao_format = vk::Format::eR16Unorm;
 
   // bloom
   const vk::Format coc_format = vk::Format::eR16Sfloat;
@@ -229,10 +229,10 @@ struct FrameResources {
 
   std::unique_ptr<Texture> ds_ms;  // depth-stencil
 
-  // ao
-  std::unique_ptr<Image> ao_ms;
-  std::unique_ptr<Texture> ao_res;
-  std::unique_ptr<Texture> ao_temp;  // for separable blur
+  // ssao
+  std::unique_ptr<Image> ssao_ms;
+  std::unique_ptr<Texture> ssao_res;
+  std::unique_ptr<Texture> ssao_temp;  // for separable blur
 
   // abuff
   std::unique_ptr<StorageBuffer<uint32_t>> abuff_heads;
@@ -288,7 +288,7 @@ class Resources : public npr_core::NonCopyable {
 
   const Texture& GetDefColorTex() const { return *default_color_tex_; }
   const Texture& GetWhiteNoiseTex() const { return *white_noise_tex_; }
-  const Texture& GetAONoiseTex() const { return *ao_noise_tex_; }
+  const Texture& GetSSAONoiseTex() const { return *ssao_noise_tex_; }
 
   const Texture& GetBlueNoiseTex64() const { return *blue_noise_tex_64_; }
   const Texture& GetBlueNoiseTex128() const { return *blue_noise_tex_128_; }
@@ -311,7 +311,7 @@ class Resources : public npr_core::NonCopyable {
 
   void CreateDefaultColorTex(vk::CommandBuffer cmd_buff);
   void CreateWhiteNoiseTex(vk::CommandBuffer cmd_buff);
-  void CreateAONoiseTex(vk::CommandBuffer cmd_buff);
+  void CreateSSAONoiseTex(vk::CommandBuffer cmd_buff);
   void LoadBlueTextures(vk::CommandBuffer cmd_buff);
 
   void CreateSphereMesh(vk::CommandBuffer cmd_buff);
@@ -343,7 +343,7 @@ class Resources : public npr_core::NonCopyable {
 
   std::unique_ptr<Texture> default_color_tex_;
   std::unique_ptr<Texture> white_noise_tex_;
-  std::unique_ptr<Texture> ao_noise_tex_;
+  std::unique_ptr<Texture> ssao_noise_tex_;
 
   std::unique_ptr<Texture> blue_noise_tex_64_;
   std::unique_ptr<Texture> blue_noise_tex_128_;

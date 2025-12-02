@@ -97,7 +97,7 @@ void GuiManager::NewFrame(npr_graphics::RenderSettings& settings,
   ImGui::NewFrame();
 
   FpsOverlay(timer.GetAvgFPS());
-  if (!camera.IsOrbit()) return;
+  if (!scene.IsValid() || !camera.IsOrbit()) return;
 
   if (show_browser_) BrowserWindow();
 

@@ -35,7 +35,7 @@ Resources::Resources(const Context& ctx, const CommandPool& cmd_pool,
   {
     CreateDefaultColorTex(cmd_buff);
     CreateWhiteNoiseTex(cmd_buff);
-    CreateAONoiseTex(cmd_buff);
+    CreateSSAONoiseTex(cmd_buff);
     LoadBlueTextures(cmd_buff);
 
     CreateSphereMesh(cmd_buff);
@@ -100,27 +100,27 @@ void Resources::CreateImages() {
         vk::ImageAspectFlagBits::eDepth, frame_props_.samples,
         "depth_stencil_ms_" + std::to_string(idx));
 
-    // ao pass
-    resrc.ao_ms = std::make_unique<Image>(
-        ctx_, frame_props_.ao_format, frame_props_.extent,
+    // ssao pass
+    resrc.ssao_ms = std::make_unique<Image>(
+        ctx_, frame_props_.ssao_format, frame_props_.extent,
         vk::ImageUsageFlagBits::eColorAttachment |
             vk::ImageUsageFlagBits::eTransientAttachment,
         vk::ImageAspectFlagBits::eColor, vk::SharingMode::eExclusive,
-        frame_props_.samples, 1, "ao_ms_" + std::to_string(idx));
+        frame_props_.samples, 1, "ssao_ms_" + std::to_string(idx));
 
-    resrc.ao_res = std::make_unique<Texture>(
-        ctx_, frame_props_.ao_format, frame_props_.extent,
+    resrc.ssao_res = std::make_unique<Texture>(
+        ctx_, frame_props_.ssao_format, frame_props_.extent,
         vk::ImageUsageFlagBits::eColorAttachment |
             vk::ImageUsageFlagBits::eSampled,
         vk::ImageAspectFlagBits::eColor, vk::SampleCountFlagBits::e1,
-        "ao_res_" + std::to_string(idx));
+        "ssao_res_" + std::to_string(idx));
 
-    resrc.ao_temp = std::make_unique<Texture>(
-        ctx_, frame_props_.ao_format, frame_props_.extent,
+    resrc.ssao_temp = std::make_unique<Texture>(
+        ctx_, frame_props_.ssao_format, frame_props_.extent,
         vk::ImageUsageFlagBits::eColorAttachment |
             vk::ImageUsageFlagBits::eSampled,
         vk::ImageAspectFlagBits::eColor, vk::SampleCountFlagBits::e1,
-        "ao_temp_" + std::to_string(idx));
+        "ssao_temp_" + std::to_string(idx));
 
     // wboit pass
     resrc.acc_color_ms = std::make_unique<Image>(
@@ -253,13 +253,13 @@ void Resources::CreateSSAOKernel() {
   std::mt19937 rng(std::random_device{}());
   std::uniform_real_distribution<float> rand01(0.0f, 1.0f);
 
-  for (uint32_t i = 0; i < kAOKernelSize; ++i) {
+  for (uint32_t i = 0; i < kSSAOKernelSize; ++i) {
     glm::vec4 sample(rand01(rng) * 2.0f - 1.0f, rand01(rng) * 2.0f - 1.0f,
                      rand01(rng), 0.0f);
     sample = glm::normalize(sample);
     sample *= rand01(rng);
 
-    float scale = float(i) / float(kAOKernelSize - 1);
+    float scale = float(i) / float(kSSAOKernelSize - 1);
     scale = glm::mix(0.1f, 1.0f, scale * scale);
     sample *= scale;
 
@@ -267,7 +267,7 @@ void Resources::CreateSSAOKernel() {
   }
 
   ssao_kernel_ =
-      std::make_unique<UniformBuffer<SSAOKernel>>(ctx_, "ao_kernel_unif");
+      std::make_unique<UniformBuffer<SSAOKernel>>(ctx_, "ssao_kernel_unif");
   ssao_kernel_->Write(kernel);
 }
 
@@ -412,8 +412,8 @@ void Resources::CreateWhiteNoiseTex(vk::CommandBuffer cmd_buff) {
                           sizeof(uint8_t) * noise.size());
 }
 
-void Resources::CreateAONoiseTex(vk::CommandBuffer cmd_buff) {
-  std::vector<glm::vec2> noise(kAONoiseDim * kAONoiseDim);
+void Resources::CreateSSAONoiseTex(vk::CommandBuffer cmd_buff) {
+  std::vector<glm::vec2> noise(kSSAONoiseDim * kSSAONoiseDim);
 
   std::mt19937 rng(std::random_device{}());
   std::uniform_real_distribution<float> dist(-1.0f, 1.0f);
@@ -424,15 +424,15 @@ void Resources::CreateAONoiseTex(vk::CommandBuffer cmd_buff) {
   props.address_mode_U = vk::SamplerAddressMode::eRepeat;
   props.address_mode_V = vk::SamplerAddressMode::eRepeat;
 
-  ao_noise_tex_ = std::make_unique<Texture>(
-      ctx_, frame_props_.ao_noise_format,
-      vk::Extent2D{kAONoiseDim, kAONoiseDim},
+  ssao_noise_tex_ = std::make_unique<Texture>(
+      ctx_, frame_props_.ssao_noise_format,
+      vk::Extent2D{kSSAONoiseDim, kSSAONoiseDim},
       vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
       vk::ImageAspectFlagBits::eColor, vk::SampleCountFlagBits::e1,
-      "ao_noise_tex", props);
+      "ssao_noise_tex", props);
 
-  ao_noise_tex_->Write(cmd_buff, noise.data(),
-                       sizeof(glm::vec2) * noise.size());
+  ssao_noise_tex_->Write(cmd_buff, noise.data(),
+                         sizeof(glm::vec2) * noise.size());
 }
 
 void Resources::LoadBlueTextures(vk::CommandBuffer cmd_buff) {

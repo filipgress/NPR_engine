@@ -58,8 +58,8 @@ class Renderer : public npr_core::NonCopyable {
                     const npr_scene::Scene& scene,
                     const npr_scene::Frustum& frustum) const;
 
-  void RecordAO(vk::CommandBuffer cmd_buff, const uint frame_idx,
-                const vk::Extent2D& resrc_extent);
+  void RecordSSAO(vk::CommandBuffer cmd_buff, const uint frame_idx,
+                  const vk::Extent2D& resrc_extent);
   void RecordGlobLight(vk::CommandBuffer cmd_buff, const uint frame_idx,
                        const npr_graphics::FrameResources& frame_resrc,
                        const vk::Extent2D& resrc_extent,

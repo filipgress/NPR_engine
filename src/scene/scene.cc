@@ -2,7 +2,7 @@
 
 namespace npr_scene {
 
-bool Scene::IsLoading() const {
+bool Scene::IsReady() const {
   return handle_.valid() &&
          handle_.wait_for(std::chrono::seconds(0)) != std::future_status::ready;
 }

@@ -11,10 +11,10 @@ class PassManager : public npr_core::NonCopyable {
  public:
   PassManager(const Context& ctx, const Swapchain& swapchain,
               const Resources& resrc)
-      : gbuff_{ctx, resrc},
-        ao_{ctx, resrc},
-        ao_blur_h_{ctx, resrc},
-        ao_blur_v_{ctx, resrc},
+      : gpass_{ctx, resrc},
+        ssao_{ctx, resrc},
+        ao_temp_{ctx, resrc},
+        ao_res_{ctx, resrc},
         glob_light_{ctx, resrc},
         local_light_{ctx, resrc},
         abuff_{ctx, resrc},
@@ -28,11 +28,11 @@ class PassManager : public npr_core::NonCopyable {
   ~PassManager() = default;
 
   void RecreateFramebuffers() {
-    gbuff_.CreateFramebuffers();
+    gpass_.CreateFramebuffers();
 
-    ao_.CreateFramebuffers();
-    ao_blur_h_.CreateFramebuffers();
-    ao_blur_v_.CreateFramebuffers();
+    ssao_.CreateFramebuffers();
+    ao_temp_.CreateFramebuffers();
+    ao_res_.CreateFramebuffers();
 
     glob_light_.CreateFramebuffers();
     local_light_.CreateFramebuffers();
@@ -50,11 +50,11 @@ class PassManager : public npr_core::NonCopyable {
   }
 
  private:
-  GBuffPass gbuff_;
+  GPass gpass_;
 
-  AOPass ao_;
-  AOBlurHPass ao_blur_h_;
-  AOBlurVPass ao_blur_v_;
+  SSAOPass ssao_;
+  AOTempPass ao_temp_;
+  AOResPass ao_res_;
 
   GlobLightPass glob_light_;
   LocalLightPass local_light_;

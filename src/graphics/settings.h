@@ -35,12 +35,12 @@ struct RenderSettings {
   float wboit_weight_min{1e-2};
   float wboit_weight_max{3e3};
 
-  bool enable_bloom{true};
+  bool enable_bloom{false};
   float bloom_threshold{1.0f};
   float bloom_soft_threshold{0.5f};
   float bloom_intensity{1.0f};
 
-  bool enable_dof{true};
+  bool enable_dof{false};
   uint dof_debug_mode{0};
   float dof_focus_distance{10.0f};
   float dof_focus_range{1.8f};

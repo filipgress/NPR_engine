@@ -57,10 +57,25 @@ class RenderPass : public BasePass {
   const Resources& resrc_;
 };
 
-class GBuffPass : public RenderPass {
+class SingleColorPass : public RenderPass {
  public:
-  GBuffPass(const Context& ctx, const Resources& resrc)
-      : RenderPass{ctx, resrc} {
+  SingleColorPass(const Context& ctx, const Resources& resrc, vk::Format format)
+      : RenderPass(ctx, resrc), format_{format} {}
+
+ private:
+  void SetClearValues() override;
+  std::vector<vk::AttachmentDescription> GetAttachments() const override;
+  std::vector<vk::SubpassDependency> GetDependencies() const override;
+  std::vector<vk::SubpassDescription> GetSubpasses() override;
+
+ protected:
+  vk::Format format_;
+  vk::AttachmentReference color_ref_{};
+};
+
+class GPass : public RenderPass {
+ public:
+  GPass(const Context& ctx, const Resources& resrc) : RenderPass{ctx, resrc} {
     Init();
   }
 
@@ -79,14 +94,15 @@ class GBuffPass : public RenderPass {
   vk::AttachmentReference depth_ref_{};
 };
 
-class AOPass : public RenderPass {
+class SSAOPass : public RenderPass {
  public:
-  AOPass(const Context& ctx, const Resources& resrc) : RenderPass{ctx, resrc} {
+  SSAOPass(const Context& ctx, const Resources& resrc)
+      : RenderPass{ctx, resrc} {
     Init();
   }
 
  private:
-  const std::string GetDbgName() const override { return "ao_pass"; }
+  const std::string GetDbgName() const override { return "ssao_pass"; }
   void SetClearValues() override;
 
   std::vector<vk::AttachmentDescription> GetAttachments() const override;
@@ -95,112 +111,33 @@ class AOPass : public RenderPass {
   std::vector<vk::ImageView> GetAttachmentViews(int frame_idx) const override;
 
  private:
-  vk::AttachmentReference ao_ms_ref_{};
-  vk::AttachmentReference ao_res_ref_{};
+  vk::AttachmentReference ssao_ms_ref_{};
+  vk::AttachmentReference ssao_res_ref_{};
   vk::AttachmentReference depth_ref_{};
 };
 
-class SingleColorPass : public RenderPass {
+class AOTempPass : public SingleColorPass {
  public:
-  SingleColorPass(const Context& ctx, const Resources& resrc, vk::Format format)
-      : RenderPass(ctx, resrc), format_{format} {}
-
- private:
-  void SetClearValues() override;
-  std::vector<vk::AttachmentDescription> GetAttachments() const override;
-  std::vector<vk::SubpassDependency> GetDependencies() const override;
-  std::vector<vk::SubpassDescription> GetSubpasses() override;
-
- protected:
-  vk::Format format_;
-  vk::AttachmentReference color_ref_{};
-};
-
-class AOBlurHPass : public SingleColorPass {  // ao_temp
- public:
-  AOBlurHPass(const Context& ctx, const Resources& resrc)
-      : SingleColorPass(ctx, resrc, resrc.GetProps().ao_format) {
+  AOTempPass(const Context& ctx, const Resources& resrc)
+      : SingleColorPass(ctx, resrc, resrc.GetProps().ssao_format) {
     Init();
   }
 
  private:
   std::vector<vk::ImageView> GetAttachmentViews(int frame_idx) const override;
-  const std::string GetDbgName() const override { return "ao_blur_h_pass"; }
+  const std::string GetDbgName() const override { return "ao_temp_pass"; }
 };
 
-class AOBlurVPass : public SingleColorPass {  // ao_res
+class AOResPass : public SingleColorPass {
  public:
-  AOBlurVPass(const Context& ctx, const Resources& resrc)
-      : SingleColorPass(ctx, resrc, resrc.GetProps().ao_format) {
+  AOResPass(const Context& ctx, const Resources& resrc)
+      : SingleColorPass(ctx, resrc, resrc.GetProps().ssao_format) {
     Init();
   }
 
  private:
   std::vector<vk::ImageView> GetAttachmentViews(int frame_idx) const override;
-  const std::string GetDbgName() const override { return "ao_blur_v_pass"; }
-};
-
-class BrightPass : public SingleColorPass {  // bright_color
- public:
-  BrightPass(const Context& ctx, const Resources& resrc)
-      : SingleColorPass(ctx, resrc, resrc.GetProps().color_format) {
-    Init();
-  }
-
- private:
-  std::vector<vk::ImageView> GetAttachmentViews(int frame_idx) const override;
-  const std::string GetDbgName() const override {
-    return "extract_bright_pass";
-  }
-};
-
-class BlurBrightPass : public SingleColorPass {  // bright_temp
- public:
-  BlurBrightPass(const Context& ctx, const Resources& resrc)
-      : SingleColorPass(ctx, resrc, resrc.GetProps().color_format) {
-    Init();
-  }
-
- private:
-  std::vector<vk::ImageView> GetAttachmentViews(int frame_idx) const override;
-  const std::string GetDbgName() const override { return "blur_h_pass"; }
-};
-
-class CocPass : public SingleColorPass {  // coc_map
- public:
-  CocPass(const Context& ctx, const Resources& resrc)
-      : SingleColorPass(ctx, resrc, resrc.GetProps().coc_format) {
-    Init();
-  }
-
- private:
-  std::vector<vk::ImageView> GetAttachmentViews(int frame_idx) const override;
-  const std::string GetDbgName() const override { return "coc_pass"; }
-};
-
-class DofPass : public SingleColorPass {  // present_color
- public:
-  DofPass(const Context& ctx, const Resources& resrc)
-      : SingleColorPass(ctx, resrc, resrc.GetProps().color_format) {
-    Init();
-  }
-
- private:
-  std::vector<vk::ImageView> GetAttachmentViews(int frame_idx) const override;
-  const std::string GetDbgName() const override { return "dof_pass"; }
-};
-
-class PostPass : public SingleColorPass {  // color_res
- public:
-  PostPass(const Context& ctx, const Resources& resrc)
-      : SingleColorPass(ctx, resrc, resrc.GetProps().color_format) {
-    Init();
-  }
-
- private:
-  std::vector<vk::AttachmentDescription> GetAttachments() const override;
-  std::vector<vk::ImageView> GetAttachmentViews(int frame_idx) const override;
-  const std::string GetDbgName() const override { return "post_pass"; }
+  const std::string GetDbgName() const override { return "ao_res_pass"; }
 };
 
 class GlobLightPass : public RenderPass {
@@ -313,6 +250,69 @@ class SwapPass : public BasePass {
   const Swapchain& swapchain_;
 
   vk::AttachmentReference color_ref_{};
+};
+
+class BrightPass : public SingleColorPass {  // bright_color
+ public:
+  BrightPass(const Context& ctx, const Resources& resrc)
+      : SingleColorPass(ctx, resrc, resrc.GetProps().color_format) {
+    Init();
+  }
+
+ private:
+  std::vector<vk::ImageView> GetAttachmentViews(int frame_idx) const override;
+  const std::string GetDbgName() const override {
+    return "extract_bright_pass";
+  }
+};
+
+class BlurBrightPass : public SingleColorPass {  // bright_temp
+ public:
+  BlurBrightPass(const Context& ctx, const Resources& resrc)
+      : SingleColorPass(ctx, resrc, resrc.GetProps().color_format) {
+    Init();
+  }
+
+ private:
+  std::vector<vk::ImageView> GetAttachmentViews(int frame_idx) const override;
+  const std::string GetDbgName() const override { return "blur_h_pass"; }
+};
+
+class CocPass : public SingleColorPass {  // coc_map
+ public:
+  CocPass(const Context& ctx, const Resources& resrc)
+      : SingleColorPass(ctx, resrc, resrc.GetProps().coc_format) {
+    Init();
+  }
+
+ private:
+  std::vector<vk::ImageView> GetAttachmentViews(int frame_idx) const override;
+  const std::string GetDbgName() const override { return "coc_pass"; }
+};
+
+class DofPass : public SingleColorPass {  // present_color
+ public:
+  DofPass(const Context& ctx, const Resources& resrc)
+      : SingleColorPass(ctx, resrc, resrc.GetProps().color_format) {
+    Init();
+  }
+
+ private:
+  std::vector<vk::ImageView> GetAttachmentViews(int frame_idx) const override;
+  const std::string GetDbgName() const override { return "dof_pass"; }
+};
+
+class PostPass : public SingleColorPass {  // color_res
+ public:
+  PostPass(const Context& ctx, const Resources& resrc)
+      : SingleColorPass(ctx, resrc, resrc.GetProps().color_format) {
+    Init();
+  }
+
+ private:
+  std::vector<vk::AttachmentDescription> GetAttachments() const override;
+  std::vector<vk::ImageView> GetAttachmentViews(int frame_idx) const override;
+  const std::string GetDbgName() const override { return "post_pass"; }
 };
 
 }  // namespace npr_graphics

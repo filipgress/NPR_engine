@@ -26,9 +26,9 @@ void SceneLoader::LoadAsync(const npr_graphics::Renderer& renderer,
                  std::cref(renderer), std::ref(scene), filepath, scene_name);
 
   tasks.Add([&scene, &tasks, on_loaded]() {
-    if (scene.IsLoading()) return false;
-
+    if (scene.IsReady()) return false;
     scene.StopLoading();
+
     if (!scene.success_) return true;
 
     scene.Init(tasks, on_loaded);

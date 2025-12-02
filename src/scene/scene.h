@@ -32,14 +32,17 @@ class Scene : npr_core::NonCopyable {
     if (success_) world_.Update();
   }
 
-  bool IsLoading() const;
+  void Invalidate() { success_ = false; }
 
-  bool IsLoaded() const { return success_; }
+  bool IsLoading() const { return handle_.valid(); }
+  bool IsValid() const { return success_; }
   bool IsInit() const { return success_ && resrc_->IsInit(); }
 
  private:
   void Init(npr_core::TaskManager& tasks, std::function<void()> on_complete);
   void StopLoading();
+
+  bool IsReady() const;
 
  private:
   World world_;

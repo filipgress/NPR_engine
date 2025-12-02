@@ -45,7 +45,6 @@ void Renderer::SwapTargetResize() {
 
 void Renderer::Render(npr_core::FrameTimer& timer, Camera& camera, Scene& scene,
                       bool is_loading) {
-  if (!scene.IsLoaded() || !scene.IsInit()) return;
   auto device = ctx_.GetDevice();
 
   // wait for in flight fence
@@ -138,28 +137,35 @@ vk::CommandBuffer Renderer::Record(uint image_idx, const Camera& camera,
   cmd_buff.setScissor(0, scissor);
   cmd_buff.setViewport(0, viewport);
 
-  RecordGBuff(cmd_buff, frame_idx, frame_resrc, resrc_extent, camera, scene);
-  if (settings_.enable_ssao) {
-    RecordAO(cmd_buff, frame_idx, resrc_extent);
+  if (!scene.IsValid() || !scene.IsInit()) {
+    frame_resrc.color_res->Transition(cmd_buff, vk::ImageLayout::eUndefined,
+                                      vk::ImageLayout::eShaderReadOnlyOptimal,
+                                      0, 1);
   } else {
-    frame_resrc.ao_res->Transition(cmd_buff, vk::ImageLayout::eUndefined,
-                                   vk::ImageLayout::eShaderReadOnlyOptimal, 0,
-                                   1);
-  }
+    RecordGBuff(cmd_buff, frame_idx, frame_resrc, resrc_extent, camera, scene);
+    if (settings_.enable_ssao)
+      RecordSSAO(cmd_buff, frame_idx, resrc_extent);
+    else  // prepare ao_res for lighting pass
+      frame_resrc.ssao_res->Transition(cmd_buff, vk::ImageLayout::eUndefined,
+                                       vk::ImageLayout::eShaderReadOnlyOptimal,
+                                       0, 1);
 
-  RecordGlobLight(cmd_buff, frame_idx, frame_resrc, resrc_extent, cam_ubo,
+    RecordGlobLight(cmd_buff, frame_idx, frame_resrc, resrc_extent, cam_ubo,
+                    scene);
+    RecordLocalLight(cmd_buff, frame_idx, frame_resrc, resrc_extent, cam_ubo,
+                     camera, scene);
+
+    if (settings_.trans_mode == TransparencyMode::kABuff)
+      RecordABuff(cmd_buff, frame_idx, frame_resrc, resrc_extent, camera,
                   scene);
-  RecordLocalLight(cmd_buff, frame_idx, frame_resrc, resrc_extent, cam_ubo,
-                   camera, scene);
+    else if (settings_.trans_mode == TransparencyMode::kWBoit)
+      RecordWBoit(cmd_buff, frame_idx, frame_resrc, resrc_extent, camera,
+                  scene);
 
-  if (settings_.trans_mode == TransparencyMode::kABuff)
-    RecordABuff(cmd_buff, frame_idx, frame_resrc, resrc_extent, camera, scene);
-  else if (settings_.trans_mode == TransparencyMode::kWBoit)
-    RecordWBoit(cmd_buff, frame_idx, frame_resrc, resrc_extent, camera, scene);
-
-  if (settings_.enable_bloom) RecordBloom(cmd_buff, frame_idx, resrc_extent);
-  if (settings_.enable_dof)
-    RecordDoF(cmd_buff, frame_idx, resrc_extent, camera);
+    if (settings_.enable_bloom) RecordBloom(cmd_buff, frame_idx, resrc_extent);
+    if (settings_.enable_dof)
+      RecordDoF(cmd_buff, frame_idx, resrc_extent, camera);
+  }
 
   RecordSwap(cmd_buff, image_idx, frame_idx, camera, is_loading, dt);
 
@@ -171,7 +177,7 @@ void Renderer::RecordGBuff(vk::CommandBuffer cmd_buff, const uint frame_idx,
                            const npr_graphics::FrameResources& frame_resrc,
                            const vk::Extent2D& resrc_extent,
                            const Camera& camera, Scene& scene) {
-  cmd_buff.beginRenderPass(passes_.gbuff_.BeginInfo(frame_idx, resrc_extent),
+  cmd_buff.beginRenderPass(passes_.gpass_.BeginInfo(frame_idx, resrc_extent),
                            vk::SubpassContents::eInline);
 
   cmd_buff.bindPipeline(vk::PipelineBindPoint::eGraphics,
@@ -261,28 +267,28 @@ void Renderer::RecordOpaque(vk::CommandBuffer cmd_buff, const uint frame_idx,
   }
 }
 
-void Renderer::RecordAO(vk::CommandBuffer cmd_buff, const uint frame_idx,
-                        const vk::Extent2D& resrc_extent) {
-  cmd_buff.beginRenderPass(passes_.ao_.BeginInfo(frame_idx, resrc_extent),
+void Renderer::RecordSSAO(vk::CommandBuffer cmd_buff, const uint frame_idx,
+                          const vk::Extent2D& resrc_extent) {
+  cmd_buff.beginRenderPass(passes_.ssao_.BeginInfo(frame_idx, resrc_extent),
                            vk::SubpassContents::eInline);
 
   cmd_buff.bindPipeline(vk::PipelineBindPoint::eGraphics,
-                        pipelines_.ao_.GetPipeline());
+                        pipelines_.ssao_.GetPipeline());
 
   cmd_buff.bindDescriptorSets(  // camera
-      vk::PipelineBindPoint::eGraphics, pipelines_.ao_.GetLayout(), 0,
+      vk::PipelineBindPoint::eGraphics, pipelines_.ssao_.GetLayout(), 0,
       desc_pool_.GetCameraSets().GetSet(frame_idx), {});
 
   cmd_buff.bindDescriptorSets(  // gbuff
-      vk::PipelineBindPoint::eGraphics, pipelines_.ao_.GetLayout(), 1,
+      vk::PipelineBindPoint::eGraphics, pipelines_.ssao_.GetLayout(), 1,
       desc_pool_.GetGBuffSets().GetSet(frame_idx), {});
 
   cmd_buff.bindDescriptorSets(  // kernel + noise texture
-      vk::PipelineBindPoint::eGraphics, pipelines_.ao_.GetLayout(), 2,
+      vk::PipelineBindPoint::eGraphics, pipelines_.ssao_.GetLayout(), 2,
       desc_pool_.GetAOSet().GetSet(0), {});
 
   SSAOPC ao_pc = {settings_.ssao_radius, settings_.ssao_bias};
-  cmd_buff.pushConstants(pipelines_.ao_.GetLayout(),
+  cmd_buff.pushConstants(pipelines_.ssao_.GetLayout(),
                          vk::ShaderStageFlagBits::eFragment, 0, sizeof(ao_pc),
                          &ao_pc);
 
@@ -290,20 +296,19 @@ void Renderer::RecordAO(vk::CommandBuffer cmd_buff, const uint frame_idx,
   cmd_buff.endRenderPass();
 
   // horizontal blur pass
-  cmd_buff.beginRenderPass(
-      passes_.ao_blur_h_.BeginInfo(frame_idx, resrc_extent),
-      vk::SubpassContents::eInline);
+  cmd_buff.beginRenderPass(passes_.ao_temp_.BeginInfo(frame_idx, resrc_extent),
+                           vk::SubpassContents::eInline);
 
   cmd_buff.bindPipeline(vk::PipelineBindPoint::eGraphics,
-                        pipelines_.blur_ao_.GetPipeline());
+                        pipelines_.blur_ssao_.GetPipeline());
 
   cmd_buff.bindDescriptorSets(  // ao_res
-      vk::PipelineBindPoint::eGraphics, pipelines_.blur_ao_.GetLayout(), 0,
+      vk::PipelineBindPoint::eGraphics, pipelines_.blur_ssao_.GetLayout(), 0,
       desc_pool_.GetAOResSets().GetSet(frame_idx), {});
 
   auto& blur_pc = resrc_.GetBlurSSAOPC();
   blur_pc.flags.x = 0;  // horizontal
-  cmd_buff.pushConstants(pipelines_.blur_ao_.GetLayout(),
+  cmd_buff.pushConstants(pipelines_.blur_ssao_.GetLayout(),
                          vk::ShaderStageFlagBits::eFragment, 0, sizeof(blur_pc),
                          &blur_pc);
 
@@ -311,19 +316,18 @@ void Renderer::RecordAO(vk::CommandBuffer cmd_buff, const uint frame_idx,
   cmd_buff.endRenderPass();
 
   // vertical blur pass
-  cmd_buff.beginRenderPass(
-      passes_.ao_blur_v_.BeginInfo(frame_idx, resrc_extent),
-      vk::SubpassContents::eInline);
+  cmd_buff.beginRenderPass(passes_.ao_res_.BeginInfo(frame_idx, resrc_extent),
+                           vk::SubpassContents::eInline);
 
   cmd_buff.bindPipeline(vk::PipelineBindPoint::eGraphics,
-                        pipelines_.blur_ao_.GetPipeline());
+                        pipelines_.blur_ssao_.GetPipeline());
 
   cmd_buff.bindDescriptorSets(  // ao_temp
-      vk::PipelineBindPoint::eGraphics, pipelines_.blur_ao_.GetLayout(), 0,
+      vk::PipelineBindPoint::eGraphics, pipelines_.blur_ssao_.GetLayout(), 0,
       desc_pool_.GetAOTempSets().GetSet(frame_idx), {});
 
   blur_pc.flags.x = 1;  // vertical
-  cmd_buff.pushConstants(pipelines_.blur_ao_.GetLayout(),
+  cmd_buff.pushConstants(pipelines_.blur_ssao_.GetLayout(),
                          vk::ShaderStageFlagBits::eFragment, 0, sizeof(blur_pc),
                          &blur_pc);
 

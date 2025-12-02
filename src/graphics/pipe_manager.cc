@@ -6,30 +6,37 @@ PipeManager::PipeManager(const Context& ctx, const Resources& resrc,
                          const PassManager& passes,
                          const ShaderManager& shaders)
     : pipe_cache_{ctx},
-      gbuff_{ctx, pipe_cache_, passes.gbuff_, "gbuff_pipe"},
-      ao_{ctx, pipe_cache_, passes.ao_, "ao_pipe"},
-      blur_ao_{ctx, pipe_cache_, passes.ao_blur_h_, "ao_blur_pipe"},
+      gbuff_{ctx, pipe_cache_, passes.gpass_, "gbuff_pipe"},
+
+      ssao_{ctx, pipe_cache_, passes.ssao_, "ssao_pipe"},
+      blur_ssao_{ctx, pipe_cache_, passes.ao_temp_, "ssao_blur_pipe"},
+
       glob_light_{ctx, pipe_cache_, passes.glob_light_, "global_light_pipe"},
       local_light_{ctx, pipe_cache_, passes.local_light_, "local_light_pipe"},
       point_light_{ctx, pipe_cache_, passes.local_light_, "point_light_pipe"},
       spot_light_{ctx, pipe_cache_, passes.local_light_, "spot_light_pipe"},
+
       abuff_fill_{ctx, pipe_cache_, passes.abuff_, "abuff_fill_pipe"},
       abuff_res_{ctx, pipe_cache_, passes.abuff_, "abuff_resolve_pipe"},
+
       wboit_acc_{ctx, pipe_cache_, passes.wboit_, "wboit_acc_pipe"},
       wboit_res_{ctx, pipe_cache_, passes.wboit_, "wboit_resolve_pipe"},
+
       bright_{ctx, pipe_cache_, passes.bright_extract_, "bright_extract_pipe"},
       blur_color_{ctx, pipe_cache_, passes.blur_bright_, "blur_color_pipe"},
       blur_color_blend_{ctx, pipe_cache_, passes.post_,
                         "blur_color_blend_pipe"},
+
       coc_{ctx, pipe_cache_, passes.coc_, "coc_pipe"},
       dof_{ctx, pipe_cache_, passes.dof_, "dof_pipe"},
+
       swap_{ctx, pipe_cache_, passes.swap_, "swap_pipe"} {
   auto samples = resrc.GetProps().samples;
 
   BuildGBuff(shaders.gbuff_vert_, shaders.gbuff_frag_, samples, desc_pool);
 
-  BuildAO(shaders.quad_vert_, shaders.ao_frag_, samples, desc_pool);
-  BuildBlurAO(shaders.quad_vert_, shaders.blur_frag_, desc_pool);
+  BuildSSAO(shaders.quad_vert_, shaders.ao_frag_, samples, desc_pool);
+  BuildBlurSSAO(shaders.quad_vert_, shaders.blur_frag_, desc_pool);
 
   BuildGlobLight(shaders.quad_vert_, shaders.dir_light_frag_, samples,
                  desc_pool);
@@ -60,8 +67,8 @@ PipeManager::PipeManager(const Context& ctx, const Resources& resrc,
 
 void PipeManager::RebuildPipes() {
   if (!gbuff_.IsUpToDate()) gbuff_.BuildPipeline();
-  if (!ao_.IsUpToDate()) ao_.BuildPipeline();
-  if (!blur_ao_.IsUpToDate()) blur_ao_.BuildPipeline();
+  if (!ssao_.IsUpToDate()) ssao_.BuildPipeline();
+  if (!blur_ssao_.IsUpToDate()) blur_ssao_.BuildPipeline();
   if (!glob_light_.IsUpToDate()) glob_light_.BuildPipeline();
   if (!local_light_.IsUpToDate()) local_light_.BuildPipeline();
   if (!point_light_.IsUpToDate()) point_light_.BuildPipeline();
@@ -127,20 +134,20 @@ void PipeManager::BuildGBuff(const VertexShader& vert_shader,
   gbuff_.BuildPipeline();
 }
 
-void PipeManager::BuildAO(const VertexShader& vert_shader,
-                          const FragmentShader& frag_shader,
-                          vk::SampleCountFlagBits samples,
-                          const DescriptorPool& desc_pool) {
-  ao_.CreateLayout(
+void PipeManager::BuildSSAO(const VertexShader& vert_shader,
+                            const FragmentShader& frag_shader,
+                            vk::SampleCountFlagBits samples,
+                            const DescriptorPool& desc_pool) {
+  ssao_.CreateLayout(
       {desc_pool.GetCameraSets().GetLayout(),
        desc_pool.GetGBuffSets().GetLayout(), desc_pool.GetAOSet().GetLayout()},
       {Pipeline::MakePushConst<SSAOPC>(vk::ShaderStageFlagBits::eFragment)});
 
-  ao_.AddShader(vert_shader);
-  ao_.AddShader(frag_shader, {Pipeline::MakeSpecConst(0, kAONoiseDim),
-                              Pipeline::MakeSpecConst(1, kAOKernelSize)});
+  ssao_.AddShader(vert_shader);
+  ssao_.AddShader(frag_shader, {Pipeline::MakeSpecConst(0, kSSAONoiseDim),
+                                Pipeline::MakeSpecConst(1, kSSAOKernelSize)});
 
-  auto& state = ao_.state_;
+  auto& state = ssao_.state_;
   state.multisample.rasterizationSamples = samples;
 
   state.color_attachments.resize(1);
@@ -163,26 +170,27 @@ void PipeManager::BuildAO(const VertexShader& vert_shader,
   state.depth_stencil.back = state.depth_stencil.front;
 
   state.subpass = 0;
-  ao_.BuildPipeline();
+  ssao_.BuildPipeline();
 }
 
-void PipeManager::BuildBlurAO(const VertexShader& vert_shader,
-                              const FragmentShader& frag_shader,
-                              const DescriptorPool& desc_pool) {
-  blur_ao_.CreateLayout({desc_pool.GetAOResSets().GetLayout()},
-                        {Pipeline::MakePushConst<GausKernelPC>(
-                            vk::ShaderStageFlagBits::eFragment)});
+void PipeManager::BuildBlurSSAO(const VertexShader& vert_shader,
+                                const FragmentShader& frag_shader,
+                                const DescriptorPool& desc_pool) {
+  blur_ssao_.CreateLayout({desc_pool.GetAOResSets().GetLayout()},
+                          {Pipeline::MakePushConst<GausKernelPC>(
+                              vk::ShaderStageFlagBits::eFragment)});
 
-  blur_ao_.AddShader(vert_shader);
-  blur_ao_.AddShader(frag_shader, {Pipeline::MakeSpecConst(0, kMaxGausRadius)});
+  blur_ssao_.AddShader(vert_shader);
+  blur_ssao_.AddShader(frag_shader,
+                       {Pipeline::MakeSpecConst(0, kMaxGausRadius)});
 
-  auto& state = blur_ao_.state_;
+  auto& state = blur_ssao_.state_;
   state.color_attachments.resize(1);
   state.color_attachments[0].blendEnable = VK_FALSE;
   state.color_attachments[0].colorWriteMask = vk::ColorComponentFlagBits::eR;
   state.subpass = 0;
 
-  blur_ao_.BuildPipeline();
+  blur_ssao_.BuildPipeline();
 }
 
 void PipeManager::BuildGlobLight(const VertexShader& vert_shader,

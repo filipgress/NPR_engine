@@ -21,7 +21,7 @@ void App::Run() {
 
     if (window_.IsMinimized()) continue;
     renderer_.Render(timer_, camera_, *active_scene_,
-                     loading_scene_->IsLoading());
+                     loading_scene_->IsValid() || loading_scene_->IsLoading());
   }
 
   renderer_.WaitIdle();
@@ -47,56 +47,65 @@ void App::ProcessInput() {
     renderer_.GetGui().ToggleFileBrowser([this](std::string path) {
       npr_scene::SceneLoader::LoadAsync(
           renderer_, *loading_scene_, tasks_,
-          [this]() { loading_scene_.swap(active_scene_); }, path);
+          [this]() {
+            loading_scene_.swap(active_scene_);
+            loading_scene_->Invalidate();
+          },
+          path);
     });
   }
-
-  if (ImGui::GetIO().WantCaptureMouse) return;
 
   if (inputs_.key_tokens.contains(GLFW_KEY_LEFT_CONTROL) &&
       inputs_.key_pressed.contains(GLFW_KEY_R))
     renderer_.RecompileShaders();
 
-  if (camera_.GetMode() == npr_scene::CameraMode::kFree) {
-    float dt = timer_.GetDelta();
-    camera_.Rotate(inputs_.mouse_move);
+  if (ImGui::GetIO().WantCaptureMouse) return;
 
-    if (inputs_.key_tokens.contains(GLFW_KEY_W))
-      camera_.Move({0.0f, 0.0f, 1.0f}, dt);
-    if (inputs_.key_tokens.contains(GLFW_KEY_A))
-      camera_.Move({-1.0f, 0.0f, 0.0f}, dt);
-    if (inputs_.key_tokens.contains(GLFW_KEY_S))
-      camera_.Move({0.0f, 0.0f, -1.0f}, dt);
-    if (inputs_.key_tokens.contains(GLFW_KEY_D))
-      camera_.Move({1.0f, 0.0f, 0.0f}, dt);
-
-    if (inputs_.key_tokens.contains(GLFW_KEY_LEFT_SHIFT)) {
-      if (inputs_.key_tokens.contains(GLFW_KEY_SPACE))
-        camera_.Move({0.0f, -1.0f, 0.0f}, dt);
-    } else {
-      if (inputs_.key_tokens.contains(GLFW_KEY_SPACE))
-        camera_.Move({0.0f, 1.0f, 0.0f}, dt);
+  if (camera_.IsOrbit()) {
+    if (inputs_.key_pressed.contains(GLFW_KEY_F)) {
+      window_.DisableMouse();
+      camera_.ToggleMode();
+      inputs_.ResetMouse();
     }
 
-    if (inputs_.key_tokens.contains(GLFW_KEY_ESCAPE)) {
+    camera_.Zoom(inputs_.mouse_scroll.y);
+    if (inputs_.mouse_buttons.contains(GLFW_MOUSE_BUTTON_LEFT))
+      camera_.Orbit(inputs_.mouse_move);
+    if (inputs_.mouse_buttons.contains(GLFW_MOUSE_BUTTON_RIGHT))
+      camera_.Pan(inputs_.mouse_move);
+
+  } else {
+    if (inputs_.key_pressed.contains(GLFW_KEY_ESCAPE)) {
       window_.EnableMouse();
       camera_.ToggleMode();
       inputs_.ResetMouse();
     }
 
-  } else {
-    camera_.Zoom(inputs_.mouse_scroll.y);
-    if (inputs_.mouse_buttons.contains(GLFW_MOUSE_BUTTON_LEFT)) {
-      camera_.Orbit(inputs_.mouse_move);
-    }
-    if (inputs_.mouse_buttons.contains(GLFW_MOUSE_BUTTON_RIGHT))
-      camera_.Pan(inputs_.mouse_move);
+    float dt = timer_.GetDelta();
+    glm::vec3 move_dir{0.0f};
 
-    if (inputs_.key_tokens.contains(GLFW_KEY_F)) {
-      window_.DisableMouse();
-      camera_.ToggleMode();
-      inputs_.ResetMouse();
-    }
+    if (inputs_.key_tokens.contains(GLFW_KEY_W))
+      move_dir += glm::vec3{0.0f, 0.0f, 1.0f};
+    if (inputs_.key_tokens.contains(GLFW_KEY_A))
+      move_dir += glm::vec3{-1.0f, 0.0f, 0.0f};
+    if (inputs_.key_tokens.contains(GLFW_KEY_S))
+      move_dir += glm::vec3{0.0f, 0.0f, -1.0f};
+    if (inputs_.key_tokens.contains(GLFW_KEY_D))
+      move_dir += glm::vec3{1.0f, 0.0f, 0.0f};
+
+    if (inputs_.key_tokens.contains(GLFW_KEY_LEFT_SHIFT) &&
+        inputs_.key_tokens.contains(GLFW_KEY_SPACE))
+      move_dir += glm::vec3{0.0f, -1.0f, 0.0f};
+
+    if (!inputs_.key_tokens.contains(GLFW_KEY_LEFT_SHIFT) &&
+        inputs_.key_tokens.contains(GLFW_KEY_SPACE))
+      move_dir += glm::vec3{0.0f, 1.0f, 0.0f};
+
+    float factor = 1.0f;
+    if (inputs_.key_tokens.contains(GLFW_KEY_LEFT_CONTROL)) factor = .2f;
+
+    camera_.Move(move_dir * factor, dt);
+    camera_.Rotate(inputs_.mouse_move * factor);
   }
 }
 
