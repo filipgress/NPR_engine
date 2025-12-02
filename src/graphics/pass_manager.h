@@ -23,6 +23,7 @@ class PassManager : public npr_core::NonCopyable {
         blur_bright_{ctx, resrc},
         coc_{ctx, resrc},
         dof_{ctx, resrc},
+        post_{ctx, resrc},
         swap_{ctx, swapchain} {}
   ~PassManager() = default;
 
@@ -44,6 +45,8 @@ class PassManager : public npr_core::NonCopyable {
 
     coc_.CreateFramebuffers();
     dof_.CreateFramebuffers();
+
+    post_.CreateFramebuffers();
   }
 
  private:
@@ -64,6 +67,8 @@ class PassManager : public npr_core::NonCopyable {
 
   CocPass coc_;
   DofPass dof_;
+
+  PostPass post_;
 
   SwapPass swap_;
 };

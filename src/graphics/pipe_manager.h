@@ -69,9 +69,12 @@ class PipeManager : public npr_core::NonCopyable {
   void BuildBright(const VertexShader& vert_shader,
                    const FragmentShader& frag_shader,
                    const DescriptorPool& desc_pool);
-  void BuildBlurBright(const VertexShader& vert_shader,
-                       const FragmentShader& frag_shader,
-                       const DescriptorPool& desc_pool);
+  void BuildBlurColor(const VertexShader& vert_shader,
+                      const FragmentShader& frag_shader,
+                      const DescriptorPool& desc_pool);
+  void BuildBlurColorBlend(const VertexShader& vert_shader,
+                           const FragmentShader& frag_shader,
+                           const DescriptorPool& desc_pool);
 
   void BuildCoC(const VertexShader& vert_shader,
                 const FragmentShader& frag_shader,
@@ -105,7 +108,8 @@ class PipeManager : public npr_core::NonCopyable {
   Pipeline wboit_res_;
 
   Pipeline bright_;
-  Pipeline blur_bright_;
+  Pipeline blur_color_;
+  Pipeline blur_color_blend_;
 
   Pipeline coc_;
   Pipeline dof_;

@@ -864,15 +864,15 @@ void Renderer::RecordBloom(vk::CommandBuffer cmd_buff, const uint frame_idx,
       vk::SubpassContents::eInline);
 
   cmd_buff.bindPipeline(vk::PipelineBindPoint::eGraphics,
-                        pipelines_.blur_bright_.GetPipeline());
+                        pipelines_.blur_color_.GetPipeline());
 
   cmd_buff.bindDescriptorSets(  // bright_color
-      vk::PipelineBindPoint::eGraphics, pipelines_.blur_bright_.GetLayout(), 0,
+      vk::PipelineBindPoint::eGraphics, pipelines_.blur_color_.GetLayout(), 0,
       desc_pool_.GetBrightColorSets().GetSet(frame_idx), {});
 
   auto& blur_pc = resrc_.GetBlurBloomPC();
   blur_pc.flags.x = 0;  // horizontal
-  cmd_buff.pushConstants(pipelines_.blur_bright_.GetLayout(),
+  cmd_buff.pushConstants(pipelines_.blur_color_.GetLayout(),
                          vk::ShaderStageFlagBits::eFragment, 0, sizeof(blur_pc),
                          &blur_pc);
 
@@ -880,19 +880,19 @@ void Renderer::RecordBloom(vk::CommandBuffer cmd_buff, const uint frame_idx,
   cmd_buff.endRenderPass();
 
   // vertical blur pass
-  cmd_buff.beginRenderPass(
-      passes_.bright_extract_.BeginInfo(frame_idx, resrc_extent),
-      vk::SubpassContents::eInline);
+  cmd_buff.beginRenderPass(passes_.post_.BeginInfo(frame_idx, resrc_extent),
+                           vk::SubpassContents::eInline);
 
   cmd_buff.bindPipeline(vk::PipelineBindPoint::eGraphics,
-                        pipelines_.blur_bright_.GetPipeline());
+                        pipelines_.blur_color_blend_.GetPipeline());
 
   cmd_buff.bindDescriptorSets(  // bright_temp
-      vk::PipelineBindPoint::eGraphics, pipelines_.blur_bright_.GetLayout(), 0,
+      vk::PipelineBindPoint::eGraphics,
+      pipelines_.blur_color_blend_.GetLayout(), 0,
       desc_pool_.GetBrightTempSets().GetSet(frame_idx), {});
 
   blur_pc.flags.x = 1;  // vertical
-  cmd_buff.pushConstants(pipelines_.blur_bright_.GetLayout(),
+  cmd_buff.pushConstants(pipelines_.blur_color_blend_.GetLayout(),
                          vk::ShaderStageFlagBits::eFragment, 0, sizeof(blur_pc),
                          &blur_pc);
 

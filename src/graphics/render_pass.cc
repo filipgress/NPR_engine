@@ -348,7 +348,7 @@ std::vector<vk::ImageView> AOPass::GetAttachmentViews(int frame_idx) const {
 }
 
 /*
- * BlurPass
+ * SingleColorPass
  */
 void SingleColorPass::SetClearValues() { clear_values_.resize(1); }
 
@@ -393,8 +393,7 @@ std::vector<vk::SubpassDependency> SingleColorPass::GetDependencies() const {
     deps[1].srcAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
 
     deps[1].dstStageMask = vk::PipelineStageFlagBits::eFragmentShader;
-    deps[1].dstAccessMask =
-        vk::AccessFlagBits::eShaderRead;  // read blurred image
+    deps[1].dstAccessMask = vk::AccessFlagBits::eShaderRead;  // read image
 
     deps[1].dependencyFlags = vk::DependencyFlagBits::eByRegion;
   }
@@ -470,6 +469,30 @@ std::vector<vk::ImageView> DofPass::GetAttachmentViews(int frame_idx) const {
   }
 
   return {resrc.present_color->GetImageView()};
+}
+/*
+ * PostPass
+ */
+std::vector<vk::AttachmentDescription> PostPass::GetAttachments() const {
+  std::vector<vk::AttachmentDescription> attachments(1);
+
+  attachments[0].format = format_;
+  attachments[0].samples = vk::SampleCountFlagBits::e1;
+  attachments[0].loadOp = vk::AttachmentLoadOp::eLoad;
+  attachments[0].storeOp = vk::AttachmentStoreOp::eStore;
+  attachments[0].initialLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+  attachments[0].finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+  return attachments;
+}
+
+std::vector<vk::ImageView> PostPass::GetAttachmentViews(int frame_idx) const {
+  auto& resrc = resrc_.GetResrc()[frame_idx];
+
+  if (!resrc.present_color) {
+    throw std::runtime_error("missing required resources for: " + GetDbgName());
+  }
+
+  return {resrc.color_res->GetImageView()};
 }
 
 /*

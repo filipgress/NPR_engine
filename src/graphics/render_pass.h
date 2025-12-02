@@ -111,12 +111,12 @@ class SingleColorPass : public RenderPass {
   std::vector<vk::SubpassDependency> GetDependencies() const override;
   std::vector<vk::SubpassDescription> GetSubpasses() override;
 
- private:
+ protected:
   vk::Format format_;
   vk::AttachmentReference color_ref_{};
 };
 
-class AOBlurHPass : public SingleColorPass {
+class AOBlurHPass : public SingleColorPass {  // ao_temp
  public:
   AOBlurHPass(const Context& ctx, const Resources& resrc)
       : SingleColorPass(ctx, resrc, resrc.GetProps().ao_format) {
@@ -128,7 +128,7 @@ class AOBlurHPass : public SingleColorPass {
   const std::string GetDbgName() const override { return "ao_blur_h_pass"; }
 };
 
-class AOBlurVPass : public SingleColorPass {
+class AOBlurVPass : public SingleColorPass {  // ao_res
  public:
   AOBlurVPass(const Context& ctx, const Resources& resrc)
       : SingleColorPass(ctx, resrc, resrc.GetProps().ao_format) {
@@ -140,7 +140,7 @@ class AOBlurVPass : public SingleColorPass {
   const std::string GetDbgName() const override { return "ao_blur_v_pass"; }
 };
 
-class BrightPass : public SingleColorPass {
+class BrightPass : public SingleColorPass {  // bright_color
  public:
   BrightPass(const Context& ctx, const Resources& resrc)
       : SingleColorPass(ctx, resrc, resrc.GetProps().color_format) {
@@ -154,7 +154,7 @@ class BrightPass : public SingleColorPass {
   }
 };
 
-class BlurBrightPass : public SingleColorPass {
+class BlurBrightPass : public SingleColorPass {  // bright_temp
  public:
   BlurBrightPass(const Context& ctx, const Resources& resrc)
       : SingleColorPass(ctx, resrc, resrc.GetProps().color_format) {
@@ -166,7 +166,7 @@ class BlurBrightPass : public SingleColorPass {
   const std::string GetDbgName() const override { return "blur_h_pass"; }
 };
 
-class CocPass : public SingleColorPass {
+class CocPass : public SingleColorPass {  // coc_map
  public:
   CocPass(const Context& ctx, const Resources& resrc)
       : SingleColorPass(ctx, resrc, resrc.GetProps().coc_format) {
@@ -178,7 +178,7 @@ class CocPass : public SingleColorPass {
   const std::string GetDbgName() const override { return "coc_pass"; }
 };
 
-class DofPass : public SingleColorPass {
+class DofPass : public SingleColorPass {  // present_color
  public:
   DofPass(const Context& ctx, const Resources& resrc)
       : SingleColorPass(ctx, resrc, resrc.GetProps().color_format) {
@@ -188,6 +188,19 @@ class DofPass : public SingleColorPass {
  private:
   std::vector<vk::ImageView> GetAttachmentViews(int frame_idx) const override;
   const std::string GetDbgName() const override { return "dof_pass"; }
+};
+
+class PostPass : public SingleColorPass {  // color_res
+ public:
+  PostPass(const Context& ctx, const Resources& resrc)
+      : SingleColorPass(ctx, resrc, resrc.GetProps().color_format) {
+    Init();
+  }
+
+ private:
+  std::vector<vk::AttachmentDescription> GetAttachments() const override;
+  std::vector<vk::ImageView> GetAttachmentViews(int frame_idx) const override;
+  const std::string GetDbgName() const override { return "post_pass"; }
 };
 
 class GlobLightPass : public RenderPass {
