@@ -22,13 +22,13 @@ PipeManager::PipeManager(const Context& ctx, const Resources& resrc,
       wboit_acc_{ctx, pipe_cache_, passes.wboit_, "wboit_acc_pipe"},
       wboit_res_{ctx, pipe_cache_, passes.wboit_, "wboit_resolve_pipe"},
 
-      bright_{ctx, pipe_cache_, passes.bright_extract_, "bright_extract_pipe"},
-      blur_color_{ctx, pipe_cache_, passes.blur_bright_, "blur_color_pipe"},
-      blur_color_blend_{ctx, pipe_cache_, passes.post_,
+      bright_{ctx, pipe_cache_, passes.bright_color_, "bright_extract_pipe"},
+      blur_color_{ctx, pipe_cache_, passes.bright_temp_, "blur_color_pipe"},
+      blur_color_blend_{ctx, pipe_cache_, passes.blend_present_,
                         "blur_color_blend_pipe"},
 
-      coc_{ctx, pipe_cache_, passes.coc_, "coc_pipe"},
-      dof_{ctx, pipe_cache_, passes.dof_, "dof_pipe"},
+      coc_{ctx, pipe_cache_, passes.coc_map_, "coc_pipe"},
+      dof_{ctx, pipe_cache_, passes.present_color_, "dof_pipe"},
 
       swap_{ctx, pipe_cache_, passes.swap_, "swap_pipe"} {
   auto samples = resrc.GetProps().samples;

@@ -19,11 +19,12 @@ class PassManager : public npr_core::NonCopyable {
         local_light_{ctx, resrc},
         abuff_{ctx, resrc},
         wboit_{ctx, resrc},
-        bright_extract_{ctx, resrc},
-        blur_bright_{ctx, resrc},
-        coc_{ctx, resrc},
-        dof_{ctx, resrc},
-        post_{ctx, resrc},
+        bright_color_{ctx, resrc},
+        bright_temp_{ctx, resrc},
+        coc_map_{ctx, resrc},
+        color_res_{ctx, resrc},
+        present_color_{ctx, resrc},
+        blend_present_{ctx, resrc},
         swap_{ctx, swapchain} {}
   ~PassManager() = default;
 
@@ -40,21 +41,22 @@ class PassManager : public npr_core::NonCopyable {
     abuff_.CreateFramebuffers();
     wboit_.CreateFramebuffers();
 
-    bright_extract_.CreateFramebuffers();
-    blur_bright_.CreateFramebuffers();
+    bright_color_.CreateFramebuffers();
+    bright_temp_.CreateFramebuffers();
 
-    coc_.CreateFramebuffers();
-    dof_.CreateFramebuffers();
+    coc_map_.CreateFramebuffers();
 
-    post_.CreateFramebuffers();
+    color_res_.CreateFramebuffers();
+    present_color_.CreateFramebuffers();
+    blend_present_.CreateFramebuffers();
   }
 
  private:
   GPass gpass_;
 
   SSAOPass ssao_;
-  AOTempPass ao_temp_;
-  AOResPass ao_res_;
+  SSAOTempPass ao_temp_;
+  SSAOResPass ao_res_;
 
   GlobLightPass glob_light_;
   LocalLightPass local_light_;
@@ -62,13 +64,14 @@ class PassManager : public npr_core::NonCopyable {
   ABuffPass abuff_;
   WBoitPass wboit_;
 
-  BrightPass bright_extract_;
-  BlurBrightPass blur_bright_;
+  BrightColorPass bright_color_;
+  BrightTempPass bright_temp_;
 
-  CocPass coc_;
-  DofPass dof_;
+  CocMapPass coc_map_;
 
-  PostPass post_;
+  ColorResPass color_res_;
+  PresentColorPass present_color_;
+  BlendPresentPass blend_present_;
 
   SwapPass swap_;
 };

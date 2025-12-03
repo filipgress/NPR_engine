@@ -18,11 +18,11 @@ struct RenderSettings {
   bool inv_rim{false};
   bool is_pbr{true};
 
-  bool enable_ssao{true};
+  bool enable_ssao{false};
   float ssao_radius{0.5f};
   float ssao_bias{0.025f};
 
-  TransparencyMode trans_mode{TransparencyMode::kABuff};
+  TransparencyMode trans_mode{TransparencyMode::kWBoit};
   float alpha_cutoff{0.001f};
 
   uint32_t abuff_avg_nodes{4};
@@ -34,6 +34,8 @@ struct RenderSettings {
   float wboit_depth_power{3.0};
   float wboit_weight_min{1e-2};
   float wboit_weight_max{3e3};
+
+  bool enable_post_process{false};
 
   bool enable_bloom{false};
   float bloom_threshold{1.0f};

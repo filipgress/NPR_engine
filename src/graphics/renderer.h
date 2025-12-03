@@ -59,6 +59,7 @@ class Renderer : public npr_core::NonCopyable {
                     const npr_scene::Frustum& frustum) const;
 
   void RecordSSAO(vk::CommandBuffer cmd_buff, const uint frame_idx,
+                  const npr_graphics::FrameResources& frame_resrc,
                   const vk::Extent2D& resrc_extent);
   void RecordGlobLight(vk::CommandBuffer cmd_buff, const uint frame_idx,
                        const npr_graphics::FrameResources& frame_resrc,
@@ -97,9 +98,13 @@ class Renderer : public npr_core::NonCopyable {
                    const npr_scene::Frustum& frustum, vk::PipelineLayout layout,
                    const uint set_idx) const;
 
+  void RecordPostProcess(vk::CommandBuffer cmd_buff, const uint frame_idx,
+                         const npr_graphics::FrameResources& frame_resrc,
+                         const vk::Extent2D& resrc_extent);
   void RecordBloom(vk::CommandBuffer cmd_buff, const uint frame_idx,
                    const vk::Extent2D& resrc_extent);
   void RecordDoF(vk::CommandBuffer cmd_buff, const uint frame_idx,
+                 const npr_graphics::FrameResources& frame_resrc,
                  const vk::Extent2D& resrc_extent,
                  const npr_scene::Camera& camera);
 

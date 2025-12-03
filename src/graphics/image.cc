@@ -175,6 +175,13 @@ void Image::Transition(vk::CommandBuffer cmd_buff, vk::ImageLayout old_layout,
 
     src_stage = vk::PipelineStageFlagBits::eTopOfPipe;
     dst_stage = vk::PipelineStageFlagBits::eFragmentShader;
+  } else if (old_layout == vk::ImageLayout::eShaderReadOnlyOptimal &&
+             new_layout == vk::ImageLayout::eTransferSrcOptimal) {
+    barrier.srcAccessMask = vk::AccessFlagBits::eShaderRead;
+    barrier.dstAccessMask = vk::AccessFlagBits::eTransferRead;
+
+    src_stage = vk::PipelineStageFlagBits::eFragmentShader;
+    dst_stage = vk::PipelineStageFlagBits::eTransfer;
   } else {
     throw std::runtime_error("unsupported image layout transition: " +
                              std::to_string(static_cast<int>(old_layout)) +
@@ -222,6 +229,59 @@ void Image::Resolve(vk::CommandBuffer cmd_buff, Image& dst,
   cmd_buff.resolveImage(image_, vk::ImageLayout::eTransferSrcOptimal,
                         dst.image_, vk::ImageLayout::eTransferDstOptimal, 1,
                         &region);
+}
+
+void Image::Clear(vk::CommandBuffer cmd_buff, vk::ClearColorValue clear_color,
+                  vk::ImageLayout layout) {
+  vk::ImageSubresourceRange range{};
+  range.aspectMask = aspect_;
+  range.baseMipLevel = 0;
+  range.levelCount = mip_levels_;
+  range.baseArrayLayer = 0;
+  range.layerCount = 1;
+
+  if (layout != vk::ImageLayout::eTransferDstOptimal)
+    Transition(cmd_buff, layout, vk::ImageLayout::eTransferDstOptimal, 0,
+               mip_levels_);
+  cmd_buff.clearColorImage(image_, vk::ImageLayout::eTransferDstOptimal,
+                           clear_color, range);
+}
+
+void Image::CopyTo(vk::CommandBuffer cmd_buff, Image& dst,
+                   vk::ImageLayout src_layout, vk::ImageLayout dst_layout) {
+  if (&dst == this) throw std::runtime_error("unable to copy image to itself");
+
+  if (format_ != dst.format_)
+    throw std::runtime_error("unable to resolve images with different formats");
+
+  if (extent_ != dst.extent_)
+    throw std::runtime_error("unable to copy images with different extents");
+
+  if (src_layout != vk::ImageLayout::eTransferSrcOptimal)
+    Transition(cmd_buff, src_layout, vk::ImageLayout::eTransferSrcOptimal, 0,
+               1);
+
+  if (dst_layout != vk::ImageLayout::eTransferDstOptimal)
+    dst.Transition(cmd_buff, dst_layout, vk::ImageLayout::eTransferDstOptimal,
+                   0, 1);
+
+  vk::ImageCopy region{};
+  region.srcSubresource.aspectMask = aspect_;
+  region.srcSubresource.mipLevel = 0;
+  region.srcSubresource.baseArrayLayer = 0;
+  region.srcSubresource.layerCount = 1;
+  region.srcOffset = vk::Offset3D{0, 0, 0};
+
+  region.dstSubresource.aspectMask = dst.aspect_;
+  region.dstSubresource.mipLevel = 0;
+  region.dstSubresource.baseArrayLayer = 0;
+  region.dstSubresource.layerCount = 1;
+  region.dstOffset = vk::Offset3D{0, 0, 0};
+
+  region.extent = vk::Extent3D{extent_.width, extent_.height, 1};
+
+  cmd_buff.copyImage(image_, vk::ImageLayout::eTransferSrcOptimal, dst.image_,
+                     vk::ImageLayout::eTransferDstOptimal, 1, &region);
 }
 
 /*

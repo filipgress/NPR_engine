@@ -22,6 +22,10 @@ class Image : public npr_core::NonCopyable {
                   uint32_t mip_level_count);
   void Resolve(vk::CommandBuffer cmd_buff, Image& dst,
                vk::ImageLayout src_layout, vk::ImageLayout dst_layout);
+  void Clear(vk::CommandBuffer cmd_buff, vk::ClearColorValue clear_color,
+             vk::ImageLayout layout = vk::ImageLayout::eTransferDstOptimal);
+  void CopyTo(vk::CommandBuffer cmd_buff, Image& dst,
+              vk::ImageLayout src_layout, vk::ImageLayout dst_layout);
 
  private:
   void CreateImage(vk::ImageUsageFlags usage, vk::SampleCountFlagBits samples,

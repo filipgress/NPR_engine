@@ -111,7 +111,8 @@ void Resources::CreateImages() {
     resrc.ssao_res = std::make_unique<Texture>(
         ctx_, frame_props_.ssao_format, frame_props_.extent,
         vk::ImageUsageFlagBits::eColorAttachment |
-            vk::ImageUsageFlagBits::eSampled,
+            vk::ImageUsageFlagBits::eSampled |
+            vk::ImageUsageFlagBits::eTransferDst,
         vk::ImageAspectFlagBits::eColor, vk::SampleCountFlagBits::e1,
         "ssao_res_" + std::to_string(idx));
 
@@ -188,6 +189,7 @@ void Resources::CreateImages() {
     resrc.color_res = std::make_unique<Texture>(
         ctx_, frame_props_.color_format, frame_props_.extent,
         vk::ImageUsageFlagBits::eColorAttachment |
+            vk::ImageUsageFlagBits::eTransferSrc |
             vk::ImageUsageFlagBits::eTransferDst |
             vk::ImageUsageFlagBits::eSampled,
         vk::ImageAspectFlagBits::eColor, vk::SampleCountFlagBits::e1,
@@ -196,7 +198,9 @@ void Resources::CreateImages() {
     resrc.present_color = std::make_unique<Texture>(
         ctx_, frame_props_.color_format, frame_props_.extent,
         vk::ImageUsageFlagBits::eColorAttachment |
-            vk::ImageUsageFlagBits::eSampled,
+            vk::ImageUsageFlagBits::eSampled |
+            vk::ImageUsageFlagBits::eTransferSrc |
+            vk::ImageUsageFlagBits::eTransferDst,
         vk::ImageAspectFlagBits::eColor, vk::SampleCountFlagBits::e1,
         "present_color_" + std::to_string(idx));
 

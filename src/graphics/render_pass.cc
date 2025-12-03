@@ -413,9 +413,10 @@ std::vector<vk::ImageView> SSAOPass::GetAttachmentViews(int frame_idx) const {
 }
 
 /*
- * AOTempPass
+ * SSAOTempPass
  */
-std::vector<vk::ImageView> AOTempPass::GetAttachmentViews(int frame_idx) const {
+std::vector<vk::ImageView> SSAOTempPass::GetAttachmentViews(
+    int frame_idx) const {
   auto& resrc = resrc_.GetResrc()[frame_idx];
 
   if (!resrc.ssao_temp)
@@ -425,9 +426,10 @@ std::vector<vk::ImageView> AOTempPass::GetAttachmentViews(int frame_idx) const {
 }
 
 /*
- * AOResPass
+ * SSAOResPass
  */
-std::vector<vk::ImageView> AOResPass::GetAttachmentViews(int frame_idx) const {
+std::vector<vk::ImageView> SSAOResPass::GetAttachmentViews(
+    int frame_idx) const {
   auto& resrc = resrc_.GetResrc()[frame_idx];
 
   if (!resrc.ssao_res)
@@ -1056,6 +1058,82 @@ std::vector<vk::SubpassDescription> SwapPass::GetSubpasses() {
   return subpasses;
 }
 
+std::vector<vk::ImageView> BrightColorPass::GetAttachmentViews(
+    int frame_idx) const {
+  auto& resrc = resrc_.GetResrc()[frame_idx];
+
+  if (!resrc.bright_color)
+    throw std::runtime_error("missing required resources for: " + GetDbgName());
+
+  return {resrc.bright_color->GetImageView()};
+}
+
+std::vector<vk::ImageView> BrightTempPass::GetAttachmentViews(
+    int frame_idx) const {
+  auto& resrc = resrc_.GetResrc()[frame_idx];
+
+  if (!resrc.bright_temp)
+    throw std::runtime_error("missing required resources for: " + GetDbgName());
+
+  return {resrc.bright_temp->GetImageView()};
+}
+
+std::vector<vk::ImageView> CocMapPass::GetAttachmentViews(int frame_idx) const {
+  auto& resrc = resrc_.GetResrc()[frame_idx];
+
+  if (!resrc.coc_map) {
+    throw std::runtime_error("missing required resources for: " + GetDbgName());
+  }
+
+  return {resrc.coc_map->GetImageView()};
+}
+
+std::vector<vk::ImageView> PresentColorPass::GetAttachmentViews(
+    int frame_idx) const {
+  auto& resrc = resrc_.GetResrc()[frame_idx];
+
+  if (!resrc.present_color) {
+    throw std::runtime_error("missing required resources for: " + GetDbgName());
+  }
+
+  return {resrc.present_color->GetImageView()};
+}
+
+std::vector<vk::ImageView> BlendPresentPass::GetAttachmentViews(
+    int frame_idx) const {
+  auto& resrc = resrc_.GetResrc()[frame_idx];
+
+  if (!resrc.present_color) {
+    throw std::runtime_error("missing required resources for: " + GetDbgName());
+  }
+
+  return {resrc.present_color->GetImageView()};
+}
+
+std::vector<vk::AttachmentDescription> BlendPresentPass::GetAttachments()
+    const {
+  std::vector<vk::AttachmentDescription> attachments(1);
+
+  attachments[0].format = format_;
+  attachments[0].samples = vk::SampleCountFlagBits::e1;
+  attachments[0].loadOp = vk::AttachmentLoadOp::eLoad;
+  attachments[0].storeOp = vk::AttachmentStoreOp::eStore;
+  attachments[0].initialLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+  attachments[0].finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+  return attachments;
+}
+
+std::vector<vk::ImageView> ColorResPass::GetAttachmentViews(
+    int frame_idx) const {
+  auto& resrc = resrc_.GetResrc()[frame_idx];
+
+  if (!resrc.present_color) {
+    throw std::runtime_error("missing required resources for: " + GetDbgName());
+  }
+
+  return {resrc.color_res->GetImageView()};
+}
+
 void SwapPass::CreateFramebuffers() {
   DestroyFramebuffers();
 
@@ -1078,69 +1156,6 @@ void SwapPass::CreateFramebuffers() {
                     vk::ObjectType::eFramebuffer,
                     GetDbgName() + "_framebuffer_" + std::to_string(i));
   }
-}
-
-std::vector<vk::ImageView> BrightPass::GetAttachmentViews(int frame_idx) const {
-  auto& resrc = resrc_.GetResrc()[frame_idx];
-
-  if (!resrc.bright_color)
-    throw std::runtime_error("missing required resources for: " + GetDbgName());
-
-  return {resrc.bright_color->GetImageView()};
-}
-
-std::vector<vk::ImageView> BlurBrightPass::GetAttachmentViews(
-    int frame_idx) const {
-  auto& resrc = resrc_.GetResrc()[frame_idx];
-
-  if (!resrc.bright_temp)
-    throw std::runtime_error("missing required resources for: " + GetDbgName());
-
-  return {resrc.bright_temp->GetImageView()};
-}
-
-std::vector<vk::ImageView> CocPass::GetAttachmentViews(int frame_idx) const {
-  auto& resrc = resrc_.GetResrc()[frame_idx];
-
-  if (!resrc.coc_map) {
-    throw std::runtime_error("missing required resources for: " + GetDbgName());
-  }
-
-  return {resrc.coc_map->GetImageView()};
-}
-
-std::vector<vk::ImageView> DofPass::GetAttachmentViews(int frame_idx) const {
-  auto& resrc = resrc_.GetResrc()[frame_idx];
-
-  if (!resrc.present_color) {
-    throw std::runtime_error("missing required resources for: " + GetDbgName());
-  }
-
-  return {resrc.present_color->GetImageView()};
-}
-/*
- * PostPass
- */
-std::vector<vk::AttachmentDescription> PostPass::GetAttachments() const {
-  std::vector<vk::AttachmentDescription> attachments(1);
-
-  attachments[0].format = format_;
-  attachments[0].samples = vk::SampleCountFlagBits::e1;
-  attachments[0].loadOp = vk::AttachmentLoadOp::eLoad;
-  attachments[0].storeOp = vk::AttachmentStoreOp::eStore;
-  attachments[0].initialLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
-  attachments[0].finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
-  return attachments;
-}
-
-std::vector<vk::ImageView> PostPass::GetAttachmentViews(int frame_idx) const {
-  auto& resrc = resrc_.GetResrc()[frame_idx];
-
-  if (!resrc.present_color) {
-    throw std::runtime_error("missing required resources for: " + GetDbgName());
-  }
-
-  return {resrc.color_res->GetImageView()};
 }
 
 }  // namespace npr_graphics
