@@ -864,8 +864,39 @@ void Renderer::RecordPostProcess(
     return;
   }
 
-  (void)frame_idx;
-  (void)resrc_extent;
+  cmd_buff.beginRenderPass(
+      passes_.present_color_.BeginInfo(frame_idx, resrc_extent),
+      vk::SubpassContents::eInline);
+
+  cmd_buff.bindPipeline(vk::PipelineBindPoint::eGraphics,
+                        pipelines_.post_process_.GetPipeline());
+
+  cmd_buff.bindDescriptorSets(  // color_res
+      vk::PipelineBindPoint::eGraphics, pipelines_.post_process_.GetLayout(), 0,
+      desc_pool_.GetColorSets().GetSet(frame_idx), {});
+
+  cmd_buff.bindDescriptorSets(  // dither noise
+      vk::PipelineBindPoint::eGraphics, pipelines_.post_process_.GetLayout(), 1,
+      desc_pool_.GetDitherNoiseSets().GetSet(settings_.blue_noise_idx), {});
+
+  cmd_buff.bindDescriptorSets(  // palette textures
+      vk::PipelineBindPoint::eGraphics, pipelines_.post_process_.GetLayout(), 2,
+      desc_pool_.GetPaletteSets().GetSet(settings_.palette_idx), {});
+
+  PostProcessPC pc{.pixel_size = settings_.pixel_size,
+                   .dither_mode = static_cast<uint32_t>(settings_.dither_mode),
+                   .bayer_size = settings_.bayer_size,
+                   .dither_strength = settings_.dither_strength,
+                   .quant_mode = static_cast<uint32_t>(settings_.quant_mode),
+                   .color_levels = settings_.color_levels};
+
+  cmd_buff.pushConstants(pipelines_.post_process_.GetLayout(),
+                         vk::ShaderStageFlagBits::eFragment, 0,
+                         sizeof(PostProcessPC), &pc);
+
+  cmd_buff.draw(3, 1, 0, 0);
+
+  cmd_buff.endRenderPass();
 }
 
 void Renderer::RecordBloom(vk::CommandBuffer cmd_buff, const uint frame_idx,

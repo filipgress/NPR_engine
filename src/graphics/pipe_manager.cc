@@ -22,6 +22,9 @@ PipeManager::PipeManager(const Context& ctx, const Resources& resrc,
       wboit_acc_{ctx, pipe_cache_, passes.wboit_, "wboit_acc_pipe"},
       wboit_res_{ctx, pipe_cache_, passes.wboit_, "wboit_resolve_pipe"},
 
+      post_process_{ctx, pipe_cache_, passes.present_color_,
+                    "post_process_pipe"},
+
       bright_{ctx, pipe_cache_, passes.bright_color_, "bright_extract_pipe"},
       blur_color_{ctx, pipe_cache_, passes.bright_temp_, "blur_color_pipe"},
       blur_color_blend_{ctx, pipe_cache_, passes.blend_present_,
@@ -55,6 +58,8 @@ PipeManager::PipeManager(const Context& ctx, const Resources& resrc,
                 desc_pool);
   BuildWBoitRes(shaders.quad_vert_, shaders.wboit_res_frag_, desc_pool);
 
+  BuildPostProcess(shaders.quad_vert_, shaders.post_process_frag_, desc_pool);
+
   BuildBright(shaders.quad_vert_, shaders.bright_extract_frag_, desc_pool);
   BuildBlurColor(shaders.quad_vert_, shaders.blur_frag_, desc_pool);
   BuildBlurColorBlend(shaders.quad_vert_, shaders.blur_frag_, desc_pool);
@@ -77,6 +82,7 @@ void PipeManager::RebuildPipes() {
   if (!abuff_res_.IsUpToDate()) abuff_res_.BuildPipeline();
   if (!wboit_acc_.IsUpToDate()) wboit_acc_.BuildPipeline();
   if (!wboit_res_.IsUpToDate()) wboit_res_.BuildPipeline();
+  if (!post_process_.IsUpToDate()) post_process_.BuildPipeline();
   if (!bright_.IsUpToDate()) bright_.BuildPipeline();
   if (!blur_color_.IsUpToDate()) blur_color_.BuildPipeline();
   if (!blur_color_blend_.IsUpToDate()) blur_color_blend_.BuildPipeline();
@@ -535,6 +541,32 @@ void PipeManager::BuildWBoitRes(const VertexShader& vert_shader,
 
   state.subpass = 1;
   wboit_res_.BuildPipeline();
+}
+
+void PipeManager::BuildPostProcess(const VertexShader& vert_shader,
+                                   const FragmentShader& frag_shader,
+                                   const DescriptorPool& desc_pool) {
+  post_process_.CreateLayout({desc_pool.GetColorSets().GetLayout(),
+                              desc_pool.GetDitherNoiseSets().GetLayout(),
+                              desc_pool.GetPaletteSets().GetLayout()},
+                             {Pipeline::MakePushConst<PostProcessPC>(
+                                 vk::ShaderStageFlagBits::eFragment)});
+
+  post_process_.AddShader(vert_shader);
+  post_process_.AddShader(frag_shader);
+
+  auto& state = post_process_.state_;
+
+  state.color_attachments.resize(1);
+  auto& att = state.color_attachments[0];
+
+  att.blendEnable = VK_FALSE;
+  att.colorWriteMask =
+      vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+      vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+
+  state.subpass = 0;
+  post_process_.BuildPipeline();
 }
 
 void PipeManager::BuildBright(const VertexShader& vert_shader,

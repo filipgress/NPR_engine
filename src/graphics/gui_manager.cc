@@ -476,6 +476,184 @@ void GuiManager::GlobalSettingsWindow(npr_graphics::RenderSettings& settings,
     ImGui::Spacing();
   }
 
+  if (ImGui::CollapsingHeader("post processing")) {
+    ImGui::Spacing();
+
+    ImGui::Checkbox("enable##post_processing", &settings.enable_post_process);
+
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    ImGui::BeginDisabled(!settings.enable_post_process);
+
+    // Pixelization
+    ImGui::SeparatorText("pixelization");
+    ImGui::Spacing();
+
+    int pixel_size = static_cast<int>(settings.pixel_size);
+    if (ImGui::SliderInt("size", &pixel_size, 1, 16))
+      settings.pixel_size = static_cast<uint32_t>(pixel_size);
+
+    ImGui::Spacing();
+
+    // Dithering
+    ImGui::SeparatorText("dithering");
+    ImGui::Spacing();
+
+    static int selected_dither = static_cast<int>(settings.dither_mode);
+
+    if (ImGui::Selectable("none##dither", selected_dither == 0)) {
+      selected_dither = 0;
+      settings.dither_mode = static_cast<DitherMode>(selected_dither);
+    }
+
+    if (ImGui::Selectable("white noise##dither", selected_dither == 1)) {
+      selected_dither = 1;
+      settings.dither_mode = static_cast<DitherMode>(selected_dither);
+    }
+
+    if (ImGui::Selectable("ordered (Bayer matrix)##dither",
+                          selected_dither == 2)) {
+      selected_dither = 2;
+      settings.dither_mode = static_cast<DitherMode>(selected_dither);
+    }
+
+    if (ImGui::Selectable("blue noise##dither", selected_dither == 3)) {
+      selected_dither = 3;
+      settings.dither_mode = static_cast<DitherMode>(selected_dither);
+    }
+
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    static int selected_bayer = 0;  // 0=2x2, 1=4x4, 2=8x8
+    if (settings.dither_mode != DitherMode::kNone) {
+      ImGui::DragFloat("strength", &settings.dither_strength, 0.005f, 0.0f,
+                       1.0f);
+    }
+
+    if (settings.dither_mode == DitherMode::kBlueNoise) {
+      ImGui::Spacing();
+
+      int blue_noise_idx = static_cast<int>(settings.blue_noise_idx);
+      if (ImGui::SliderInt("texture##blue_noise", &blue_noise_idx, 0, 3)) {
+        settings.blue_noise_idx = static_cast<uint32_t>(blue_noise_idx);
+      }
+
+      if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
+        const char* texture_names[] = {"64x64 #1", "64x64 #2", "64x64 #3",
+                                       "128x128", "256x256"};
+        ImGui::SetTooltip("%s", texture_names[blue_noise_idx]);
+      }
+
+      ImGui::Spacing();
+    }
+
+    ImGui::Spacing();
+
+    // Initialize from settings
+    if (settings.dither_mode == DitherMode::kOrdered) {
+      if (settings.bayer_size == 2)
+        selected_bayer = 0;
+      else if (settings.bayer_size == 4)
+        selected_bayer = 1;
+      else if (settings.bayer_size == 8)
+        selected_bayer = 2;
+
+      if (ImGui::Selectable("2x2##bayer", selected_bayer == 0)) {
+        selected_bayer = 0;
+        settings.bayer_size = 2;
+      }
+      if (ImGui::Selectable("4x4##bayer", selected_bayer == 1)) {
+        selected_bayer = 1;
+        settings.bayer_size = 4;
+      }
+      if (ImGui::Selectable("8x8##bayer", selected_bayer == 2)) {
+        selected_bayer = 2;
+        settings.bayer_size = 8;
+      }
+    }
+
+    ImGui::Spacing();
+    ImGui::SeparatorText("color quantization");
+    ImGui::Spacing();
+
+    static int selected_quant = static_cast<int>(settings.quant_mode);
+
+    if (ImGui::Selectable("none##quant", selected_quant == 0)) {
+      selected_quant = 0;
+      settings.quant_mode = static_cast<QuantMode>(selected_quant);
+    }
+
+    if (ImGui::Selectable("grayscale##quant", selected_quant == 1)) {
+      selected_quant = 1;
+      settings.quant_mode = static_cast<QuantMode>(selected_quant);
+    }
+
+    if (ImGui::Selectable("rgb##quant", selected_quant == 2)) {
+      selected_quant = 2;
+      settings.quant_mode = static_cast<QuantMode>(selected_quant);
+    }
+
+    if (ImGui::Selectable("palette luma##quant", selected_quant == 3)) {
+      selected_quant = 3;
+      settings.quant_mode = static_cast<QuantMode>(selected_quant);
+    }
+
+    if (ImGui::Selectable("palette nearest##quant", selected_quant == 4)) {
+      selected_quant = 4;
+      settings.quant_mode = static_cast<QuantMode>(selected_quant);
+    }
+
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    int color_levels = static_cast<int>(settings.color_levels);
+
+    if (settings.quant_mode == QuantMode::kGrayscale ||
+        settings.quant_mode == QuantMode::kRGB) {
+      if (ImGui::SliderInt("color levels", &color_levels, 1, 256))
+        settings.color_levels =
+            static_cast<uint32_t>(glm::clamp(color_levels, 2, 256));
+
+      if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
+        if (settings.quant_mode == QuantMode::kGrayscale)
+          ImGui::SetTooltip("number of gray shades\n2 = black & white");
+        else if (settings.quant_mode == QuantMode::kRGB)
+          ImGui::SetTooltip(
+              "levels per channel (total colors = levels^3)\n"
+              "2 = 8 colors, 4 = 64 colors, 8 = 512 colors");
+      }
+    }
+
+    ImGui::Spacing();
+
+    if (settings.quant_mode == QuantMode::kPaletteLuma ||
+        settings.quant_mode == QuantMode::kPaletteNearest) {
+      ImGui::Text("palette:");
+      ImGui::Indent();
+
+      const char* palettes[] = {"grayscale", "gameboy",  "commodore 64",
+                                "nes",       "pico-8",   "warm",
+                                "cool",      "sunset",   "earth",
+                                "midnight",  "pastel-32"};
+
+      int palette_idx = static_cast<int>(settings.palette_idx);
+      if (ImGui::Combo("##palette_select", &palette_idx, palettes, 11))
+        settings.palette_idx = static_cast<uint32_t>(palette_idx);
+
+      ImGui::Unindent();
+      ImGui::Spacing();
+    }
+
+    ImGui::Spacing();
+
+    ImGui::EndDisabled();
+  }
+
   ImGui::End();
 }
 

@@ -20,6 +20,9 @@ DescriptorPool::DescriptorPool(const Context& ctx, const Resources& resrc)
       abuff_sets_{ctx, resrc.GetFrameCount()},
       wboit_input_sets_{ctx, resrc.GetFrameCount()},
 
+      dither_sets_{ctx},
+      palette_sets_{ctx, resrc.GetPaletteCount()},
+
       bright_sets_{ctx, resrc.GetFrameCount()},
       bright_temp_sets_{ctx, resrc.GetFrameCount()},
 
@@ -60,6 +63,12 @@ DescriptorPool::DescriptorPool(const Context& ctx, const Resources& resrc)
   abuff_sets_.Update(resrc);
   wboit_input_sets_.AllocSets(pool_);
   wboit_input_sets_.Update(resrc);
+
+  // post-processing
+  dither_sets_.AllocSets(pool_);
+  dither_sets_.Update(resrc);
+  palette_sets_.AllocSets(pool_);
+  palette_sets_.Update(resrc);
 
   // bloom
   bright_sets_.AllocSets(pool_);
@@ -121,6 +130,13 @@ void DescriptorPool::CreateDescriptorPool() {
   const auto& wboit_sizes = wboit_input_sets_.GetPoolSizes();
   pool_sizes.insert(pool_sizes.end(), wboit_sizes.begin(), wboit_sizes.end());
 
+  // post-processing
+  const auto& dither_sizes = dither_sets_.GetPoolSizes();
+  pool_sizes.insert(pool_sizes.end(), dither_sizes.begin(), dither_sizes.end());
+  const auto& palette_sizes = palette_sets_.GetPoolSizes();
+  pool_sizes.insert(pool_sizes.end(), palette_sizes.begin(),
+                    palette_sizes.end());
+
   // bloom
   const auto& bright_sizes = bright_sets_.GetPoolSizes();
   pool_sizes.insert(pool_sizes.end(), bright_sizes.begin(), bright_sizes.end());
@@ -149,6 +165,7 @@ void DescriptorPool::CreateDescriptorPool() {
       point_light_sets_.GetCount() + spot_light_sets_.GetCount() +
       ao_set_.GetCount() + ao_res_sets_.GetCount() + ao_temp_sets_.GetCount() +
       abuff_sets_.GetCount() + wboit_input_sets_.GetCount() +
+      dither_sets_.GetCount() + palette_sets_.GetCount() +
       bright_sets_.GetCount() + bright_temp_sets_.GetCount() +
       depth_sets_.GetCount() + dof_set_.GetCount() + coc_sets_.GetCount() +
       color_sets_.GetCount() + present_sets_.GetCount();

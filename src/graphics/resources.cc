@@ -37,7 +37,7 @@ Resources::Resources(const Context& ctx, const CommandPool& cmd_pool,
     CreateWhiteNoiseTex(cmd_buff);
     CreateSSAONoiseTex(cmd_buff);
     LoadBlueTextures(cmd_buff);
-
+    CreatePalettes(cmd_buff);
     CreateSphereMesh(cmd_buff);
     CreateConeMesh(cmd_buff);
   }
@@ -453,6 +453,8 @@ void Resources::LoadBlueTextures(vk::CommandBuffer cmd_buff) {
           blue_noise_tex_64_2, "blue_noise_64_2");
   LoadTex(cmd_buff, "../assets/textures/blue_noise_64_3.png",
           blue_noise_tex_64_3, "blue_noise_64_3");
+  LoadTex(cmd_buff, "../assets/textures/blue_noise_128_4.png",
+          blue_noise_tex_128_4, "blue_noise_128_4");
 }
 
 void Resources::LoadTex(vk::CommandBuffer cmd_buff, const std::string& filepath,
@@ -479,6 +481,160 @@ void Resources::LoadTex(vk::CommandBuffer cmd_buff, const std::string& filepath,
   out_texture->Write(cmd_buff, data, width * height * 4);
 
   stbi_image_free(data);
+}
+
+// === create palettes ===
+void Resources::CreatePalettes(vk::CommandBuffer cmd_buff) {
+  CreatePalette(cmd_buff, "grayscale",
+                {
+                    {0.0f, 0.0f, 0.0f, 1.0f},        // Black
+                    {0.333f, 0.333f, 0.333f, 1.0f},  // Dark gray
+                    {0.667f, 0.667f, 0.667f, 1.0f},  // Light gray
+                    {1.0f, 1.0f, 1.0f, 1.0f}         // White
+                });
+
+  CreatePalette(cmd_buff, "gameboy",
+                {
+                    {0.06f, 0.22f, 0.06f, 1.0f},  // Darkest green
+                    {0.19f, 0.38f, 0.19f, 1.0f},  // Dark green
+                    {0.55f, 0.68f, 0.06f, 1.0f},  // Light green
+                    {0.61f, 0.74f, 0.06f, 1.0f}   // Lightest green
+                });
+
+  CreatePalette(cmd_buff, "commodore64",
+                {
+                    {0.0f, 0.0f, 0.0f, 1.0f},     // Black
+                    {0.38f, 0.27f, 0.71f, 1.0f},  // Purple
+                    {0.42f, 0.29f, 0.71f, 1.0f},  // Light purple
+                    {0.0f, 0.42f, 0.69f, 1.0f},   // Blue
+                    {0.0f, 0.6f, 0.85f, 1.0f},    // Light blue
+                    {0.35f, 0.35f, 0.35f, 1.0f},  // Gray
+                    {0.6f, 0.6f, 0.6f, 1.0f},     // Light gray
+                    {1.0f, 1.0f, 1.0f, 1.0f}      // White
+                });
+
+  CreatePalette(cmd_buff, "nes",
+                {
+                    {0.0f, 0.0f, 0.0f, 1.0f},    // Black
+                    {0.33f, 0.0f, 0.33f, 1.0f},  // Purple
+                    {0.67f, 0.0f, 0.0f, 1.0f},   // Red
+                    {1.0f, 0.33f, 0.0f, 1.0f},   // Orange
+                    {1.0f, 0.67f, 0.0f, 1.0f},   // Yellow
+                    {0.67f, 1.0f, 0.33f, 1.0f},  // Light green
+                    {0.0f, 0.67f, 0.67f, 1.0f},  // Cyan
+                    {1.0f, 1.0f, 1.0f, 1.0f}     // White
+                });
+
+  CreatePalette(cmd_buff, "pico8",
+                {
+                    {0.0f, 0.0f, 0.0f, 1.0f},     // Black
+                    {0.11f, 0.17f, 0.33f, 1.0f},  // Dark blue
+                    {0.49f, 0.15f, 0.44f, 1.0f},  // Dark purple
+                    {0.0f, 0.53f, 0.33f, 1.0f},   // Dark green
+                    {0.67f, 0.32f, 0.21f, 1.0f},  // Brown
+                    {0.37f, 0.34f, 0.31f, 1.0f},  // Dark gray
+                    {0.76f, 0.76f, 0.78f, 1.0f},  // Light gray
+                    {1.0f, 0.95f, 0.91f, 1.0f},   // White
+                    {1.0f, 0.0f, 0.3f, 1.0f},     // Red
+                    {1.0f, 0.64f, 0.0f, 1.0f},    // Orange
+                    {1.0f, 0.93f, 0.15f, 1.0f},   // Yellow
+                    {0.0f, 0.89f, 0.21f, 1.0f},   // Green
+                    {0.16f, 0.68f, 1.0f, 1.0f},   // Blue
+                    {0.51f, 0.46f, 0.61f, 1.0f},  // Indigo
+                    {1.0f, 0.47f, 0.66f, 1.0f},   // Pink
+                    {1.0f, 0.8f, 0.67f, 1.0f}     // Peach
+                });
+
+  CreatePalette(cmd_buff, "warm",
+                {
+                    {0.2f, 0.0f, 0.1f, 1.0f},  // Dark maroon
+                    {0.6f, 0.1f, 0.0f, 1.0f},  // Dark red
+                    {0.9f, 0.3f, 0.0f, 1.0f},  // Orange-red
+                    {1.0f, 0.6f, 0.2f, 1.0f},  // Orange
+                    {1.0f, 0.9f, 0.7f, 1.0f}   // Warm white
+                });
+
+  CreatePalette(cmd_buff, "cool",
+                {
+                    {0.0f, 0.1f, 0.2f, 1.0f},  // Dark blue
+                    {0.0f, 0.3f, 0.5f, 1.0f},  // Blue
+                    {0.2f, 0.5f, 0.7f, 1.0f},  // Light blue
+                    {0.5f, 0.7f, 0.9f, 1.0f},  // Sky blue
+                    {0.9f, 0.95f, 1.0f, 1.0f}  // Cool white
+                });
+
+  CreatePalette(cmd_buff, "sunset",
+                {
+                    {0.1f, 0.0f, 0.2f, 1.0f},  // Deep purple
+                    {0.4f, 0.0f, 0.3f, 1.0f},  // Purple
+                    {0.8f, 0.2f, 0.3f, 1.0f},  // Pink-red
+                    {1.0f, 0.5f, 0.2f, 1.0f},  // Orange
+                    {1.0f, 0.9f, 0.5f, 1.0f}   // Yellow
+                });
+
+  CreatePalette(cmd_buff, "earth",
+                {
+                    {0.15f, 0.1f, 0.05f, 1.0f},  // Dark soil
+                    {0.3f, 0.2f, 0.1f, 1.0f},    // Soil
+                    {0.5f, 0.35f, 0.2f, 1.0f},   // Brown earth
+                    {0.4f, 0.5f, 0.3f, 1.0f},    // Moss
+                    {0.6f, 0.7f, 0.5f, 1.0f},    // Green-brown
+                    {0.8f, 0.75f, 0.6f, 1.0f},   // Sand
+                    {0.9f, 0.9f, 0.85f, 1.0f}    // Light sand
+                });
+
+  CreatePalette(cmd_buff, "midnight",
+                {
+                    {0.0f, 0.0f, 0.1f, 1.0f},    // Very dark blue
+                    {0.05f, 0.05f, 0.2f, 1.0f},  // Dark blue
+                    {0.1f, 0.1f, 0.3f, 1.0f},    // Blue
+                    {0.2f, 0.2f, 0.4f, 1.0f},    // Medium blue
+                    {0.3f, 0.3f, 0.5f, 1.0f},    // Light blue
+                    {0.5f, 0.5f, 0.6f, 1.0f},    // Gray-blue
+                    {0.7f, 0.7f, 0.8f, 1.0f}     // Light gray
+                });
+
+  CreatePalette(cmd_buff, "gradient 32",
+                {{0.0f, 0.0f, 0.0f, 1.0f},       {0.032f, 0.032f, 0.032f, 1.0f},
+                 {0.065f, 0.065f, 0.065f, 1.0f}, {0.097f, 0.097f, 0.097f, 1.0f},
+                 {0.129f, 0.129f, 0.129f, 1.0f}, {0.161f, 0.161f, 0.161f, 1.0f},
+                 {0.194f, 0.194f, 0.194f, 1.0f}, {0.226f, 0.226f, 0.226f, 1.0f},
+                 {0.258f, 0.258f, 0.258f, 1.0f}, {0.290f, 0.290f, 0.290f, 1.0f},
+                 {0.323f, 0.323f, 0.323f, 1.0f}, {0.355f, 0.355f, 0.355f, 1.0f},
+                 {0.387f, 0.387f, 0.387f, 1.0f}, {0.419f, 0.419f, 0.419f, 1.0f},
+                 {0.452f, 0.452f, 0.452f, 1.0f}, {0.484f, 0.484f, 0.484f, 1.0f},
+                 {0.516f, 0.516f, 0.516f, 1.0f}, {0.548f, 0.548f, 0.548f, 1.0f},
+                 {0.581f, 0.581f, 0.581f, 1.0f}, {0.613f, 0.613f, 0.613f, 1.0f},
+                 {0.645f, 0.645f, 0.645f, 1.0f}, {0.677f, 0.677f, 0.677f, 1.0f},
+                 {0.710f, 0.710f, 0.710f, 1.0f}, {0.742f, 0.742f, 0.742f, 1.0f},
+                 {0.774f, 0.774f, 0.774f, 1.0f}, {0.806f, 0.806f, 0.806f, 1.0f},
+                 {0.839f, 0.839f, 0.839f, 1.0f}, {0.871f, 0.871f, 0.871f, 1.0f},
+                 {0.903f, 0.903f, 0.903f, 1.0f}, {0.935f, 0.935f, 0.935f, 1.0f},
+                 {0.968f, 0.968f, 0.968f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f}});
+}
+
+void Resources::CreatePalette(vk::CommandBuffer cmd_buff,
+                              const std::string& name,
+                              const std::vector<glm::vec4>& colors) {
+  if (colors.empty()) return;
+
+  std::vector<uint8_t> data(colors.size() * 4);
+  for (size_t i = 0; i < colors.size(); ++i) {
+    data[i * 4 + 0] = static_cast<uint8_t>(colors[i].r * 255.0f);
+    data[i * 4 + 1] = static_cast<uint8_t>(colors[i].g * 255.0f);
+    data[i * 4 + 2] = static_cast<uint8_t>(colors[i].b * 255.0f);
+    data[i * 4 + 3] = static_cast<uint8_t>(colors[i].a * 255.0f);
+  }
+
+  auto palette = std::make_unique<Texture>(
+      ctx_, frame_props_.palette_format,
+      vk::Extent2D{static_cast<uint32_t>(colors.size()), 1},
+      vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
+      vk::ImageAspectFlagBits::eColor, vk::SampleCountFlagBits::e1,
+      "palette_" + name);
+
+  palette->Write(cmd_buff, data.data(), data.size());
+  palette_texs_.push_back(std::move(palette));
 }
 
 // === create meshes ===

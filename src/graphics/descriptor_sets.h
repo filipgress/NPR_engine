@@ -314,6 +314,40 @@ class DofSet : public BaseDescSets {
   void CreateLayout() override;
 };
 
+/*
+ * DitherNoiseSets
+ */
+class DitherNoiseSets : public BaseDescSets {
+ public:
+  DitherNoiseSets(const Context& ctx) : BaseDescSets{ctx, 4} { CreateLayout(); }
+
+  void Update(const Resources& resrc) const;
+  std::vector<vk::DescriptorPoolSize> GetPoolSizes() const override {
+    return {{vk::DescriptorType::eCombinedImageSampler, 2 * count_}};
+  }
+
+ private:
+  void CreateLayout() override;
+};
+
+/*
+ * PaletteSets
+ */
+class PaletteSets : public BaseDescSets {
+ public:
+  PaletteSets(const Context& ctx, uint count) : BaseDescSets{ctx, count} {
+    CreateLayout();
+  }
+
+  void Update(const Resources& resrc) const;
+  std::vector<vk::DescriptorPoolSize> GetPoolSizes() const override {
+    return {{vk::DescriptorType::eCombinedImageSampler, count_}};
+  }
+
+ private:
+  void CreateLayout() override;
+};
+
 }  // namespace npr_graphics
 
 #endif  // DESCRIPTOR_SETS_H_

@@ -29,6 +29,7 @@ class ShaderManager : public npr_core::NonCopyable {
   FragmentShader abuff_res_frag_;
   FragmentShader wboit_acc_frag_;
   FragmentShader wboit_res_frag_;
+  FragmentShader post_process_frag_;
   FragmentShader bright_extract_frag_;
   FragmentShader coc_extract_frag_;
   FragmentShader dof_poisson_frag_;

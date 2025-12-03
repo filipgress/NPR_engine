@@ -22,6 +22,8 @@ ShaderManager::ShaderManager(const Context& ctx)
                       "../shaders/wboit_acc.frag"},
       wboit_res_frag_{ctx, "shaders/wboit_res.spv",
                       "../shaders/wboit_res.frag"},
+      post_process_frag_{ctx, "shaders/post_process_frag.spv",
+                         "../shaders/post_process.frag"},
       bright_extract_frag_{ctx, "shaders/bright_extract_frag.spv",
                            "../shaders/bright_extract.frag"},
       coc_extract_frag_{ctx, "shaders/coc_extract_frag.spv",
@@ -29,15 +31,12 @@ ShaderManager::ShaderManager(const Context& ctx)
       dof_poisson_frag_{ctx, "shaders/dof_poisson_frag.spv",
                         "../shaders/dof_poisson.frag"},
       swap_frag_{ctx, "shaders/swap_frag.spv", "../shaders/swap.frag"},
-      shaders_{&quad_vert_,        &gbuff_vert_,
-               &light_vert_,       &gbuff_frag_,
-               &ao_frag_,          &blur_frag_,
-               &dir_light_frag_,   &point_light_frag_,
-               &spot_light_frag_,  &abuff_fill_frag_,
-               &abuff_res_frag_,   &wboit_acc_frag_,
-               &wboit_res_frag_,   &bright_extract_frag_,
-               &coc_extract_frag_, &dof_poisson_frag_,
-               &swap_frag_} {}
+      shaders_{&quad_vert_,        &gbuff_vert_,        &light_vert_,
+               &gbuff_frag_,       &ao_frag_,           &blur_frag_,
+               &dir_light_frag_,   &point_light_frag_,  &spot_light_frag_,
+               &abuff_fill_frag_,  &abuff_res_frag_,    &wboit_acc_frag_,
+               &wboit_res_frag_,   &post_process_frag_, &bright_extract_frag_,
+               &coc_extract_frag_, &dof_poisson_frag_,  &swap_frag_} {}
 
 void ShaderManager::Recompile() {
   if (!kEnableShaderReload) return;

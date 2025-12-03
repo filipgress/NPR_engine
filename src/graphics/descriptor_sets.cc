@@ -577,4 +577,110 @@ void DofSet::Update(const Resources& resrc) const {
                                         0, nullptr);
 }
 
+/*
+ * DitherNoiseSets
+ */
+void DitherNoiseSets::CreateLayout() {
+  std::array<vk::DescriptorSetLayoutBinding, 2> bindings;
+
+  // white_noise_tex
+  bindings[0].binding = 0;
+  bindings[0].descriptorType = vk::DescriptorType::eCombinedImageSampler;
+  bindings[0].descriptorCount = 1;
+  bindings[0].stageFlags = vk::ShaderStageFlagBits::eFragment;
+
+  // blue_noise_tex
+  bindings[1].binding = 1;
+  bindings[1].descriptorType = vk::DescriptorType::eCombinedImageSampler;
+  bindings[1].descriptorCount = 1;
+  bindings[1].stageFlags = vk::ShaderStageFlagBits::eFragment;
+
+  vk::DescriptorSetLayoutCreateInfo layout_info{};
+  layout_info.bindingCount = bindings.size();
+  layout_info.pBindings = bindings.data();
+
+  layout_ = ctx_.GetDevice().createDescriptorSetLayout(layout_info);
+  ctx_.SetDbgName((uint64_t)(VkDescriptorSetLayout)layout_,
+                  vk::ObjectType::eDescriptorSetLayout,
+                  "dither_noise_set_layout");
+}
+
+void DitherNoiseSets::Update(const Resources& resrc) const {
+  const auto& white_noise = resrc.GetWhiteNoiseTex();
+  vk::DescriptorImageInfo white_noise_info{};
+  white_noise_info.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+  white_noise_info.imageView = white_noise.GetImageView();
+  white_noise_info.sampler = white_noise.GetSampler();
+
+  std::array<const Texture*, 4> blue_noises = {
+      &resrc.GetBlueNoiseTex64_1(), &resrc.GetBlueNoiseTex64_2(),
+      &resrc.GetBlueNoiseTex64_3(), &resrc.GetBlueNoiseTex128_4()};
+
+  for (size_t i = 0; i < count_; ++i) {
+    std::array<vk::DescriptorImageInfo, 2> image_infos;
+
+    // white_noise_tex
+    image_infos[0] = white_noise_info;
+
+    // blue_noise_tex
+    image_infos[1].imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+    image_infos[1].imageView = blue_noises[i]->GetImageView();
+    image_infos[1].sampler = blue_noises[i]->GetSampler();
+
+    std::array<vk::WriteDescriptorSet, 2> desc_writes;
+    for (size_t j = 0; j < 2; ++j) {
+      desc_writes[j].dstSet = sets_[i];
+      desc_writes[j].dstBinding = j;
+      desc_writes[j].dstArrayElement = 0;
+      desc_writes[j].descriptorType = vk::DescriptorType::eCombinedImageSampler;
+      desc_writes[j].descriptorCount = 1;
+      desc_writes[j].pImageInfo = &image_infos[j];
+    }
+
+    ctx_.GetDevice().updateDescriptorSets(desc_writes.size(),
+                                          desc_writes.data(), 0, nullptr);
+  }
+}
+
+/*
+ * PaletteSets
+ */
+void PaletteSets::CreateLayout() {
+  vk::DescriptorSetLayoutBinding binding{};
+  binding.binding = 0;
+  binding.descriptorType = vk::DescriptorType::eCombinedImageSampler;
+  binding.descriptorCount = 1;
+  binding.stageFlags = vk::ShaderStageFlagBits::eFragment;
+
+  vk::DescriptorSetLayoutCreateInfo layout_info{};
+  layout_info.bindingCount = 1;
+  layout_info.pBindings = &binding;
+
+  layout_ = ctx_.GetDevice().createDescriptorSetLayout(layout_info);
+  ctx_.SetDbgName((uint64_t)(VkDescriptorSetLayout)layout_,
+                  vk::ObjectType::eDescriptorSetLayout, "palette_set_layout");
+}
+
+void PaletteSets::Update(const Resources& resrc) const {
+  for (uint32_t i = 0; i < count_; ++i) {
+    uint32_t palette_idx = std::min(i, resrc.GetPaletteCount() - 1);
+    const auto& palette = resrc.GetPaletteTex(palette_idx);
+
+    vk::DescriptorImageInfo image_info{};
+    image_info.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+    image_info.imageView = palette.GetImageView();
+    image_info.sampler = palette.GetSampler();
+
+    vk::WriteDescriptorSet desc_write{};
+    desc_write.dstSet = sets_[i];
+    desc_write.dstBinding = 0;
+    desc_write.dstArrayElement = 0;
+    desc_write.descriptorType = vk::DescriptorType::eCombinedImageSampler;
+    desc_write.descriptorCount = 1;
+    desc_write.pImageInfo = &image_info;
+
+    ctx_.GetDevice().updateDescriptorSets(1, &desc_write, 0, nullptr);
+  }
+}
+
 }  // namespace npr_graphics

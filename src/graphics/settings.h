@@ -2,7 +2,17 @@
 #define SETTINGS_H
 
 namespace npr_graphics {
+
 enum class TransparencyMode { kNone, kABuff, kWBoit };
+enum class DitherMode : uint32_t { kNone, kWhiteNoise, kOrdered, kBlueNoise };
+enum class QuantMode : uint32_t {
+  kNone = 0,
+  kGrayscale,
+  kRGB,
+  kPaletteLuma,
+  kPaletteNearest
+};
+
 struct RenderSettings {
   vk::Extent2D target_size{500, 400};
 
@@ -35,7 +45,15 @@ struct RenderSettings {
   float wboit_weight_min{1e-2};
   float wboit_weight_max{3e3};
 
-  bool enable_post_process{false};
+  bool enable_post_process{true};
+  uint32_t pixel_size{1};
+  DitherMode dither_mode{DitherMode::kNone};
+  uint32_t bayer_size{2};
+  float dither_strength{0.2f};
+  QuantMode quant_mode{QuantMode::kNone};
+  uint32_t color_levels{2};
+  uint32_t palette_idx{0};
+  uint32_t blue_noise_idx{0};
 
   bool enable_bloom{false};
   float bloom_threshold{1.0f};

@@ -168,6 +168,17 @@ struct DofPC {
   uint32_t debug_mode;
 };
 
+struct PostProcessPC {
+  uint32_t pixel_size;
+
+  uint32_t dither_mode;  // 0 = none, 1 = white, 2 = bayer, 3 = blue
+  uint32_t bayer_size;   // 2, 4, 8
+  float dither_strength;
+
+  uint32_t quant_mode;  // 0=none, 1 = grayscale, 2 = rgb, 3 = palette, 4 = hue
+  uint32_t color_levels;  // per channel for rgb, total for grayscale/palette
+};
+
 struct LoadPC {
   glm::uvec2 res{0};
   alignas(16) glm::vec3 t{0.0f};
@@ -207,6 +218,7 @@ struct FrameProps {
   // noise textures
   const vk::Format white_noise_format = vk::Format::eR8Unorm;
   const vk::Format blue_noise_format = vk::Format::eR8G8B8A8Unorm;
+  const vk::Format palette_format = vk::Format::eR8G8B8A8Unorm;
 };
 
 struct FrameResources {
@@ -297,6 +309,12 @@ class Resources : public npr_core::NonCopyable {
   const Texture& GetBlueNoiseTex64_1() const { return *blue_noise_tex_64_1; }
   const Texture& GetBlueNoiseTex64_2() const { return *blue_noise_tex_64_2; }
   const Texture& GetBlueNoiseTex64_3() const { return *blue_noise_tex_64_3; }
+  const Texture& GetBlueNoiseTex128_4() const { return *blue_noise_tex_128_4; }
+
+  uint32_t GetPaletteCount() const { return palette_texs_.size(); }
+  const Texture& GetPaletteTex(uint32_t idx) const {
+    return *palette_texs_[idx];
+  }
 
   const LightMesh& GetSphereMesh() const { return *sphere_mesh_; }
   const LightMesh& GetConeMesh() const { return *cone_mesh_; }
@@ -314,6 +332,8 @@ class Resources : public npr_core::NonCopyable {
   void CreateSSAONoiseTex(vk::CommandBuffer cmd_buff);
   void LoadBlueTextures(vk::CommandBuffer cmd_buff);
 
+  void CreatePalettes(vk::CommandBuffer cmd_buff);
+
   void CreateSphereMesh(vk::CommandBuffer cmd_buff);
   void CreateConeMesh(vk::CommandBuffer cmd_buff);
 
@@ -323,6 +343,8 @@ class Resources : public npr_core::NonCopyable {
 
   void LoadTex(vk::CommandBuffer cmd_buff, const std::string& filepath,
                std::unique_ptr<Texture>& out_texture, const std::string& name);
+  void CreatePalette(vk::CommandBuffer cmd_buff, const std::string& name,
+                     const std::vector<glm::vec4>& colors);
 
   vk::SampleCountFlagBits GetMaxSamples();
 
@@ -352,6 +374,9 @@ class Resources : public npr_core::NonCopyable {
   std::unique_ptr<Texture> blue_noise_tex_64_1;
   std::unique_ptr<Texture> blue_noise_tex_64_2;
   std::unique_ptr<Texture> blue_noise_tex_64_3;
+  std::unique_ptr<Texture> blue_noise_tex_128_4;
+
+  std::vector<std::unique_ptr<Texture>> palette_texs_;
 
   std::unique_ptr<LightMesh> cone_mesh_;
   std::unique_ptr<LightMesh> sphere_mesh_;
