@@ -5,6 +5,13 @@ namespace npr_graphics {
 
 enum class TransparencyMode { kNone, kABuff, kWBoit };
 enum class DitherMode : uint32_t { kNone, kWhiteNoise, kOrdered, kBlueNoise };
+enum class HatchMode : uint32_t {
+  kNone,
+  kHatch,
+  kCrossHatch,
+  kScribble,
+  kStipple
+};
 enum class QuantMode : uint32_t {
   kNone = 0,
   kGrayscale,
@@ -54,6 +61,10 @@ struct RenderSettings {
   uint32_t color_levels{2};
   uint32_t palette_idx{0};
   uint32_t blue_noise_idx{0};
+
+  HatchMode hatch_mode{HatchMode::kNone};
+  float hatch_int{0.8f};
+  float hatch_density{4.0f};
 
   bool enable_bloom{false};
   float bloom_threshold{1.0f};

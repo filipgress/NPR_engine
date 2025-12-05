@@ -36,6 +36,10 @@ class DescriptorPool : public npr_core::NonCopyable {
   const DitherNoiseSets& GetDitherNoiseSets() const { return dither_sets_; }
   const PaletteSets& GetPaletteSets() const { return palette_sets_; }
 
+  const HatchingArraySets& GetHatchingArraySets() const {
+    return hatch_array_sets_;
+  }
+
   const DepthSets& GetDepthSets() const { return depth_sets_; }
   const CocMapSets& GetCocMapSets() const { return coc_sets_; }
   const DofSet& GetDofSet() const { return dof_set_; }
@@ -70,6 +74,8 @@ class DescriptorPool : public npr_core::NonCopyable {
 
   DitherNoiseSets dither_sets_;
   PaletteSets palette_sets_;
+
+  HatchingArraySets hatch_array_sets_;
 
   BrightColorSets bright_sets_;
   BrightTempSets bright_temp_sets_;

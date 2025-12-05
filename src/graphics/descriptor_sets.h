@@ -348,6 +348,28 @@ class PaletteSets : public BaseDescSets {
   void CreateLayout() override;
 };
 
+/*
+ * HatchingArraySets - 4 descriptor sets, one for each hatching type
+ * Set 0: Hatch textures (9 levels)
+ * Set 1: Cross-hatch textures (9 levels)
+ * Set 2: Scribble textures (9 levels)
+ * Set 3: Stipple textures (9 levels)
+ */
+class HatchingArraySets : public BaseDescSets {
+ public:
+  HatchingArraySets(const Context& ctx) : BaseDescSets{ctx, 4} {
+    CreateLayout();
+  }
+
+  void Update(const Resources& resrc) const;
+  std::vector<vk::DescriptorPoolSize> GetPoolSizes() const override {
+    return {{vk::DescriptorType::eCombinedImageSampler, 4 * kHatchLevels}};
+  }
+
+ private:
+  void CreateLayout() override;
+};
+
 }  // namespace npr_graphics
 
 #endif  // DESCRIPTOR_SETS_H_

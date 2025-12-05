@@ -24,6 +24,8 @@ constexpr uint32_t kSSAOKernelSize = 64;
 constexpr uint32_t kMaxPoisSize = 128;
 constexpr uint32_t kMaxGausRadius = 16;
 
+constexpr uint kHatchLevels = 6;
+
 using SSAOKernel = std::array<glm::vec4, kSSAOKernelSize>;
 
 struct PoisKernelUnif {
@@ -178,6 +180,10 @@ struct PostProcessPC {
   uint32_t quant_mode;  // 0=none, 1 = grayscale, 2 = rgb, 3 = palette, 4 = hue
   uint32_t color_levels;  // per channel for rgb, total for grayscale/palette
 
+  uint32_t hatch_mode;  // 0=none, 1=hatch, 2=cross-hatch, 3=scribble, 4=stipple
+  float hatch_int;
+  float hatch_density;
+
   uint32_t enable_crt;
   float crt_curve_int;
   float crt_chroma;
@@ -230,6 +236,7 @@ struct FrameProps {
   // noise textures
   const vk::Format white_noise_format = vk::Format::eR8Unorm;
   const vk::Format blue_noise_format = vk::Format::eR8G8B8A8Unorm;
+  const vk::Format hatch_format = vk::Format::eR8Unorm;
   const vk::Format palette_format = vk::Format::eR8G8B8A8Unorm;
 };
 
@@ -328,6 +335,24 @@ class Resources : public npr_core::NonCopyable {
     return *palette_texs_[idx];
   }
 
+  uint32_t GetHatchTexCount() const { return hatch_texs_.size(); }
+  const Texture& GetHatchTex(uint32_t idx) const { return *hatch_texs_[idx]; }
+
+  uint32_t GetCrossHatchTexCount() const { return cross_hatch_texs_.size(); }
+  const Texture& GetCrossHatchTex(uint32_t idx) const {
+    return *cross_hatch_texs_[idx];
+  }
+
+  uint32_t GetScribbleTexCount() const { return scribble_texs_.size(); }
+  const Texture& GetScribbleTex(uint32_t idx) const {
+    return *scribble_texs_[idx];
+  }
+
+  uint32_t GetStippleTexCount() const { return stipple_texs_.size(); }
+  const Texture& GetStippleTex(uint32_t idx) const {
+    return *stipple_texs_[idx];
+  }
+
   const LightMesh& GetSphereMesh() const { return *sphere_mesh_; }
   const LightMesh& GetConeMesh() const { return *cone_mesh_; }
 
@@ -343,6 +368,7 @@ class Resources : public npr_core::NonCopyable {
   void CreateWhiteNoiseTex(vk::CommandBuffer cmd_buff);
   void CreateSSAONoiseTex(vk::CommandBuffer cmd_buff);
   void LoadBlueTextures(vk::CommandBuffer cmd_buff);
+  void LoadPatternTextures(vk::CommandBuffer cmd_buff);
 
   void CreatePalettes(vk::CommandBuffer cmd_buff);
 
@@ -353,7 +379,8 @@ class Resources : public npr_core::NonCopyable {
   GausKernelPC GenGausKernel(uint32_t radius);
   PoisKernelUnif GenPoisKernel(uint32_t sample_count, uint32_t max_attempts);
 
-  void LoadTex(vk::CommandBuffer cmd_buff, const std::string& filepath,
+  void LoadTex(vk::CommandBuffer cmd_buff, vk::Format format,
+               const std::string& filepath,
                std::unique_ptr<Texture>& out_texture, const std::string& name);
   void CreatePalette(vk::CommandBuffer cmd_buff, const std::string& name,
                      const std::vector<glm::vec4>& colors);
@@ -387,6 +414,11 @@ class Resources : public npr_core::NonCopyable {
   std::unique_ptr<Texture> blue_noise_tex_64_2;
   std::unique_ptr<Texture> blue_noise_tex_64_3;
   std::unique_ptr<Texture> blue_noise_tex_128_4;
+
+  std::vector<std::unique_ptr<Texture>> hatch_texs_;
+  std::vector<std::unique_ptr<Texture>> cross_hatch_texs_;
+  std::vector<std::unique_ptr<Texture>> scribble_texs_;
+  std::vector<std::unique_ptr<Texture>> stipple_texs_;
 
   std::vector<std::unique_ptr<Texture>> palette_texs_;
 

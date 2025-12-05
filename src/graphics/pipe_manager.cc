@@ -548,12 +548,14 @@ void PipeManager::BuildPostProcess(const VertexShader& vert_shader,
                                    const DescriptorPool& desc_pool) {
   post_process_.CreateLayout({desc_pool.GetColorSets().GetLayout(),
                               desc_pool.GetDitherNoiseSets().GetLayout(),
-                              desc_pool.GetPaletteSets().GetLayout()},
+                              desc_pool.GetPaletteSets().GetLayout(),
+                              desc_pool.GetHatchingArraySets().GetLayout()},
                              {Pipeline::MakePushConst<PostProcessPC>(
                                  vk::ShaderStageFlagBits::eFragment)});
 
   post_process_.AddShader(vert_shader);
-  post_process_.AddShader(frag_shader);
+  post_process_.AddShader(frag_shader,
+                          {Pipeline::MakeSpecConst(0, kHatchLevels)});
 
   auto& state = post_process_.state_;
 

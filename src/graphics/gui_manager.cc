@@ -329,7 +329,7 @@ void GuiManager::GlobalSettingsWindow(npr_graphics::RenderSettings& settings,
 
     ImGui::ColorEdit3("color", &settings.ambient_color.x);
     ImGui::DragFloat("intensity##ambient", &settings.ambient_intensity, 0.005f,
-                     0.0f, 1.0f);
+                     0.0f, 8.0f);
 
     if (settings.ambient_intensity < 0.05f) settings.enable_ssao = false;
 
@@ -496,6 +496,64 @@ void GuiManager::GlobalSettingsWindow(npr_graphics::RenderSettings& settings,
         settings.pixel_size = static_cast<uint32_t>(pixel_size);
 
       ImGui::Unindent();
+    }
+
+    ImGui::Spacing();
+
+    // ========================================================================
+    // HATCHING
+    // ========================================================================
+    if (ImGui::CollapsingHeader("hatching##hatch")) {
+      ImGui::Text("mode:");
+      ImGui::Indent();
+
+      static int selected_hatch = static_cast<int>(settings.hatch_mode);
+
+      if (ImGui::Selectable("none##hm", selected_hatch == 0)) {
+        selected_hatch = 0;
+        settings.hatch_mode = static_cast<HatchMode>(selected_hatch);
+      }
+
+      if (ImGui::Selectable("hatch##hm", selected_hatch == 1)) {
+        selected_hatch = 1;
+        settings.hatch_mode = static_cast<HatchMode>(selected_hatch);
+      }
+
+      if (ImGui::Selectable("cross-hatch##hm", selected_hatch == 2)) {
+        selected_hatch = 2;
+        settings.hatch_mode = static_cast<HatchMode>(selected_hatch);
+      }
+
+      if (ImGui::Selectable("scribble##hm", selected_hatch == 3)) {
+        selected_hatch = 3;
+        settings.hatch_mode = static_cast<HatchMode>(selected_hatch);
+      }
+
+      if (ImGui::Selectable("stipple##hm", selected_hatch == 4)) {
+        selected_hatch = 4;
+        settings.hatch_mode = static_cast<HatchMode>(selected_hatch);
+      }
+
+      ImGui::Unindent();
+      ImGui::Spacing();
+
+      ImGui::BeginDisabled(settings.hatch_mode == HatchMode::kNone);
+
+      if (ImGui::SliderFloat("intensity##hatch", &settings.hatch_int, 0.0f,
+                             1.0f, "%.2f"))
+        settings.hatch_int = glm::clamp(settings.hatch_int, 0.0f, 1.0f);
+
+      if (ImGui::DragFloat("density##hatch_density", &settings.hatch_density,
+                           0.1f, 1.0f, 16.0f, "%.1f"))
+        settings.hatch_density =
+            glm::clamp(settings.hatch_density, 1.0f, 16.0f);
+
+      if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
+        ImGui::SetTooltip("How many times the pattern tiles across the screen");
+      }
+
+      ImGui::EndDisabled();
+      ImGui::Spacing();
     }
 
     ImGui::Spacing();

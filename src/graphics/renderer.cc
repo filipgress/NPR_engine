@@ -883,12 +883,23 @@ void Renderer::RecordPostProcess(
       vk::PipelineBindPoint::eGraphics, pipelines_.post_process_.GetLayout(), 2,
       desc_pool_.GetPaletteSets().GetSet(settings_.palette_idx), {});
 
+  uint32_t set_idx = settings_.hatch_mode == HatchMode::kNone
+                         ? 0
+                         : static_cast<uint32_t>(settings_.hatch_mode) - 1;
+
+  cmd_buff.bindDescriptorSets(  // hatching textures
+      vk::PipelineBindPoint::eGraphics, pipelines_.post_process_.GetLayout(), 3,
+      desc_pool_.GetHatchingArraySets().GetSet(set_idx), {});
+
   PostProcessPC pc{.pixel_size = settings_.pixel_size,
                    .dither_mode = static_cast<uint32_t>(settings_.dither_mode),
                    .bayer_size = settings_.bayer_size,
                    .dither_strength = settings_.dither_strength,
                    .quant_mode = static_cast<uint32_t>(settings_.quant_mode),
                    .color_levels = settings_.color_levels,
+                   .hatch_mode = static_cast<uint32_t>(settings_.hatch_mode),
+                   .hatch_int = settings_.hatch_int,
+                   .hatch_density = settings_.hatch_density,
                    .enable_crt = settings_.enable_crt,
                    .crt_curve_int = settings_.crt_curve_int,
                    .crt_chroma = settings_.crt_chroma,

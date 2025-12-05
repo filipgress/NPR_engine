@@ -1,11 +1,19 @@
 #version 450
 
+layout(constant_id = 0) const int HATCH_LEVELS = 6;
+
 const float EPSILON = 1e-5;
 
 const uint DITHER_NONE = 0u;
 const uint DITHER_WHITE_NOISE = 1u;
 const uint DITHER_BAYER = 2u;
 const uint DITHER_BLUE_NOISE = 3u;
+
+const uint HATCH_NONE = 0u;
+const uint HATCH_HATCH = 1u;
+const uint HATCH_CROSS_HATCH = 2u;
+const uint HATCH_SCRIBBLE = 3u;
+const uint HATCH_STIPPLE = 4u;
 
 const uint QUANT_NONE = 0u;
 const uint QUANT_GRAYSCALE = 1u;
@@ -26,6 +34,7 @@ layout(set = 0, binding = 0) uniform sampler2D color_tex;
 layout(set = 1, binding = 0) uniform sampler2D white_noise_tex;
 layout(set = 1, binding = 1) uniform sampler2D blue_noise_tex;
 layout(set = 2, binding = 0) uniform sampler2D palette_tex;
+layout(set = 3, binding = 0) uniform sampler2D hatch_textures[HATCH_LEVELS];
 
 layout(push_constant) uniform PostPC {
   uint pixel_size;
@@ -36,6 +45,10 @@ layout(push_constant) uniform PostPC {
 
   uint quant_mode; // 0 = none, 1 = grayscale, 2 = rgb, 3 = palette, 4 = hue
   uint color_levels; // per channel for rgb, total for grayscale/palette
+
+  uint hatch_mode; // 0 = none, 1 = hatch, 2 = cross-hatch, 3 = scribble, 4 = stipple
+  float hatch_int;
+  float hatch_density;
 
   uint enable_crt;
   float crt_curve_int;
@@ -209,6 +222,27 @@ vec3 apply_quantization(vec3 color) {
 }
 
 // ============================================================================
+// HATCHING
+// ============================================================================
+vec3 apply_hatching(vec2 uv, vec3 color) {
+  if (hatch_mode == HATCH_NONE) return color;
+
+  float lum = get_lum(color);
+  float level_f = (1.0 - lum) * float(HATCH_LEVELS - 1);
+  int level = int(clamp(level_f, 0.0, float(HATCH_LEVELS - 1)));
+
+  vec2 hatch_size = textureSize(hatch_textures[0], 0);
+
+  vec2 hatch_uv = (uv * textureSize(color_tex, 0)) / (hatch_size / hatch_density);
+  float hatch_value = texture(hatch_textures[level], hatch_uv).r;
+
+  // vec2 tex_scale = textureSize(color_tex, 0) / textureSize(hatch_textures[0], 0);
+  // float hatch_value = texture(hatch_textures[level], frag_uv * tex_scale).r;
+
+  return color * mix(1.0, hatch_value, hatch_int);
+}
+
+// ============================================================================
 // PIXELIZATION
 // ============================================================================
 vec2 apply_pixelization(vec2 uv) {
@@ -224,7 +258,7 @@ vec2 apply_pixelization(vec2 uv) {
 vec2 apply_distortion(vec2 uv) {
   if (crt_distortion_int < EPSILON) return uv;
 
-  vec2 noise_uv = vec2(uv.y * 3, t * crt_distortion_speed);
+  vec2 noise_uv = vec2(uv.y * 3.0, t * crt_distortion_speed);
   float noise = texture(white_noise_tex, noise_uv).r;
 
   uv.x += (noise - 0.5) * crt_distortion_int;
@@ -299,6 +333,7 @@ void main() {
     vec3 color = texture(color_tex, uv).rgb;
 
     color = apply_quantization(color);
+    color = apply_hatching(frag_uv, color);
     out_color = vec4(color, 1.0);
 
     return;
@@ -317,6 +352,7 @@ void main() {
   vec3 color = sample_with_chroma(pixel_uv);
 
   color = apply_quantization(color);
+  color = apply_hatching(frag_uv, color);
   color = apply_rgb_cell_mask(frag_uv, color);
   color = apply_scanlines(curve_uv, color);
 

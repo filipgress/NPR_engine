@@ -37,6 +37,7 @@ Resources::Resources(const Context& ctx, const CommandPool& cmd_pool,
     CreateWhiteNoiseTex(cmd_buff);
     CreateSSAONoiseTex(cmd_buff);
     LoadBlueTextures(cmd_buff);
+    LoadPatternTextures(cmd_buff);
     CreatePalettes(cmd_buff);
     CreateSphereMesh(cmd_buff);
     CreateConeMesh(cmd_buff);
@@ -440,29 +441,71 @@ void Resources::CreateSSAONoiseTex(vk::CommandBuffer cmd_buff) {
 }
 
 void Resources::LoadBlueTextures(vk::CommandBuffer cmd_buff) {
-  LoadTex(cmd_buff, "../assets/textures/blue_noise_64.png", blue_noise_tex_64_,
+  LoadTex(cmd_buff, frame_props_.blue_noise_format,
+          "../assets/textures/blue_noise_64.png", blue_noise_tex_64_,
           "blue_noise_64");
-  LoadTex(cmd_buff, "../assets/textures/blue_noise_128.png",
-          blue_noise_tex_128_, "blue_noise_128");
-  LoadTex(cmd_buff, "../assets/textures/blue_noise_256.png",
-          blue_noise_tex_256_, "blue_noise_256");
+  LoadTex(cmd_buff, frame_props_.blue_noise_format,
+          "../assets/textures/blue_noise_128.png", blue_noise_tex_128_,
+          "blue_noise_128");
+  LoadTex(cmd_buff, frame_props_.blue_noise_format,
+          "../assets/textures/blue_noise_256.png", blue_noise_tex_256_,
+          "blue_noise_256");
 
-  LoadTex(cmd_buff, "../assets/textures/blue_noise_64_1.png",
-          blue_noise_tex_64_1, "blue_noise_64_1");
-  LoadTex(cmd_buff, "../assets/textures/blue_noise_64_2.png",
-          blue_noise_tex_64_2, "blue_noise_64_2");
-  LoadTex(cmd_buff, "../assets/textures/blue_noise_64_3.png",
-          blue_noise_tex_64_3, "blue_noise_64_3");
-  LoadTex(cmd_buff, "../assets/textures/blue_noise_128_4.png",
-          blue_noise_tex_128_4, "blue_noise_128_4");
+  LoadTex(cmd_buff, frame_props_.blue_noise_format,
+          "../assets/textures/blue_noise_64_1.png", blue_noise_tex_64_1,
+          "blue_noise_64_1");
+  LoadTex(cmd_buff, frame_props_.blue_noise_format,
+          "../assets/textures/blue_noise_64_2.png", blue_noise_tex_64_2,
+          "blue_noise_64_2");
+  LoadTex(cmd_buff, frame_props_.blue_noise_format,
+          "../assets/textures/blue_noise_64_3.png", blue_noise_tex_64_3,
+          "blue_noise_64_3");
+  LoadTex(cmd_buff, frame_props_.blue_noise_format,
+          "../assets/textures/blue_noise_128_4.png", blue_noise_tex_128_4,
+          "blue_noise_128_4");
 }
 
-void Resources::LoadTex(vk::CommandBuffer cmd_buff, const std::string& filepath,
+void Resources::LoadPatternTextures(vk::CommandBuffer cmd_buff) {
+  hatch_texs_.resize(kHatchLevels);
+  cross_hatch_texs_.resize(kHatchLevels);
+  scribble_texs_.resize(kHatchLevels);
+  stipple_texs_.resize(kHatchLevels);
+
+  for (uint i = 0; i < kHatchLevels; ++i) {
+    LoadTex(cmd_buff, frame_props_.hatch_format,
+            "../assets/textures/hatch" + std::to_string(i) + ".jpg",
+            hatch_texs_[i], "hatch_" + std::to_string(i));
+
+    LoadTex(cmd_buff, frame_props_.hatch_format,
+            "../assets/textures/crosshatch" + std::to_string(i) + ".jpg",
+            cross_hatch_texs_[i], "cross_hatch_" + std::to_string(i));
+
+    LoadTex(cmd_buff, frame_props_.hatch_format,
+            "../assets/textures/scribble" + std::to_string(i) + ".jpg",
+            scribble_texs_[i], "scribble_" + std::to_string(i));
+
+    LoadTex(cmd_buff, frame_props_.hatch_format,
+            "../assets/textures/stipple" + std::to_string(i) + ".jpg",
+            stipple_texs_[i], "stipple_" + std::to_string(i));
+  }
+}
+
+void Resources::LoadTex(vk::CommandBuffer cmd_buff, vk::Format format,
+                        const std::string& filepath,
                         std::unique_ptr<Texture>& out_texture,
                         const std::string& name) {
   int width, height, channels;
+
+  int desired_channels = STBI_rgb_alpha;
+  size_t pixel_size = 4;
+
+  if (format == vk::Format::eR8Unorm) {
+    desired_channels = STBI_grey;
+    pixel_size = 1;
+  }
+
   unsigned char* data =
-      stbi_load(filepath.c_str(), &width, &height, &channels, STBI_rgb_alpha);
+      stbi_load(filepath.c_str(), &width, &height, &channels, desired_channels);
 
   if (!data)
     throw std::runtime_error("failed to load texture: " +
@@ -474,11 +517,11 @@ void Resources::LoadTex(vk::CommandBuffer cmd_buff, const std::string& filepath,
   props.min_filter = props.mag_filter = vk::Filter::eNearest;
 
   out_texture = std::make_unique<Texture>(
-      ctx_, frame_props_.blue_noise_format, vk::Extent2D(width, height),
+      ctx_, format, vk::Extent2D(width, height),
       vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
       vk::ImageAspectFlagBits::eColor, vk::SampleCountFlagBits::e1, name,
       props);
-  out_texture->Write(cmd_buff, data, width * height * 4);
+  out_texture->Write(cmd_buff, data, width * height * pixel_size);
 
   stbi_image_free(data);
 }
