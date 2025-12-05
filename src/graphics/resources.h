@@ -177,6 +177,18 @@ struct PostProcessPC {
 
   uint32_t quant_mode;  // 0=none, 1 = grayscale, 2 = rgb, 3 = palette, 4 = hue
   uint32_t color_levels;  // per channel for rgb, total for grayscale/palette
+
+  uint32_t enable_crt;
+  float crt_curve_int;
+  float crt_chroma;
+
+  float crt_scanline_int;
+  float crt_mask_int;
+
+  float crt_distortion_speed;
+  float crt_distortion_int;
+
+  float t;
 };
 
 struct LoadPC {

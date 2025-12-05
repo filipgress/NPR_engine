@@ -626,12 +626,16 @@ void Resources::CreatePalette(vk::CommandBuffer cmd_buff,
     data[i * 4 + 3] = static_cast<uint8_t>(colors[i].a * 255.0f);
   }
 
+  SamplerProps props;
+  props.address_mode_U = vk::SamplerAddressMode::eClampToEdge;
+  props.address_mode_V = vk::SamplerAddressMode::eClampToEdge;
+
   auto palette = std::make_unique<Texture>(
       ctx_, frame_props_.palette_format,
       vk::Extent2D{static_cast<uint32_t>(colors.size()), 1},
       vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
       vk::ImageAspectFlagBits::eColor, vk::SampleCountFlagBits::e1,
-      "palette_" + name);
+      "palette_" + name, props);
 
   palette->Write(cmd_buff, data.data(), data.size());
   palette_texs_.push_back(std::move(palette));

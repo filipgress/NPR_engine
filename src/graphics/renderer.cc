@@ -155,7 +155,7 @@ vk::CommandBuffer Renderer::Record(uint image_idx, const Camera& camera,
     RecordABuff(cmd_buff, frame_idx, frame_resrc, resrc_extent, camera, scene);
     RecordWBoit(cmd_buff, frame_idx, frame_resrc, resrc_extent, camera, scene);
 
-    RecordPostProcess(cmd_buff, frame_idx, frame_resrc, resrc_extent);
+    RecordPostProcess(cmd_buff, frame_idx, frame_resrc, resrc_extent, dt);
     RecordBloom(cmd_buff, frame_idx, resrc_extent);
     RecordDoF(cmd_buff, frame_idx, frame_resrc, resrc_extent, camera);
   }
@@ -847,7 +847,7 @@ void Renderer::RecordTrans(vk::CommandBuffer cmd_buff, const uint frame_idx,
 void Renderer::RecordPostProcess(
     vk::CommandBuffer cmd_buff, const uint frame_idx,
     const npr_graphics::FrameResources& frame_resrc,
-    const vk::Extent2D& resrc_extent) {
+    const vk::Extent2D& resrc_extent, float dt) {
   if (!settings_.enable_post_process) {
     if (!settings_.enable_bloom && !settings_.enable_dof) return;
 
@@ -888,7 +888,15 @@ void Renderer::RecordPostProcess(
                    .bayer_size = settings_.bayer_size,
                    .dither_strength = settings_.dither_strength,
                    .quant_mode = static_cast<uint32_t>(settings_.quant_mode),
-                   .color_levels = settings_.color_levels};
+                   .color_levels = settings_.color_levels,
+                   .enable_crt = settings_.enable_crt,
+                   .crt_curve_int = settings_.crt_curve_int,
+                   .crt_chroma = settings_.crt_chroma,
+                   .crt_scanline_int = settings_.crt_scanline_int,
+                   .crt_mask_int = settings_.crt_mask_int,
+                   .crt_distortion_speed = settings_.crt_distortion_speed,
+                   .crt_distortion_int = settings_.crt_distortion_int,
+                   .t = dt};
 
   cmd_buff.pushConstants(pipelines_.post_process_.GetLayout(),
                          vk::ShaderStageFlagBits::eFragment, 0,

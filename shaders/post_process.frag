@@ -1,5 +1,24 @@
 #version 450
 
+const float EPSILON = 1e-5;
+
+const uint DITHER_NONE = 0u;
+const uint DITHER_WHITE_NOISE = 1u;
+const uint DITHER_BAYER = 2u;
+const uint DITHER_BLUE_NOISE = 3u;
+
+const uint QUANT_NONE = 0u;
+const uint QUANT_GRAYSCALE = 1u;
+const uint QUANT_RGB = 2u;
+const uint QUANT_PALETTE_LUMA = 3u;
+const uint QUANT_PALETTE_NEAREST = 4u;
+
+const uint BAYER_SIZE_2X2 = 2u;
+const uint BAYER_SIZE_4X4 = 4u;
+const uint BAYER_SIZE_8X8 = 8u;
+
+const float CRT_MASK_BORDER = 0.9;
+
 layout(location = 0) in vec2 frag_uv;
 layout(location = 0) out vec4 out_color;
 
@@ -17,6 +36,16 @@ layout(push_constant) uniform PostPC {
 
   uint quant_mode; // 0 = none, 1 = grayscale, 2 = rgb, 3 = palette, 4 = hue
   uint color_levels; // per channel for rgb, total for grayscale/palette
+
+  uint enable_crt;
+  float crt_curve_int;
+  float crt_chroma;
+  float crt_scanline_int;
+  float crt_mask_int;
+  float crt_distortion_speed;
+  float crt_distortion_int;
+
+  float t;
 };
 
 // ============================================================================
@@ -50,55 +79,73 @@ const float bayer_matrix_8x8[64] = float[64](
 // DITHERING FUNCTIONS
 // ============================================================================
 
-float get_bayer_threshold(uint size) {
+float sample_bayer_matrix(uint size) {
   ivec2 pixel = ivec2(gl_FragCoord.xy /
         vec2(pixel_size));
 
-  if (size == 2u) {
+  if (size == BAYER_SIZE_2X2) {
     int x = pixel.x % 2;
     int y = pixel.y % 2;
     return bayer_matrix_2x2[y][x];
-  } else if (size == 4u) {
+  }
+
+  if (size == BAYER_SIZE_4X4) {
     int x = pixel.x % 4;
     int y = pixel.y % 4;
     return bayer_matrix_4x4[y][x];
-  } else {
-    int x = pixel.x % 8;
-    int y = pixel.y % 8;
-    return bayer_matrix_8x8[y * 8 + x];
   }
+
+  // BAYER_SIZE_8X8
+  int x = pixel.x % 8;
+  int y = pixel.y % 8;
+  return bayer_matrix_8x8[y * 8 + x];
 }
 
-float get_white_noise_tex() {
-  vec2 noise_uv = frag_uv * textureSize(color_tex, 0) / (pixel_size * textureSize(white_noise_tex, 0));
+float sample_white_noise() {
+  vec2 noise_size = textureSize(white_noise_tex, 0);
+  vec2 color_size = textureSize(color_tex, 0);
+
+  vec2 noise_uv = frag_uv * color_size / (pixel_size * noise_size);
   return texture(white_noise_tex, noise_uv).r;
 }
 
-float get_blue_noise_tex() {
-  vec2 noise_uv = frag_uv * textureSize(color_tex, 0) / (pixel_size * textureSize(blue_noise_tex, 0));
+float sample_blue_noise() {
+  vec2 noise_size = textureSize(blue_noise_tex, 0);
+  vec2 color_size = textureSize(color_tex, 0);
+
+  vec2 noise_uv = frag_uv * color_size / (pixel_size * noise_size);
   return texture(blue_noise_tex, noise_uv).r;
 }
 
 float get_dither_threshold() {
-  if (dither_mode == 1u)
-    return get_white_noise_tex();
-  else if (dither_mode == 2u)
-    return get_bayer_threshold(bayer_size);
-  else if (dither_mode == 3u)
-    return get_blue_noise_tex();
+  if (dither_mode == DITHER_NONE)
+    return 0.5; // no dither
+  if (dither_mode == DITHER_WHITE_NOISE)
+    return sample_white_noise();
+  if (dither_mode == DITHER_BAYER)
+    return sample_bayer_matrix(bayer_size);
+  if (dither_mode == DITHER_BLUE_NOISE)
+    return sample_blue_noise();
 
-  return 0.5; // no dither
+  return 0.5; // fallback
 }
 
 // ============================================================================
 // COLOR QUANTIZATION
 // ============================================================================
 
-vec3 find_closest_palette_color(vec3 color) {
-  int palette_size = textureSize(palette_tex, 0).x;
+float get_lum(vec3 color) {
+  return dot(color, vec3(0.2126, 0.7152, 0.0722));
+}
+
+vec3 get_closest_color(vec3 color) {
+  uint palette_size = textureSize(palette_tex, 0).x;
+
+  if (palette_size == 0u)
+    return color;
 
   vec3 closest = vec3(0.0);
-  float min_distance = 999999.0;
+  float min_distance = 1e10;
 
   for (int i = 0; i < palette_size; i++) {
     float u = (float(i) + 0.5) / float(palette_size);
@@ -118,50 +165,126 @@ vec3 find_closest_palette_color(vec3 color) {
 
 vec3 quantize_palette_nearest(vec3 color, float threshold) {
   color += (threshold - 0.5) * dither_strength * 0.1;
-  color = clamp(color, 0.0, 0.99);
+  return get_closest_color(color);
+}
 
-  return find_closest_palette_color(color);
+vec3 quantize_palette_luma(vec3 color, float threshold) {
+  float lum = get_lum(color) + (threshold - 0.5) * dither_strength * 0.1;
+  return texture(palette_tex, vec2(lum, 0.5)).rgb;
 }
 
 vec3 quantize_grayscale(vec3 color, float threshold) {
-  float lum = dot(color, vec3(0.2126, 0.7152, 0.0722));
-  lum += (threshold - 0.5) * dither_strength * 0.1;
-
+  float lum = get_lum(color) + (threshold - 0.5) * dither_strength * 0.1;
   float quantized = floor(lum * (color_levels - 1.0) + 0.5) / (color_levels - 1.0);
 
   return vec3(quantized);
 }
 
 vec3 quantize_rgb(vec3 color, float threshold) {
-  vec3 adjusted = color + (threshold - 0.5) * dither_strength * 0.1;
+  color += (threshold - 0.5) * dither_strength * 0.1;
+  float divisor = color_levels - 1.0;
 
-  adjusted.r = floor(adjusted.r * (color_levels - 1.0) + 0.5) / (color_levels - 1.0);
-  adjusted.g = floor(adjusted.g * (color_levels - 1.0) + 0.5) / (color_levels - 1.0);
-  adjusted.b = floor(adjusted.b * (color_levels - 1.0) + 0.5) / (color_levels - 1.0);
+  color.r = floor(color.r * divisor + 0.5) / divisor;
+  color.g = floor(color.g * divisor + 0.5) / divisor;
+  color.b = floor(color.b * divisor + 0.5) / divisor;
 
-  return clamp(adjusted, 0.0, 1.0);
+  return color;
 }
 
-vec3 quantize_palette_luma(vec3 color, float threshold) {
-  float lum = dot(color, vec3(0.2126, 0.7152, 0.0722));
-  lum += (threshold - 0.5) * dither_strength * 0.1;
-  lum = clamp(lum, 0.0, 0.99);
-
-  return texture(palette_tex, vec2(lum, 0.5)).rgb;
-}
-
-vec3 apply_quantization(vec3 color, float threshold) {
-  if (quant_mode == 0u) {
+vec3 apply_quantization(vec3 color) {
+  if (quant_mode == QUANT_NONE)
     return color;
-  } else if (quant_mode == 1u) {
+
+  float threshold = get_dither_threshold();
+  if (quant_mode == QUANT_GRAYSCALE)
     return quantize_grayscale(color, threshold);
-  } else if (quant_mode == 2u) {
+  if (quant_mode == QUANT_RGB)
     return quantize_rgb(color, threshold);
-  } else if (quant_mode == 3u) {
+  if (quant_mode == QUANT_PALETTE_LUMA)
     return quantize_palette_luma(color, threshold);
-  } else {
+  if (quant_mode == QUANT_PALETTE_NEAREST)
     return quantize_palette_nearest(color, threshold);
-  }
+
+  return color; // fallback
+}
+
+// ============================================================================
+// PIXELIZATION
+// ============================================================================
+vec2 apply_pixelization(vec2 uv) {
+  if (pixel_size == 1u) return uv;
+
+  vec2 pixel = vec2(pixel_size) / textureSize(color_tex, 0);
+  return pixel * floor(uv / pixel);
+}
+
+// ============================================================================
+// CRT EFFECT
+// ============================================================================
+vec2 apply_distortion(vec2 uv) {
+  if (crt_distortion_int < EPSILON) return uv;
+
+  vec2 noise_uv = vec2(uv.y * 3, t * crt_distortion_speed);
+  float noise = texture(white_noise_tex, noise_uv).r;
+
+  uv.x += (noise - 0.5) * crt_distortion_int;
+  return uv;
+}
+
+vec2 apply_curve(vec2 uv) {
+  if (crt_curve_int < EPSILON) return uv;
+
+  vec2 curve_uv = uv * 2.0 - 1.0;
+  vec2 offset = curve_uv.yx * crt_curve_int;
+  curve_uv += curve_uv * offset * offset;
+  uv = curve_uv * 0.5 + 0.5;
+
+  return uv;
+}
+
+float get_screen_mask(vec2 uv) {
+  vec2 edge = smoothstep(0.0, 0.02, uv) * (1.0 - smoothstep(0.98, 1.0, uv));
+  return edge.x * edge.y;
+}
+
+vec3 apply_rgb_cell_mask(vec2 uv, vec3 color) {
+  if (crt_mask_int < EPSILON) return color;
+
+  vec2 pixel = uv * textureSize(color_tex, 0);
+  vec2 coord = pixel / float(pixel_size);
+  vec2 subcoord = coord * vec2(3.0, 1.0);
+
+  vec2 cell_offset = vec2(0.0, mod(floor(coord.x), 3.0) * 0.5);
+
+  // rgb subcell mask
+  float ind = mod(floor(subcoord.x), 3.0);
+  vec3 mask_color = vec3(ind == 0.0, ind == 1.0, ind == 2.0) * 2.0;
+
+  // cell border mask
+  vec2 cell_uv = fract(subcoord + cell_offset) * 2.0 - 1.0;
+  vec2 border = 1.0 - cell_uv * cell_uv * CRT_MASK_BORDER;
+  mask_color *= border.x * border.y;
+
+  return color * (1.0 + (mask_color - 1.0) * crt_mask_int);
+}
+
+vec3 apply_scanlines(vec2 uv, vec3 color) {
+  if (crt_scanline_int < EPSILON) return color;
+
+  float lines = sin(uv.y * 2000.0 + t * 100.0);
+  return color * (1.0 + lines * crt_scanline_int);
+}
+
+vec3 sample_with_chroma(vec2 uv) {
+  if (crt_chroma < EPSILON) return texture(color_tex, uv).rgb;
+
+  vec2 spread = vec2(crt_chroma * 1e-2);
+
+  float r = texture(color_tex, uv + spread).r;
+  float g = texture(color_tex, uv).g;
+  float b = texture(color_tex, uv - spread).b;
+
+  return vec3(r, g, b);
 }
 
 // ============================================================================
@@ -171,18 +294,32 @@ vec3 apply_quantization(vec3 color, float threshold) {
 void main() {
   vec2 uv = frag_uv;
 
-  // === PIXELIZATION ===
-  if (pixel_size > 1.0) {
-    vec2 pixel = vec2(pixel_size) / textureSize(color_tex, 0);
-    uv = pixel * floor(frag_uv / pixel);
+  if (enable_crt == 0u) {
+    uv = apply_pixelization(uv);
+    vec3 color = texture(color_tex, uv).rgb;
+
+    color = apply_quantization(color);
+    out_color = vec4(color, 1.0);
+
+    return;
   }
 
-  // sample color
-  vec4 color = texture(color_tex, uv);
+  uv = apply_distortion(uv);
+  vec2 curve_uv = apply_curve(uv);
 
-  // === DITHERING & QUANTIZATION ===
-  float threshold = get_dither_threshold();
-  color.rgb = apply_quantization(color.rgb, threshold);
+  float screen_mask = get_screen_mask(curve_uv);
+  if (screen_mask <= 0.0) {
+    out_color = vec4(0.0, 0.0, 0.0, 1.0);
+    return;
+  }
 
-  out_color = color;
+  vec2 pixel_uv = apply_pixelization(curve_uv);
+  vec3 color = sample_with_chroma(pixel_uv);
+
+  color = apply_quantization(color);
+  color = apply_rgb_cell_mask(frag_uv, color);
+  color = apply_scanlines(curve_uv, color);
+
+  color *= screen_mask;
+  out_color = vec4(color, 1.0);
 }

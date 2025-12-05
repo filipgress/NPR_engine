@@ -100,7 +100,7 @@ class Renderer : public npr_core::NonCopyable {
 
   void RecordPostProcess(vk::CommandBuffer cmd_buff, const uint frame_idx,
                          const npr_graphics::FrameResources& frame_resrc,
-                         const vk::Extent2D& resrc_extent);
+                         const vk::Extent2D& resrc_extent, float dt);
   void RecordBloom(vk::CommandBuffer cmd_buff, const uint frame_idx,
                    const vk::Extent2D& resrc_extent);
   void RecordDoF(vk::CommandBuffer cmd_buff, const uint frame_idx,

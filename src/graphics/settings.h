@@ -69,6 +69,14 @@ struct RenderSettings {
   float dof_near_falloff{4.0f};
   float dof_far_falloff{4.0f};
 
+  bool enable_crt{false};
+  float crt_curve_int{0.35f};
+  float crt_scanline_int{0.1f};
+  float crt_chroma{0.25f};
+  float crt_mask_int{0.0f};
+  float crt_distortion_speed{0.35f};
+  float crt_distortion_int{0.003f};
+
   float dof_blur_radius{5.0f};
   float dof_coc_threshold{0.05f};
   float dof_coc_falloff{10.0f};
