@@ -393,8 +393,10 @@ void Renderer::RecordGlobLight(vk::CommandBuffer cmd_buff, const uint frame_idx,
                               pipelines_.glob_light_.GetLayout(), 1,
                               desc_pool_.GetGBuffSets().GetSet(frame_idx), {});
 
-  LightPC light_pc{
-      {}, settings_.diff_int, settings_.spec_int, settings_.is_pbr};
+  LightPC light_pc{.model = {},
+                   .shading_mode = settings_.shading_mode == ShadingMode::kPBR,
+                   .diff_int = settings_.diff_int,
+                   .spec_int = settings_.spec_int};
 
   cmd_buff.pushConstants(pipelines_.glob_light_.GetLayout(),
                          vk::ShaderStageFlagBits::eFragment, 0,
@@ -450,8 +452,11 @@ void Renderer::RecordPointLights(
           const RangeComp& range, BoundingBoxComp& bb) {
         if (point_at >= kMaxPointLights || !frustum.IsVisible(bb)) return;
 
-        LightPC light_pc{tf.glob_mat, settings_.diff_int, settings_.spec_int,
-                         settings_.is_pbr};
+        LightPC light_pc{
+            .model = {tf.glob_mat},
+            .shading_mode = settings_.shading_mode == ShadingMode::kPBR,
+            .diff_int = settings_.diff_int,
+            .spec_int = settings_.spec_int};
 
         glm::vec3 world_pos = glm::vec3(tf.glob_mat[3]);
         glm::vec3 view_pos = cam_ubo.view * glm::vec4(world_pos, 1.0f);
@@ -546,8 +551,11 @@ void Renderer::RecordSpotLights(vk::CommandBuffer cmd_buff,
           const RangeComp& range, const SpotComp& spot, BoundingBoxComp& bb) {
         if (spot_at >= kMaxSpotLights || !frustum.IsVisible(bb)) return;
 
-        LightPC light_pc{tf.glob_mat, settings_.diff_int, settings_.spec_int,
-                         settings_.is_pbr};
+        LightPC light_pc{
+            .model = {tf.glob_mat},
+            .shading_mode = settings_.shading_mode == ShadingMode::kPBR,
+            .diff_int = settings_.diff_int,
+            .spec_int = settings_.spec_int};
 
         glm::vec3 world_pos = glm::vec3(tf.glob_mat[3]);
         glm::vec3 view_pos = cam_ubo.view * glm::vec4(world_pos, 1.0f);
@@ -679,7 +687,7 @@ void Renderer::RecordABuff(vk::CommandBuffer cmd_buff, const uint frame_idx,
                    .alpha_cutoff = settings_.alpha_cutoff,
                    .diff_int = settings_.diff_int,
                    .spec_int = settings_.spec_int,
-                   .is_pbr = settings_.is_pbr};
+                   .is_pbr = true};
 
     cmd_buff.pushConstants(pipelines_.abuff_fill_.GetLayout(),
                            vk::ShaderStageFlagBits::eFragment, 0, sizeof(pc),
@@ -746,7 +754,7 @@ void Renderer::RecordWBoit(vk::CommandBuffer cmd_buff, const uint frame_idx,
                .alpha_cutoff = settings_.alpha_cutoff,
                .diff_int = settings_.diff_int,
                .spec_int = settings_.spec_int,
-               .is_pbr = settings_.is_pbr};
+               .is_pbr = true};
 
     cmd_buff.pushConstants(pipelines_.wboit_acc_.GetLayout(),
                            vk::ShaderStageFlagBits::eFragment, 0, sizeof(pc),

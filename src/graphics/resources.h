@@ -107,9 +107,10 @@ struct SSAOPC {
 
 struct LightPC {
   glm::mat4 model;
+
+  uint32_t shading_mode;  // 0 = blinn-phong, 1 = pbr
   float diff_int;
   float spec_int;
-  uint32_t is_pbr;  // 0 = blinn-phong, 1 = pbr
 };
 
 struct ABuffFillPC {

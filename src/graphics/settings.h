@@ -3,6 +3,7 @@
 
 namespace npr_graphics {
 
+enum class ShadingMode : uint32_t { kBlinnPhong, kPBR, kGooch, kToon };
 enum class TransparencyMode { kNone, kABuff, kWBoit };
 enum class DitherMode : uint32_t { kNone, kWhiteNoise, kOrdered, kBlueNoise };
 enum class HatchMode : uint32_t {
@@ -29,11 +30,13 @@ struct RenderSettings {
   glm::vec3 rim_color{1.0f, 1.0f, 1.0f};
   float rim_intensity{0.0f};
 
+  ShadingMode shading_mode{ShadingMode::kPBR};
+
   float diff_int{1.0f};
   float spec_int{1.0f};
+
   float rim_power{4.0f};
   bool inv_rim{false};
-  bool is_pbr{true};
 
   bool enable_ssao{false};
   float ssao_radius{0.5f};

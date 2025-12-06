@@ -6,6 +6,9 @@ layout(constant_id = 1) const int MAX_DIR_LIGHTS = 2;
 const float EPSILON = 0.001;
 const float PI = 3.14159265359;
 
+const uint SHADING_BLINN_PHONG = 0u;
+const uint SHADING_PBR = 1u;
+
 layout(location = 0) in vec2 frag_uv;
 layout(location = 0) out vec4 out_color;
 
@@ -36,9 +39,10 @@ layout(set = 2, binding = 0) uniform DirLightUnif {
 
 layout(push_constant) uniform LightPC {
   mat4 model; // unused
+
+  uint shading_mode; // 0 = blinn-phong, 1 = pbr
   float diff_int;
   float spec_int;
-  uint is_pbr; // 0 = blinn-phong, 1 = pbr
 };
 
 float distribution_ggx(vec3 N, vec3 H, float roughness) {
@@ -192,20 +196,24 @@ void main() {
 
   float coverage = texture(g_coverage, frag_uv).r;
   if (coverage == 1.0) { // simple pixel
-    if (is_pbr == 1u)
-      out_color = vec4(calc_pbr(0, coord, ao), 1.0);
-    else
-      out_color = vec4(calc_blinn_phong(0, coord, ao), 1.0);
+    vec3 shaded_color;
+
+    if (shading_mode == SHADING_PBR)
+      shaded_color = calc_pbr(0, coord, ao.rgb);
+    else // SHADING_BLINN_PHONG
+      shaded_color = calc_blinn_phong(0, coord, ao.rgb);
+
+    out_color = vec4(shaded_color, 1.0);
     return;
   }
 
   // complex pixel
   vec3 final_color = vec3(0.0);
   for (int s = 0; s < SAMPLES; ++s) {
-    if (is_pbr == 1u)
-      final_color += calc_pbr(s, coord, ao);
-    else
-      final_color += calc_blinn_phong(s, coord, ao);
+    if (shading_mode == SHADING_PBR)
+      final_color += calc_pbr(s, coord, ao.rgb);
+    else // SHADING_BLINN_PHONG
+      final_color += calc_blinn_phong(s, coord, ao.rgb);
   }
 
   out_color = vec4(final_color / float(SAMPLES), 1.0);

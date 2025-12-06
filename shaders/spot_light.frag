@@ -5,6 +5,9 @@ layout(constant_id = 0) const int SAMPLES = 4;
 const float EPSILON = 0.001;
 const float PI = 3.14159265359;
 
+const uint SHADING_BLINN_PHONG = 0u;
+const uint SHADING_PBR = 1u;
+
 layout(location = 0) out vec4 out_color;
 
 layout(set = 1, binding = 0) uniform sampler2DMS g_albedo_metallic;
@@ -22,9 +25,10 @@ layout(set = 2, binding = 0) uniform SpotLightUnif {
 
 layout(push_constant) uniform LightPC {
   mat4 model; // unused
+
+  uint shading_mode; // 0 = blinn-phong, 1 = pbr
   float diff_int;
   float spec_int;
-  uint is_pbr; // 0 = blinn-phong, 1 = pbr
 };
 
 float distribution_ggx(vec3 N, vec3 H, float roughness) {
@@ -169,19 +173,23 @@ void main() {
   ivec2 px = ivec2(gl_FragCoord.xy);
 
   if (coverage == 1.0) { // simple pixel
-    if (is_pbr == 1u)
-      out_color = vec4(calc_pbr(0, px), 1.0);
-    else
-      out_color = vec4(calc_blinn_phong(0, px), 1.0);
+    vec3 shaded_color;
+
+    if (shading_mode == SHADING_PBR)
+      shaded_color = calc_pbr(0, px);
+    else // SHADING_BLINN_PHONG
+      shaded_color = calc_blinn_phong(0, px);
+
+    out_color = vec4(shaded_color, 1.0);
     return;
   }
 
   // complex pixel
   vec3 final_color = vec3(0.0);
   for (int s = 0; s < SAMPLES; ++s) {
-    if (is_pbr == 1u)
+    if (shading_mode == SHADING_PBR)
       final_color += calc_pbr(s, px);
-    else
+    else // SHADING_BLINN_PHONG
       final_color += calc_blinn_phong(s, px);
   }
 

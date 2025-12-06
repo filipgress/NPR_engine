@@ -279,20 +279,27 @@ void GuiManager::GlobalSettingsWindow(npr_graphics::RenderSettings& settings,
     ImGui::SeparatorText("shading model");
     ImGui::Spacing();
 
-    static int selected_shading = settings.is_pbr ? 1 : 0;
+    static int selected_shading = static_cast<int>(settings.shading_mode);
 
-    if (ImGui::Selectable("Blinn-Phong", selected_shading == 0)) {
+    if (ImGui::Selectable("Blinn-Phong##shading", selected_shading == 0)) {
       selected_shading = 0;
-      settings.is_pbr = false;
+      settings.shading_mode = ShadingMode::kBlinnPhong;
     }
 
-    if (ImGui::Selectable("PBR (Physically Based Rendering)",
+    if (ImGui::Selectable("PBR (Physically Based Rendering)##shading",
                           selected_shading == 1)) {
       selected_shading = 1;
-      settings.is_pbr = true;
+      settings.shading_mode = ShadingMode::kPBR;
     }
 
-    if (!settings.is_pbr) {
+    if (ImGui::Selectable("Gooch##shading", selected_shading == 2)) {
+      selected_shading = 2;
+      settings.shading_mode = ShadingMode::kGooch;
+    }
+
+    ImGui::Spacing();
+
+    if (settings.shading_mode != ShadingMode::kPBR) {
       ImGui::Spacing();
       ImGui::Separator();
       ImGui::Spacing();
