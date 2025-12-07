@@ -137,22 +137,23 @@ std::vector<vk::SubpassDescription> SingleColorPass::GetSubpasses() {
  * GPass
  */
 void GPass::SetClearValues() {
-  clear_values_.resize(7);
+  clear_values_.resize(8);
 
-  // albedo_ms, emissive_ms, position_ms, normal_ms, ds_ms,
+  // albedo_ms, albedo_res, emissive_ms, position_ms, normal_ms, ds_ms,
   // coverage_ms, coverage_res
   clear_values_[0].color = std::array<float, 4>{0.0f, 0.0f, 0.0f, 0.0f};
-  clear_values_[1].color = std::array<float, 4>{0.0f, 0.0f, 0.0f, 1.0f};
-  clear_values_[2].color = std::array<float, 4>{0.0f, 0.0f, 0.0f, 0.0f};
-  clear_values_[3].color = std::array<float, 4>{0.0f, 0.0f, -1.0f, 0.0f};
-  clear_values_[4].depthStencil = vk::ClearDepthStencilValue(1.0f, 0);
-  clear_values_[5].color = std::array<float, 4>{0.0f, 0.0f, 0.0f, 0.0f};
+  clear_values_[1].color = std::array<float, 4>{0.0f, 0.0f, 0.0f, 0.0f};
+  clear_values_[2].color = std::array<float, 4>{0.0f, 0.0f, 0.0f, 1.0f};
+  clear_values_[3].color = std::array<float, 4>{0.0f, 0.0f, 0.0f, 0.0f};
+  clear_values_[4].color = std::array<float, 4>{0.0f, 0.0f, -1.0f, 0.0f};
+  clear_values_[5].depthStencil = vk::ClearDepthStencilValue(1.0f, 0);
   clear_values_[6].color = std::array<float, 4>{0.0f, 0.0f, 0.0f, 0.0f};
+  clear_values_[7].color = std::array<float, 4>{0.0f, 0.0f, 0.0f, 0.0f};
 }
 
 std::vector<vk::AttachmentDescription> GPass::GetAttachments() const {
   auto& props = resrc_.GetProps();
-  std::vector<vk::AttachmentDescription> attachs(7);
+  std::vector<vk::AttachmentDescription> attachs(8);
 
   // albedo_ms
   attachs[0].format = props.albedo_format;
@@ -162,55 +163,63 @@ std::vector<vk::AttachmentDescription> GPass::GetAttachments() const {
   attachs[0].initialLayout = vk::ImageLayout::eUndefined;
   attachs[0].finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
 
-  // emissive_ms
-  attachs[1].format = props.emissive_format;
-  attachs[1].samples = props.samples;
-  attachs[1].loadOp = vk::AttachmentLoadOp::eClear;
+  // albedo_res
+  attachs[1].format = props.albedo_format;
+  attachs[1].samples = vk::SampleCountFlagBits::e1;
+  attachs[1].loadOp = vk::AttachmentLoadOp::eDontCare;
   attachs[1].storeOp = vk::AttachmentStoreOp::eStore;
   attachs[1].initialLayout = vk::ImageLayout::eUndefined;
   attachs[1].finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
 
-  // position_ms
-  attachs[2].format = props.position_format;
+  // emissive_ms
+  attachs[2].format = props.emissive_format;
   attachs[2].samples = props.samples;
   attachs[2].loadOp = vk::AttachmentLoadOp::eClear;
   attachs[2].storeOp = vk::AttachmentStoreOp::eStore;
   attachs[2].initialLayout = vk::ImageLayout::eUndefined;
   attachs[2].finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
 
-  // normal_ms
-  attachs[3].format = props.normal_format;
+  // position_ms
+  attachs[3].format = props.position_format;
   attachs[3].samples = props.samples;
   attachs[3].loadOp = vk::AttachmentLoadOp::eClear;
   attachs[3].storeOp = vk::AttachmentStoreOp::eStore;
   attachs[3].initialLayout = vk::ImageLayout::eUndefined;
   attachs[3].finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
 
-  // ds_ms
-  attachs[4].format = props.ds_format;
+  // normal_ms
+  attachs[4].format = props.normal_format;
   attachs[4].samples = props.samples;
   attachs[4].loadOp = vk::AttachmentLoadOp::eClear;
   attachs[4].storeOp = vk::AttachmentStoreOp::eStore;
-  attachs[4].stencilLoadOp = vk::AttachmentLoadOp::eClear;
-  attachs[4].stencilStoreOp = vk::AttachmentStoreOp::eStore;
   attachs[4].initialLayout = vk::ImageLayout::eUndefined;
-  attachs[4].finalLayout = vk::ImageLayout::eDepthStencilReadOnlyOptimal;
+  attachs[4].finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
 
-  // coverage_ms
-  attachs[5].format = props.coverage_format;
+  // ds_ms
+  attachs[5].format = props.ds_format;
   attachs[5].samples = props.samples;
   attachs[5].loadOp = vk::AttachmentLoadOp::eClear;
-  attachs[5].storeOp = vk::AttachmentStoreOp::eDontCare;
+  attachs[5].storeOp = vk::AttachmentStoreOp::eStore;
+  attachs[5].stencilLoadOp = vk::AttachmentLoadOp::eClear;
+  attachs[5].stencilStoreOp = vk::AttachmentStoreOp::eStore;
   attachs[5].initialLayout = vk::ImageLayout::eUndefined;
-  attachs[5].finalLayout = vk::ImageLayout::eColorAttachmentOptimal;
+  attachs[5].finalLayout = vk::ImageLayout::eDepthStencilReadOnlyOptimal;
+
+  // coverage_ms
+  attachs[6].format = props.coverage_format;
+  attachs[6].samples = props.samples;
+  attachs[6].loadOp = vk::AttachmentLoadOp::eClear;
+  attachs[6].storeOp = vk::AttachmentStoreOp::eDontCare;
+  attachs[6].initialLayout = vk::ImageLayout::eUndefined;
+  attachs[6].finalLayout = vk::ImageLayout::eColorAttachmentOptimal;
 
   // coverage_res
-  attachs[6].format = props.coverage_format;
-  attachs[6].samples = vk::SampleCountFlagBits::e1;
-  attachs[6].loadOp = vk::AttachmentLoadOp::eDontCare;
-  attachs[6].storeOp = vk::AttachmentStoreOp::eStore;
-  attachs[6].initialLayout = vk::ImageLayout::eUndefined;
-  attachs[6].finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+  attachs[7].format = props.coverage_format;
+  attachs[7].samples = vk::SampleCountFlagBits::e1;
+  attachs[7].loadOp = vk::AttachmentLoadOp::eDontCare;
+  attachs[7].storeOp = vk::AttachmentStoreOp::eStore;
+  attachs[7].initialLayout = vk::ImageLayout::eUndefined;
+  attachs[7].finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
 
   return attachs;
 }
@@ -258,18 +267,18 @@ std::vector<vk::SubpassDependency> GPass::GetDependencies() const {
 
 std::vector<vk::SubpassDescription> GPass::GetSubpasses() {
   color_refs_[0] = {0, vk::ImageLayout::eColorAttachmentOptimal};  // albedo
-  color_refs_[1] = {1, vk::ImageLayout::eColorAttachmentOptimal};  // emissive
-  color_refs_[2] = {2, vk::ImageLayout::eColorAttachmentOptimal};  // position
-  color_refs_[3] = {3, vk::ImageLayout::eColorAttachmentOptimal};  // normal
-  color_refs_[4] = {5, vk::ImageLayout::eColorAttachmentOptimal};  // coverage
+  color_refs_[1] = {2, vk::ImageLayout::eColorAttachmentOptimal};  // emissive
+  color_refs_[2] = {3, vk::ImageLayout::eColorAttachmentOptimal};  // position
+  color_refs_[3] = {4, vk::ImageLayout::eColorAttachmentOptimal};  // normal
+  color_refs_[4] = {6, vk::ImageLayout::eColorAttachmentOptimal};  // coverage
 
-  resolve_refs_[0] = {VK_ATTACHMENT_UNUSED, vk::ImageLayout::eUndefined};
+  resolve_refs_[0] = {1, vk::ImageLayout::eColorAttachmentOptimal};
   resolve_refs_[1] = {VK_ATTACHMENT_UNUSED, vk::ImageLayout::eUndefined};
   resolve_refs_[2] = {VK_ATTACHMENT_UNUSED, vk::ImageLayout::eUndefined};
   resolve_refs_[3] = {VK_ATTACHMENT_UNUSED, vk::ImageLayout::eUndefined};
-  resolve_refs_[4] = {6, vk::ImageLayout::eColorAttachmentOptimal};
+  resolve_refs_[4] = {7, vk::ImageLayout::eColorAttachmentOptimal};
 
-  depth_ref_ = {4, vk::ImageLayout::eDepthStencilAttachmentOptimal};
+  depth_ref_ = {5, vk::ImageLayout::eDepthStencilAttachmentOptimal};
 
   vk::SubpassDescription subpass;
   subpass.pipelineBindPoint = vk::PipelineBindPoint::eGraphics;
@@ -284,13 +293,14 @@ std::vector<vk::SubpassDescription> GPass::GetSubpasses() {
 std::vector<vk::ImageView> GPass::GetAttachmentViews(int frame_idx) const {
   auto& resrc = resrc_.GetResrc()[frame_idx];
 
-  if (!resrc.albedo_metallic_ms || !resrc.emissive_roughness_ms ||
-      !resrc.position_ms || !resrc.normal_ms || !resrc.ds_ms ||
-      !resrc.coverage_ms || !resrc.coverage_res) {
+  if (!resrc.albedo_metallic_ms || !resrc.albedo_metallic_res ||
+      !resrc.emissive_roughness_ms || !resrc.position_ms || !resrc.normal_ms ||
+      !resrc.ds_ms || !resrc.coverage_ms || !resrc.coverage_res) {
     throw std::runtime_error("missing required resources for: " + GetDbgName());
   }
 
   return {resrc.albedo_metallic_ms->GetImageView(),
+          resrc.albedo_metallic_res->GetImageView(),
           resrc.emissive_roughness_ms->GetImageView(),
           resrc.position_ms->GetImageView(),
           resrc.normal_ms->GetImageView(),

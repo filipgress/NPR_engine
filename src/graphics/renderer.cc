@@ -540,16 +540,6 @@ void Renderer::RecLocalLightsInt(
                        vk::ImageLayout::eUndefined);
   light_map_res.Transition(cmd_buff, vk::ImageLayout::eTransferDstOptimal,
                            vk::ImageLayout::eShaderReadOnlyOptimal, 0, 1);
-
-  // 2.  Resolve albedo_metallic_ms → albedo_metallic_res
-  auto& albedo_ms = *frame_resrc.albedo_metallic_ms;
-  auto& albedo_res = *frame_resrc.albedo_metallic_res;
-
-  albedo_ms.Resolve(cmd_buff, albedo_res,
-                    vk::ImageLayout::eShaderReadOnlyOptimal,
-                    vk::ImageLayout::eUndefined);
-  albedo_res.Transition(cmd_buff, vk::ImageLayout::eTransferDstOptimal,
-                        vk::ImageLayout::eShaderReadOnlyOptimal, 0, 1);
 }
 
 void Renderer::RecPointLights(vk::CommandBuffer cmd_buff, const uint frame_idx,
