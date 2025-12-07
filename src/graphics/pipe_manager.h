@@ -49,6 +49,25 @@ class PipeManager : public npr_core::NonCopyable {
                       vk::SampleCountFlagBits samples,
                       const DescriptorPool& desc_pool);
 
+  void BuildGlobLightMap(const VertexShader& vert_shader,
+                         const FragmentShader& frag_shader,
+                         vk::SampleCountFlagBits samples,
+                         const DescriptorPool& desc_pool);
+  void BuildLocalLightMap(const VertexShader& vert_shader,
+                          vk::SampleCountFlagBits samples,
+                          const DescriptorPool& desc_pool);
+  void BuildStylizedShading(const VertexShader& vert_shader,
+                            const FragmentShader& frag_shader,
+                            const DescriptorPool& desc_pool);
+  void BuildPointLightMap(const VertexShader& vert_shader,
+                          const FragmentShader& frag_shader,
+                          vk::SampleCountFlagBits samples,
+                          const DescriptorPool& desc_pool);
+  void BuildSpotLightMap(const VertexShader& vert_shader,
+                         const FragmentShader& frag_shader,
+                         vk::SampleCountFlagBits samples,
+                         const DescriptorPool& desc_pool);
+
   void BuildABuffFill(const VertexShader& vert_shader,
                       const FragmentShader& frag_shader,
                       vk::SampleCountFlagBits samples,
@@ -104,6 +123,12 @@ class PipeManager : public npr_core::NonCopyable {
   Pipeline local_light_;
   Pipeline point_light_;
   Pipeline spot_light_;
+
+  Pipeline glob_light_map_;
+  Pipeline local_light_map_;
+  Pipeline stylized_shading_;
+  Pipeline point_light_map_;
+  Pipeline spot_light_map_;
 
   Pipeline abuff_fill_;
   Pipeline abuff_res_;

@@ -370,6 +370,23 @@ class HatchingArraySets : public BaseDescSets {
   void CreateLayout() override;
 };
 
+class StylizedShadingSets : public BaseDescSets {
+ public:
+  StylizedShadingSets(const Context& ctx, uint count)
+      : BaseDescSets{ctx, count} {
+    CreateLayout();
+  }
+
+  void Update(const Resources& resrc) const;
+  std::vector<vk::DescriptorPoolSize> GetPoolSizes() const override {
+    return {{vk::DescriptorType::eCombinedImageSampler,
+             2 * count_}};  // 2 textures per set
+  }
+
+ private:
+  void CreateLayout() override;
+};
+
 }  // namespace npr_graphics
 
 #endif  // DESCRIPTOR_SETS_H_

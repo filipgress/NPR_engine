@@ -16,6 +16,17 @@ PipeManager::PipeManager(const Context& ctx, const Resources& resrc,
       point_light_{ctx, pipe_cache_, passes.local_light_, "point_light_pipe"},
       spot_light_{ctx, pipe_cache_, passes.local_light_, "spot_light_pipe"},
 
+      glob_light_map_{ctx, pipe_cache_, passes.glob_light_map_,
+                      "global_light_map_pipe"},
+      local_light_map_{ctx, pipe_cache_, passes.local_light_map_,
+                       "local_light_map_pipe"},
+      stylized_shading_{ctx, pipe_cache_, passes.color_res_,
+                        "stylized_shading_pipe"},
+      point_light_map_{ctx, pipe_cache_, passes.local_light_map_,
+                       "point_light_map_pipe"},
+      spot_light_map_{ctx, pipe_cache_, passes.local_light_map_,
+                      "spot_light_map_pipe"},
+
       abuff_fill_{ctx, pipe_cache_, passes.abuff_, "abuff_fill_pipe"},
       abuff_res_{ctx, pipe_cache_, passes.abuff_, "abuff_resolve_pipe"},
 
@@ -49,6 +60,15 @@ PipeManager::PipeManager(const Context& ctx, const Resources& resrc,
   BuildSpotLight(shaders.light_vert_, shaders.spot_light_frag_, samples,
                  desc_pool);
 
+  BuildGlobLightMap(shaders.quad_vert_, shaders.dir_int_frag_, samples,
+                    desc_pool);
+  BuildLocalLightMap(shaders.light_vert_, samples, desc_pool);
+  BuildStylizedShading(shaders.quad_vert_, shaders.shading_frag_, desc_pool);
+  BuildPointLightMap(shaders.light_vert_, shaders.point_int_frag_, samples,
+                     desc_pool);
+  BuildSpotLightMap(shaders.light_vert_, shaders.spot_int_frag_, samples,
+                    desc_pool);
+
   BuildABuffFill(shaders.gbuff_vert_, shaders.abuff_fill_frag_, samples,
                  desc_pool);
   BuildABuffRes(shaders.quad_vert_, shaders.abuff_res_frag_, samples,
@@ -78,6 +98,11 @@ void PipeManager::RebuildPipes() {
   if (!local_light_.IsUpToDate()) local_light_.BuildPipeline();
   if (!point_light_.IsUpToDate()) point_light_.BuildPipeline();
   if (!spot_light_.IsUpToDate()) spot_light_.BuildPipeline();
+  if (!glob_light_map_.IsUpToDate()) glob_light_map_.BuildPipeline();
+  if (!local_light_map_.IsUpToDate()) local_light_map_.BuildPipeline();
+  if (!stylized_shading_.IsUpToDate()) stylized_shading_.BuildPipeline();
+  if (!point_light_map_.IsUpToDate()) point_light_map_.BuildPipeline();
+  if (!spot_light_map_.IsUpToDate()) spot_light_map_.BuildPipeline();
   if (!abuff_fill_.IsUpToDate()) abuff_fill_.BuildPipeline();
   if (!abuff_res_.IsUpToDate()) abuff_res_.BuildPipeline();
   if (!wboit_acc_.IsUpToDate()) wboit_acc_.BuildPipeline();
@@ -381,6 +406,214 @@ void PipeManager::BuildSpotLight(const VertexShader& vert_shader,
 
   state.subpass = 1;
   spot_light_.BuildPipeline();
+}
+
+void PipeManager::BuildGlobLightMap(const VertexShader& vert_shader,
+                                    const FragmentShader& frag_shader,
+                                    vk::SampleCountFlagBits samples,
+                                    const DescriptorPool& desc_pool) {
+  glob_light_map_.CreateLayout(
+      {desc_pool.GetAOResSets().GetLayout(),
+       desc_pool.GetGBuffSets().GetLayout(),
+       desc_pool.GetDirLightSets().GetLayout()},
+      {Pipeline::MakePushConst<LightPC>(vk::ShaderStageFlagBits::eFragment)});
+
+  glob_light_map_.AddShader(vert_shader);
+  glob_light_map_.AddShader(frag_shader,
+                            {Pipeline::MakeSpecConst(0, samples),
+                             Pipeline::MakeSpecConst(1, kMaxDirLights)});
+
+  auto& state = glob_light_map_.state_;
+  state.multisample.rasterizationSamples = samples;
+
+  // single channel intensity output (R16Sfloat)
+  state.color_attachments.resize(1);
+  state.color_attachments[0].blendEnable = VK_FALSE;
+  state.color_attachments[0].colorWriteMask = vk::ColorComponentFlagBits::eR;
+
+  state.depth_stencil.depthTestEnable = VK_FALSE;
+  state.depth_stencil.depthWriteEnable = VK_FALSE;
+  state.depth_stencil.depthCompareOp = vk::CompareOp::eAlways;
+  state.depth_stencil.depthBoundsTestEnable = VK_FALSE;
+  state.depth_stencil.stencilTestEnable = VK_TRUE;
+
+  // same stencil test as glob_light (only render where geometry exists)
+  state.depth_stencil.front.failOp = vk::StencilOp::eKeep;
+  state.depth_stencil.front.passOp = vk::StencilOp::eKeep;
+  state.depth_stencil.front.depthFailOp = vk::StencilOp::eKeep;
+  state.depth_stencil.front.compareOp = vk::CompareOp::eEqual;
+  state.depth_stencil.front.compareMask = BIT(1);
+  state.depth_stencil.front.writeMask = 0;
+  state.depth_stencil.front.reference = BIT(1);
+
+  state.depth_stencil.back = state.depth_stencil.front;
+
+  state.subpass = 0;
+  glob_light_map_.BuildPipeline();
+}
+
+void PipeManager::BuildLocalLightMap(const VertexShader& vert_shader,
+                                     vk::SampleCountFlagBits samples,
+                                     const DescriptorPool& desc_pool) {
+  local_light_map_.CreateLayout(
+      {desc_pool.GetCameraSets().GetLayout()},
+      {Pipeline::MakePushConst<LightPC>(vk::ShaderStageFlagBits::eVertex)});
+
+  local_light_map_.AddShader(vert_shader);
+
+  local_light_map_.AddLightVertexAttribs();
+
+  auto& state = local_light_map_.state_;
+  state.multisample.rasterizationSamples = samples;
+  state.rasterization.cullMode = vk::CullModeFlagBits::eBack;
+
+  state.color_attachments.resize(1);
+  state.color_attachments[0].blendEnable = VK_FALSE;
+  state.color_attachments[0].colorWriteMask = vk::ColorComponentFlagBits::eR;
+
+  state.depth_stencil.depthTestEnable = VK_TRUE;
+  state.depth_stencil.depthWriteEnable = VK_FALSE;
+  state.depth_stencil.depthCompareOp = vk::CompareOp::eLessOrEqual;
+  state.depth_stencil.stencilTestEnable = VK_TRUE;
+
+  state.depth_stencil.front.failOp = vk::StencilOp::eKeep;
+  state.depth_stencil.front.passOp = vk::StencilOp::eKeep;
+  state.depth_stencil.front.depthFailOp = vk::StencilOp::eReplace;
+  state.depth_stencil.front.compareOp = vk::CompareOp::eAlways;
+  state.depth_stencil.front.compareMask = BIT(1);
+  state.depth_stencil.front.writeMask = BIT(1);
+  state.depth_stencil.front.reference = BIT(1);
+  state.depth_stencil.back = state.depth_stencil.front;
+
+  state.subpass = 0;
+  local_light_map_.BuildPipeline();
+}
+
+void PipeManager::BuildStylizedShading(const VertexShader& vert_shader,
+                                       const FragmentShader& frag_shader,
+                                       const DescriptorPool& desc_pool) {
+  stylized_shading_.CreateLayout(
+      {desc_pool.GetLightMapSets().GetLayout(),
+       desc_pool.GetGBuffSets().GetLayout()},  // for albedo
+      {Pipeline::MakePushConst<ShadingPC>(vk::ShaderStageFlagBits::eFragment)});
+
+  stylized_shading_.AddShader(vert_shader);
+  stylized_shading_.AddShader(frag_shader);
+
+  auto& state = stylized_shading_.state_;
+
+  state.color_attachments.resize(1);
+  state.color_attachments[0].blendEnable = VK_FALSE;
+  state.color_attachments[0].colorWriteMask =
+      vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+      vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+
+  state.subpass = 0;
+  stylized_shading_.BuildPipeline();
+}
+
+void PipeManager::BuildPointLightMap(const VertexShader& vert_shader,
+                                     const FragmentShader& frag_shader,
+                                     vk::SampleCountFlagBits samples,
+                                     const DescriptorPool& desc_pool) {
+  point_light_map_.CreateLayout(
+      {desc_pool.GetCameraSets().GetLayout(),
+       desc_pool.GetGBuffSets().GetLayout(),
+       desc_pool.GetPointLightSets().GetLayout()},
+      {Pipeline::MakePushConst<LightPC>(vk::ShaderStageFlagBits::eVertex |
+                                        vk::ShaderStageFlagBits::eFragment)});
+
+  point_light_map_.AddShader(vert_shader);
+  point_light_map_.AddShader(frag_shader,
+                             {Pipeline::MakeSpecConst(0, samples)});
+
+  point_light_map_.AddLightVertexAttribs();
+
+  auto& state = point_light_map_.state_;
+  state.multisample.rasterizationSamples = samples;
+  state.rasterization.cullMode = vk::CullModeFlagBits::eFront;
+
+  state.color_attachments.resize(1);
+  auto& att = state.color_attachments[0];
+
+  att.blendEnable = VK_TRUE;
+  att.colorWriteMask = vk::ColorComponentFlagBits::eR;
+
+  att.srcColorBlendFactor = vk::BlendFactor::eOne;
+  att.dstColorBlendFactor = vk::BlendFactor::eOne;
+  att.colorBlendOp = vk::BlendOp::eAdd;
+  att.srcAlphaBlendFactor = vk::BlendFactor::eOne;
+  att.dstAlphaBlendFactor = vk::BlendFactor::eOne;
+  att.alphaBlendOp = vk::BlendOp::eAdd;
+
+  state.depth_stencil.depthTestEnable = VK_TRUE;
+  state.depth_stencil.depthWriteEnable = VK_FALSE;
+  state.depth_stencil.depthCompareOp = vk::CompareOp::eGreaterOrEqual;
+  state.depth_stencil.stencilTestEnable = VK_TRUE;
+
+  state.depth_stencil.front.failOp = vk::StencilOp::eKeep;
+  state.depth_stencil.front.passOp = vk::StencilOp::eKeep;
+  state.depth_stencil.front.depthFailOp = vk::StencilOp::eKeep;
+  state.depth_stencil.front.compareOp = vk::CompareOp::eEqual;
+  state.depth_stencil.front.compareMask = BIT(1);
+  state.depth_stencil.front.writeMask = 0;
+  state.depth_stencil.front.reference = 0;
+  state.depth_stencil.back = state.depth_stencil.front;
+
+  state.subpass = 1;
+  point_light_map_.BuildPipeline();
+}
+
+void PipeManager::BuildSpotLightMap(const VertexShader& vert_shader,
+                                    const FragmentShader& frag_shader,
+                                    vk::SampleCountFlagBits samples,
+                                    const DescriptorPool& desc_pool) {
+  spot_light_map_.CreateLayout(
+      {desc_pool.GetCameraSets().GetLayout(),
+       desc_pool.GetGBuffSets().GetLayout(),
+       desc_pool.GetSpotLightSets().GetLayout()},
+      {Pipeline::MakePushConst<LightPC>(vk::ShaderStageFlagBits::eVertex |
+                                        vk::ShaderStageFlagBits::eFragment)});
+
+  spot_light_map_.AddShader(vert_shader);
+  spot_light_map_.AddShader(frag_shader, {Pipeline::MakeSpecConst(0, samples)});
+
+  spot_light_map_.AddLightVertexAttribs();
+
+  auto& state = spot_light_map_.state_;
+  state.multisample.rasterizationSamples = samples;
+  state.rasterization.cullMode = vk::CullModeFlagBits::eFront;
+
+  state.color_attachments.resize(1);
+  auto& att = state.color_attachments[0];
+
+  att.blendEnable = VK_TRUE;
+  att.colorWriteMask = vk::ColorComponentFlagBits::eR;
+
+  // Additive blending for accumulating intensity
+  att.srcColorBlendFactor = vk::BlendFactor::eOne;
+  att.dstColorBlendFactor = vk::BlendFactor::eOne;
+  att.colorBlendOp = vk::BlendOp::eAdd;
+  att.srcAlphaBlendFactor = vk::BlendFactor::eOne;
+  att.dstAlphaBlendFactor = vk::BlendFactor::eOne;
+  att.alphaBlendOp = vk::BlendOp::eAdd;
+
+  state.depth_stencil.depthTestEnable = VK_TRUE;
+  state.depth_stencil.depthWriteEnable = VK_FALSE;
+  state.depth_stencil.depthCompareOp = vk::CompareOp::eGreaterOrEqual;
+  state.depth_stencil.stencilTestEnable = VK_TRUE;
+
+  state.depth_stencil.front.failOp = vk::StencilOp::eKeep;
+  state.depth_stencil.front.passOp = vk::StencilOp::eKeep;
+  state.depth_stencil.front.depthFailOp = vk::StencilOp::eKeep;
+  state.depth_stencil.front.compareOp = vk::CompareOp::eEqual;
+  state.depth_stencil.front.compareMask = BIT(1);
+  state.depth_stencil.front.writeMask = 0;
+  state.depth_stencil.front.reference = 0;
+  state.depth_stencil.back = state.depth_stencil.front;
+
+  state.subpass = 1;
+  spot_light_map_.BuildPipeline();
 }
 
 void PipeManager::BuildABuffFill(const VertexShader& vert_shader,

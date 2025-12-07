@@ -788,4 +788,66 @@ void HatchingArraySets::Update(const Resources& resrc) const {
     ctx_.GetDevice().updateDescriptorSets(1, &desc_write, 0, nullptr);
   }
 }
+
+/*
+ * StylizedShadingSets
+ */
+void StylizedShadingSets::CreateLayout() {
+  std::array<vk::DescriptorSetLayoutBinding, 2> bindings;
+
+  // light_map
+  bindings[0].binding = 0;
+  bindings[0].descriptorType = vk::DescriptorType::eCombinedImageSampler;
+  bindings[0].descriptorCount = 1;
+  bindings[0].stageFlags = vk::ShaderStageFlagBits::eFragment;
+
+  // albedo_metallic
+  bindings[1].binding = 1;
+  bindings[1].descriptorType = vk::DescriptorType::eCombinedImageSampler;
+  bindings[1].descriptorCount = 1;
+  bindings[1].stageFlags = vk::ShaderStageFlagBits::eFragment;
+
+  vk::DescriptorSetLayoutCreateInfo layout_info{};
+  layout_info.bindingCount = bindings.size();
+  layout_info.pBindings = bindings.data();
+
+  layout_ = ctx_.GetDevice().createDescriptorSetLayout(layout_info);
+  ctx_.SetDbgName((uint64_t)(VkDescriptorSetLayout)layout_,
+                  vk::ObjectType::eDescriptorSetLayout,
+                  "stylized_shading_set_layout");
+}
+
+void StylizedShadingSets::Update(const Resources& resrc) const {
+  const auto& per_frame_resrc = resrc.GetResrc();
+  assert(count_ == per_frame_resrc.size());
+
+  for (size_t i = 0; i < per_frame_resrc.size(); ++i) {
+    const auto& frame_resrc = per_frame_resrc[i];
+    std::array<vk::DescriptorImageInfo, 2> image_infos;
+
+    // light_map_res
+    image_infos[0].imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+    image_infos[0].imageView = frame_resrc.light_map_res->GetImageView();
+    image_infos[0].sampler = frame_resrc.light_map_res->GetSampler();
+
+    // albedo_metallic_res
+    image_infos[1].imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+    image_infos[1].imageView = frame_resrc.albedo_metallic_res->GetImageView();
+    image_infos[1].sampler = frame_resrc.albedo_metallic_res->GetSampler();
+
+    std::array<vk::WriteDescriptorSet, 2> desc_writes;
+    for (size_t j = 0; j < 2; ++j) {
+      desc_writes[j].dstSet = sets_[i];
+      desc_writes[j].dstBinding = j;
+      desc_writes[j].dstArrayElement = 0;
+      desc_writes[j].descriptorType = vk::DescriptorType::eCombinedImageSampler;
+      desc_writes[j].descriptorCount = 1;
+      desc_writes[j].pImageInfo = &image_infos[j];
+    }
+
+    ctx_.GetDevice().updateDescriptorSets(desc_writes.size(),
+                                          desc_writes.data(), 0, nullptr);
+  }
+}
+
 }  // namespace npr_graphics

@@ -183,6 +183,52 @@ class LocalLightPass : public RenderPass {
   vk::AttachmentReference ds_ref_{};
 };
 
+class GlobLightMapPass : public RenderPass {
+ public:
+  GlobLightMapPass(const Context& ctx, const Resources& resrc)
+      : RenderPass{ctx, resrc} {
+    Init();
+  }
+
+ private:
+  const std::string GetDbgName() const override {
+    return "glob_light_map_pass";
+  }
+  void SetClearValues() override;
+
+  std::vector<vk::AttachmentDescription> GetAttachments() const override;
+  std::vector<vk::SubpassDependency> GetDependencies() const override;
+  std::vector<vk::SubpassDescription> GetSubpasses() override;
+  std::vector<vk::ImageView> GetAttachmentViews(int frame_idx) const override;
+
+ private:
+  vk::AttachmentReference light_map_ref_{};
+  vk::AttachmentReference ds_ref_{};
+};
+
+class LocalLightMapPass : public RenderPass {
+ public:
+  LocalLightMapPass(const Context& ctx, const Resources& resrc)
+      : RenderPass{ctx, resrc} {
+    Init();
+  }
+
+ private:
+  const std::string GetDbgName() const override {
+    return "local_light_map_pass";
+  }
+  void SetClearValues() override;
+
+  std::vector<vk::AttachmentDescription> GetAttachments() const override;
+  std::vector<vk::SubpassDependency> GetDependencies() const override;
+  std::vector<vk::SubpassDescription> GetSubpasses() override;
+  std::vector<vk::ImageView> GetAttachmentViews(int frame_idx) const override;
+
+ private:
+  vk::AttachmentReference light_map_ref_{};
+  vk::AttachmentReference ds_ref_{};
+};
+
 class ABuffPass : public RenderPass {
  public:
   ABuffPass(const Context& ctx, const Resources& resrc)

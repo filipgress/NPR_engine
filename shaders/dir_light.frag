@@ -22,7 +22,7 @@ layout(set = 1, binding = 4) uniform sampler2D g_coverage;
 
 struct DirLight {
   vec4 dir; // xyz = normalized view-space direction to light, w = unused
-  vec4 color; // rgb = color * intensity, a = unused
+  vec4 color; // rgb = color * intensity, a = intensity
 };
 
 layout(set = 2, binding = 0) uniform DirLightUnif {

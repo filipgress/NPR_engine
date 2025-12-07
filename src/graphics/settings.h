@@ -35,6 +35,14 @@ struct RenderSettings {
   float diff_int{1.0f};
   float spec_int{1.0f};
 
+  float gooch_alpha{0.25f};
+  float gooch_beta{0.5f};
+  glm::vec3 gooch_cool{0.0f, 0.0f, 0.55f};  // blue
+  glm::vec3 gooch_warm{0.3f, 0.3f, 0.0f};   // yellow
+  uint32_t toon_steps{4};
+  float toon_min_brightness{0.2f};
+  float toon_threshold{0.5f};
+
   float rim_power{4.0f};
   bool inv_rim{false};
 

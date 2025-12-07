@@ -18,7 +18,7 @@ layout(set = 1, binding = 4) uniform sampler2D g_coverage;
 
 layout(set = 2, binding = 0) uniform PointLightUnif {
   vec4 pos; // xyz = view-space position, w = range
-  vec4 color; // rgb = color * intensity, a = unused
+  vec4 color; // rgb = color * intensity, a = intensity
 };
 
 layout(push_constant) uniform LightPC {

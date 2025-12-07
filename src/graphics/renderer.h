@@ -61,23 +61,51 @@ class Renderer : public npr_core::NonCopyable {
   void RecordSSAO(vk::CommandBuffer cmd_buff, const uint frame_idx,
                   const npr_graphics::FrameResources& frame_resrc,
                   const vk::Extent2D& resrc_extent);
-  void RecordGlobLight(vk::CommandBuffer cmd_buff, const uint frame_idx,
-                       const npr_graphics::FrameResources& frame_resrc,
-                       const vk::Extent2D& resrc_extent,
-                       const CameraUnif& cam_ubo, npr_scene::Scene& scene);
-  void RecordLocalLight(vk::CommandBuffer cmd_buff, const uint frame_idx,
-                        const npr_graphics::FrameResources& frame_resrc,
-                        const vk::Extent2D& resrc_extent,
-                        const CameraUnif& cam_ubo,
-                        const npr_scene::Camera& camera,
-                        npr_scene::Scene& scene);
-  void RecordPointLights(vk::CommandBuffer cmd_buff, const uint frame_idx,
+
+  void PrepDirLights(const npr_graphics::FrameResources& frame_resrc,
+                     const CameraUnif& cam_ubo, npr_scene::Scene& scene);
+  void RecLights(vk::CommandBuffer cmd_buff, const uint frame_idx,
+                 const npr_graphics::FrameResources& frame_resrc,
+                 const vk::Extent2D& resrc_extent, const CameraUnif& cam_ubo,
+                 const npr_scene::Camera& camera, npr_scene::Scene& scene);
+  void RecShading(vk::CommandBuffer cmd_buff, const uint frame_idx,
+                  const vk::Extent2D& resrc_extent);
+
+  void RecGlobLights(vk::CommandBuffer cmd_buff, const uint frame_idx,
+                     const vk::Extent2D& resrc_extent);
+  void RecGlobLightsInt(vk::CommandBuffer cmd_buff, const uint frame_idx,
+                        const vk::Extent2D& resrc_extent);
+
+  void RecLocalLights(vk::CommandBuffer cmd_buff, const uint frame_idx,
+                      const npr_graphics::FrameResources& frame_resrc,
+                      const vk::Extent2D& resrc_extent,
+                      const CameraUnif& cam_ubo,
+                      const npr_scene::Camera& camera, npr_scene::Scene& scene);
+
+  void RecLocalLightsInt(vk::CommandBuffer cmd_buff, const uint frame_idx,
                          const npr_graphics::FrameResources& frame_resrc,
                          const vk::Extent2D& resrc_extent,
                          const CameraUnif& cam_ubo,
                          const npr_scene::Camera& camera,
                          npr_scene::Scene& scene);
-  void RecordSpotLights(vk::CommandBuffer cmd_buff, const uint frame_idx,
+
+  void RecPointLights(vk::CommandBuffer cmd_buff, const uint frame_idx,
+                      const npr_graphics::FrameResources& frame_resrc,
+                      const vk::Extent2D& resrc_extent,
+                      const CameraUnif& cam_ubo,
+                      const npr_scene::Camera& camera, npr_scene::Scene& scene);
+  void RecPointLightsInt(vk::CommandBuffer cmd_buff, const uint frame_idx,
+                         const npr_graphics::FrameResources& frame_resrc,
+                         const vk::Extent2D& resrc_extent,
+                         const CameraUnif& cam_ubo,
+                         const npr_scene::Camera& camera,
+                         npr_scene::Scene& scene);
+  void RecSpotLights(vk::CommandBuffer cmd_buff, const uint frame_idx,
+                     const npr_graphics::FrameResources& frame_resrc,
+                     const vk::Extent2D& resrc_extent,
+                     const CameraUnif& cam_ubo, const npr_scene::Camera& camera,
+                     npr_scene::Scene& scene);
+  void RecSpotLightsInt(vk::CommandBuffer cmd_buff, const uint frame_idx,
                         const npr_graphics::FrameResources& frame_resrc,
                         const vk::Extent2D& resrc_extent,
                         const CameraUnif& cam_ubo,

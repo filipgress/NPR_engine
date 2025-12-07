@@ -45,6 +45,7 @@ class DescriptorPool : public npr_core::NonCopyable {
   const DofSet& GetDofSet() const { return dof_set_; }
 
   const ColorSets& GetColorSets() const { return color_sets_; }
+  const StylizedShadingSets& GetLightMapSets() const { return light_map_sets_; }
   const PresentColorSets& GetPresentColorSets() const { return present_sets_; }
 
   void UpdateDescriptors(const Resources& resrc);
@@ -83,6 +84,8 @@ class DescriptorPool : public npr_core::NonCopyable {
   DepthSets depth_sets_;
   CocMapSets coc_sets_;
   DofSet dof_set_;
+
+  StylizedShadingSets light_map_sets_;
 
   ColorSets color_sets_;
   PresentColorSets present_sets_;

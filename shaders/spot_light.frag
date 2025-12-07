@@ -19,7 +19,7 @@ layout(set = 1, binding = 4) uniform sampler2D g_coverage;
 layout(set = 2, binding = 0) uniform SpotLightUnif {
   vec4 pos; // xyz = view-space position, w = range
   vec4 dir; // xyz = normalized view-space direction to light, w = unused
-  vec4 color; // rgb = color, a = unused
+  vec4 color; // rgb = color, a = intensity
   vec4 params; // x = angle_scale, y = angle_offset, zw = unused
 } light;
 

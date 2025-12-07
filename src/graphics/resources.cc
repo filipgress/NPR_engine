@@ -54,9 +54,18 @@ void Resources::CreateImages() {
     resrc.albedo_metallic_ms = std::make_unique<Texture>(
         ctx_, frame_props_.albedo_format, frame_props_.extent,
         vk::ImageUsageFlagBits::eColorAttachment |
+            vk::ImageUsageFlagBits::eTransferSrc |
             vk::ImageUsageFlagBits::eSampled,
         vk::ImageAspectFlagBits::eColor, frame_props_.samples,
         "albedo_metallic_ms_" + std::to_string(idx));
+
+    resrc.albedo_metallic_res = std::make_unique<Texture>(
+        ctx_, frame_props_.albedo_format, frame_props_.extent,
+        vk::ImageUsageFlagBits::eColorAttachment |
+            vk::ImageUsageFlagBits::eSampled |
+            vk::ImageUsageFlagBits::eTransferDst,
+        vk::ImageAspectFlagBits::eColor, vk::SampleCountFlagBits::e1,
+        "albedo_metallic_res_" + std::to_string(idx));
 
     resrc.emissive_roughness_ms = std::make_unique<Texture>(
         ctx_, frame_props_.emissive_format, frame_props_.extent,
@@ -124,6 +133,39 @@ void Resources::CreateImages() {
         vk::ImageAspectFlagBits::eColor, vk::SampleCountFlagBits::e1,
         "ssao_temp_" + std::to_string(idx));
 
+    // lightings
+    resrc.color_ms = std::make_unique<Image>(
+        ctx_, frame_props_.color_format, frame_props_.extent,
+        vk::ImageUsageFlagBits::eColorAttachment |
+            vk::ImageUsageFlagBits::eTransferSrc,
+        vk::ImageAspectFlagBits::eColor, vk::SharingMode::eExclusive,
+        frame_props_.samples, 1, "color_ms_" + std::to_string(idx));
+
+    resrc.color_res = std::make_unique<Texture>(
+        ctx_, frame_props_.color_format, frame_props_.extent,
+        vk::ImageUsageFlagBits::eColorAttachment |
+            vk::ImageUsageFlagBits::eTransferSrc |
+            vk::ImageUsageFlagBits::eTransferDst |
+            vk::ImageUsageFlagBits::eSampled,
+        vk::ImageAspectFlagBits::eColor, vk::SampleCountFlagBits::e1,
+        "color_res_" + std::to_string(idx));
+
+    resrc.light_map_ms = std::make_unique<Image>(
+        ctx_, frame_props_.light_map_format, frame_props_.extent,
+        vk::ImageUsageFlagBits::eColorAttachment |
+            vk::ImageUsageFlagBits::eTransferSrc,
+        vk::ImageAspectFlagBits::eColor, vk::SharingMode::eExclusive,
+        frame_props_.samples, 1, "light_map_ms_" + std::to_string(idx));
+
+    resrc.light_map_res = std::make_unique<Texture>(
+        ctx_, frame_props_.light_map_format, frame_props_.extent,
+        vk::ImageUsageFlagBits::eColorAttachment |
+            vk::ImageUsageFlagBits::eTransferSrc |
+            vk::ImageUsageFlagBits::eTransferDst |
+            vk::ImageUsageFlagBits::eSampled,
+        vk::ImageAspectFlagBits::eColor, vk::SampleCountFlagBits::e1,
+        "light_map_res_" + std::to_string(idx));
+
     // wboit pass
     resrc.acc_color_ms = std::make_unique<Image>(
         ctx_, frame_props_.acc_color_format, frame_props_.extent,
@@ -179,23 +221,7 @@ void Resources::CreateImages() {
         vk::ImageAspectFlagBits::eColor, vk::SampleCountFlagBits::e1,
         "coc_map_" + std::to_string(idx));
 
-    // color targets
-    resrc.color_ms = std::make_unique<Image>(
-        ctx_, frame_props_.color_format, frame_props_.extent,
-        vk::ImageUsageFlagBits::eColorAttachment |
-            vk::ImageUsageFlagBits::eTransferSrc,
-        vk::ImageAspectFlagBits::eColor, vk::SharingMode::eExclusive,
-        frame_props_.samples, 1, "color_ms_" + std::to_string(idx));
-
-    resrc.color_res = std::make_unique<Texture>(
-        ctx_, frame_props_.color_format, frame_props_.extent,
-        vk::ImageUsageFlagBits::eColorAttachment |
-            vk::ImageUsageFlagBits::eTransferSrc |
-            vk::ImageUsageFlagBits::eTransferDst |
-            vk::ImageUsageFlagBits::eSampled,
-        vk::ImageAspectFlagBits::eColor, vk::SampleCountFlagBits::e1,
-        "color_res_" + std::to_string(idx));
-
+    // final present
     resrc.present_color = std::make_unique<Texture>(
         ctx_, frame_props_.color_format, frame_props_.extent,
         vk::ImageUsageFlagBits::eColorAttachment |

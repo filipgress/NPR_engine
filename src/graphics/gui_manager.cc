@@ -297,6 +297,12 @@ void GuiManager::GlobalSettingsWindow(npr_graphics::RenderSettings& settings,
       settings.shading_mode = ShadingMode::kGooch;
     }
 
+    if (ImGui::Selectable("Toon (Cel Shading)##shading",
+                          selected_shading == 3)) {
+      selected_shading = 3;
+      settings.shading_mode = ShadingMode::kToon;
+    }
+
     ImGui::Spacing();
 
     if (settings.shading_mode != ShadingMode::kPBR) {
@@ -308,6 +314,48 @@ void GuiManager::GlobalSettingsWindow(npr_graphics::RenderSettings& settings,
                        2.0f);
       ImGui::DragFloat("specular intensity", &settings.spec_int, 0.01f, 0.0f,
                        2.0f);
+
+      if (settings.shading_mode == ShadingMode::kGooch) {
+        ImGui::Spacing();
+        ImGui::SeparatorText("gooch parameters");
+        ImGui::Spacing();
+
+        ImGui::ColorEdit3("cool color##gooch", &settings.gooch_cool.x);
+        ImGui::ColorEdit3("warm color##gooch", &settings.gooch_warm.x);
+
+        ImGui::Spacing();
+
+        if (ImGui::DragFloat("cool influence##gooch", &settings.gooch_beta,
+                             0.01f, 0.0f, 1.0f, "%.2f"))
+          settings.gooch_alpha = glm::clamp(settings.gooch_alpha, 0.0f, 1.0f);
+
+        if (ImGui::DragFloat("warm influence##gooch", &settings.gooch_alpha,
+                             0.01f, 0.0f, 1.0f, "%.2f"))
+          settings.gooch_beta = glm::clamp(settings.gooch_beta, 0.0f, 1.0f);
+      }
+
+      if (settings.shading_mode == ShadingMode::kToon) {
+        ImGui::Spacing();
+        ImGui::SeparatorText("toon parameters");
+        ImGui::Spacing();
+
+        int toon_steps_int = static_cast<int>(settings.toon_steps);
+        if (ImGui::SliderInt("steps##toon", &toon_steps_int, 1, 8))
+          settings.toon_steps = static_cast<uint32_t>(toon_steps_int);
+
+        ImGui::DragFloat("min brightness##toon", &settings.toon_min_brightness,
+                         0.01f, 0.0f, 1.0f, "%.2f");
+
+        ImGui::BeginDisabled(toon_steps_int > 1);
+        ImGui::DragFloat("threshold##toon", &settings.toon_threshold, 0.01f,
+                         0.0f, 1.0f, "%.2f");
+
+        if (toon_steps_int > 1) {
+          ImGui::SameLine();
+          ImGui::Text("(only used for 1 step)");
+        }
+        ImGui::EndDisabled();
+      }
 
       ImGui::Spacing();
       ImGui::SeparatorText("rim light");
@@ -1166,7 +1214,7 @@ void GuiManager::DrawLightComp() {
   ImGui::SeparatorText("light");
 
   ImGui::ColorEdit3("color", &light.color.x);
-  ImGui::DragFloat("intensity##light", &light.intensity, 0.1f, 0.0f, 100.0f);
+  ImGui::DragFloat("intensity##light", &light.intensity, 0.01f, 0.0f, 100.0f);
 
   ImGui::Spacing();
 }

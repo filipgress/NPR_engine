@@ -669,6 +669,225 @@ std::vector<vk::ImageView> LocalLightPass::GetAttachmentViews(
 }
 
 /*
+ * GlobLightMapPass
+ */
+void GlobLightMapPass::SetClearValues() {
+  clear_values_.resize(2);
+
+  // light_map_ms
+  clear_values_[0].color = std::array<float, 4>{0.0f, 0.0f, 0.0f, 0.0f};
+}
+
+std::vector<vk::AttachmentDescription> GlobLightMapPass::GetAttachments()
+    const {
+  auto& props = resrc_.GetProps();
+  std::vector<vk::AttachmentDescription> attachments(2);
+
+  // light_map_ms
+  attachments[0].format = props.light_map_format;
+  attachments[0].samples = props.samples;
+  attachments[0].loadOp = vk::AttachmentLoadOp::eClear;
+  attachments[0].storeOp = vk::AttachmentStoreOp::eStore;
+  attachments[0].initialLayout = vk::ImageLayout::eUndefined;
+  attachments[0].finalLayout = vk::ImageLayout::eColorAttachmentOptimal;
+
+  // ds_ms
+  attachments[1].format = props.ds_format;
+  attachments[1].samples = props.samples;
+  attachments[1].loadOp = vk::AttachmentLoadOp::eLoad;
+  attachments[1].storeOp = vk::AttachmentStoreOp::eStore;
+  attachments[1].stencilLoadOp = vk::AttachmentLoadOp::eLoad;
+  attachments[1].stencilStoreOp = vk::AttachmentStoreOp::eStore;
+  attachments[1].initialLayout = vk::ImageLayout::eDepthStencilReadOnlyOptimal;
+  attachments[1].finalLayout =
+      vk::ImageLayout::eDepthReadOnlyStencilAttachmentOptimal;
+
+  return attachments;
+}
+
+std::vector<vk::SubpassDependency> GlobLightMapPass::GetDependencies() const {
+  std::vector<vk::SubpassDependency> deps(2);
+
+  {
+    deps[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+    deps[0].dstSubpass = 0;
+
+    deps[0].srcStageMask = vk::PipelineStageFlagBits::eLateFragmentTests |
+                           vk::PipelineStageFlagBits::eColorAttachmentOutput;
+    deps[0].srcAccessMask = vk::AccessFlagBits::eDepthStencilAttachmentWrite |
+                            vk::AccessFlagBits::eColorAttachmentWrite;
+
+    deps[0].dstStageMask = vk::PipelineStageFlagBits::eFragmentShader |
+                           vk::PipelineStageFlagBits::eEarlyFragmentTests |
+                           vk::PipelineStageFlagBits::eColorAttachmentOutput;
+    deps[0].dstAccessMask = vk::AccessFlagBits::eDepthStencilAttachmentRead |
+                            vk::AccessFlagBits::eShaderRead |
+                            vk::AccessFlagBits::eColorAttachmentWrite;
+
+    deps[0].dependencyFlags = vk::DependencyFlagBits::eByRegion;
+  }
+  {
+    deps[1].srcSubpass = 0;
+    deps[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+
+    deps[1].srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+    deps[1].srcAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
+
+    deps[1].dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput |
+                           vk::PipelineStageFlagBits::eEarlyFragmentTests;
+    deps[1].dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite |
+                            vk::AccessFlagBits::eDepthStencilAttachmentWrite |
+                            vk::AccessFlagBits::eDepthStencilAttachmentRead;
+
+    deps[1].dependencyFlags = vk::DependencyFlagBits::eByRegion;
+  }
+
+  return deps;
+}
+
+std::vector<vk::SubpassDescription> GlobLightMapPass::GetSubpasses() {
+  light_map_ref_ = {0, vk::ImageLayout::eColorAttachmentOptimal};
+  ds_ref_ = {1, vk::ImageLayout::eDepthStencilReadOnlyOptimal};
+
+  vk::SubpassDescription subpass{};
+  subpass.pipelineBindPoint = vk::PipelineBindPoint::eGraphics;
+  subpass.colorAttachmentCount = 1;
+  subpass.pColorAttachments = &light_map_ref_;
+  subpass.pDepthStencilAttachment = &ds_ref_;
+
+  return {subpass};
+}
+
+std::vector<vk::ImageView> GlobLightMapPass::GetAttachmentViews(
+    int frame_idx) const {
+  auto& resrc = resrc_.GetResrc()[frame_idx];
+  if (!resrc.light_map_ms || !resrc.ds_ms)
+    throw std::runtime_error("missing required resources for: " + GetDbgName());
+
+  return {resrc.light_map_ms->GetImageView(), resrc.ds_ms->GetImageView()};
+}
+
+/*
+ * LocalLightMapPass
+ */
+void LocalLightMapPass::SetClearValues() {
+  clear_values_.resize(2);
+
+  // ds_ms
+  clear_values_[1].depthStencil = vk::ClearDepthStencilValue(1.0f, 0);
+}
+
+std::vector<vk::AttachmentDescription> LocalLightMapPass::GetAttachments()
+    const {
+  auto& props = resrc_.GetProps();
+  std::vector<vk::AttachmentDescription> attachments(2);
+
+  // light_map_ms
+  attachments[0].format = props.light_map_format;
+  attachments[0].samples = props.samples;
+  attachments[0].loadOp = vk::AttachmentLoadOp::eLoad;
+  attachments[0].storeOp = vk::AttachmentStoreOp::eStore;
+  attachments[0].initialLayout = vk::ImageLayout::eColorAttachmentOptimal;
+  attachments[0].finalLayout = vk::ImageLayout::eColorAttachmentOptimal;
+
+  // ds_ms
+  attachments[1].format = props.ds_format;
+  attachments[1].samples = props.samples;
+  attachments[1].loadOp = vk::AttachmentLoadOp::eLoad;
+  attachments[1].storeOp = vk::AttachmentStoreOp::eStore;
+  attachments[1].stencilLoadOp = vk::AttachmentLoadOp::eClear;
+  attachments[1].stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
+  attachments[1].initialLayout =
+      vk::ImageLayout::eDepthReadOnlyStencilAttachmentOptimal;
+  attachments[1].finalLayout =
+      vk::ImageLayout::eDepthReadOnlyStencilAttachmentOptimal;
+
+  return attachments;
+}
+
+std::vector<vk::SubpassDependency> LocalLightMapPass::GetDependencies() const {
+  std::vector<vk::SubpassDependency> deps(3);
+
+  {
+    deps[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+    deps[0].dstSubpass = 0;
+
+    deps[0].srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput |
+                           vk::PipelineStageFlagBits::eLateFragmentTests;
+    deps[0].srcAccessMask = vk::AccessFlagBits::eColorAttachmentWrite |
+                            vk::AccessFlagBits::eDepthStencilAttachmentRead |
+                            vk::AccessFlagBits::eDepthStencilAttachmentWrite;
+
+    deps[0].dstStageMask = vk::PipelineStageFlagBits::eEarlyFragmentTests |
+                           vk::PipelineStageFlagBits::eLateFragmentTests;
+    deps[0].dstAccessMask = vk::AccessFlagBits::eDepthStencilAttachmentRead |
+                            vk::AccessFlagBits::eDepthStencilAttachmentWrite;
+
+    deps[0].dependencyFlags = vk::DependencyFlagBits::eByRegion;
+  }
+
+  {
+    deps[1].srcSubpass = 0;
+    deps[1].dstSubpass = 1;
+
+    deps[1].srcStageMask = vk::PipelineStageFlagBits::eLateFragmentTests;
+    deps[1].srcAccessMask = vk::AccessFlagBits::eDepthStencilAttachmentWrite;
+
+    deps[1].dstStageMask = vk::PipelineStageFlagBits::eEarlyFragmentTests |
+                           vk::PipelineStageFlagBits::eColorAttachmentOutput;
+    deps[1].dstAccessMask = vk::AccessFlagBits::eDepthStencilAttachmentRead |
+                            vk::AccessFlagBits::eColorAttachmentRead |
+                            vk::AccessFlagBits::eColorAttachmentWrite;
+
+    deps[1].dependencyFlags = vk::DependencyFlagBits::eByRegion;
+  }
+
+  {
+    deps[2].srcSubpass = 1;
+    deps[2].dstSubpass = VK_SUBPASS_EXTERNAL;
+
+    deps[2].srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput |
+                           vk::PipelineStageFlagBits::eLateFragmentTests;
+    deps[2].srcAccessMask = vk::AccessFlagBits::eColorAttachmentWrite |
+                            vk::AccessFlagBits::eDepthStencilAttachmentWrite;
+
+    deps[2].dstStageMask = vk::PipelineStageFlagBits::eTransfer;
+    deps[2].dstAccessMask = vk::AccessFlagBits::eTransferRead;
+
+    deps[2].dependencyFlags = vk::DependencyFlagBits::eByRegion;
+  }
+
+  return deps;
+}
+
+std::vector<vk::SubpassDescription> LocalLightMapPass::GetSubpasses() {
+  std::vector<vk::SubpassDescription> subpasses(2);
+
+  light_map_ref_ = {0, vk::ImageLayout::eColorAttachmentOptimal};
+  ds_ref_ = {1, vk::ImageLayout::eDepthReadOnlyStencilAttachmentOptimal};
+
+  subpasses[0].pipelineBindPoint = vk::PipelineBindPoint::eGraphics;
+  subpasses[0].colorAttachmentCount = 0;
+  subpasses[0].pDepthStencilAttachment = &ds_ref_;
+
+  subpasses[1].pipelineBindPoint = vk::PipelineBindPoint::eGraphics;
+  subpasses[1].colorAttachmentCount = 1;
+  subpasses[1].pColorAttachments = &light_map_ref_;
+  subpasses[1].pDepthStencilAttachment = &ds_ref_;
+
+  return subpasses;
+}
+
+std::vector<vk::ImageView> LocalLightMapPass::GetAttachmentViews(
+    int frame_idx) const {
+  auto& resrc = resrc_.GetResrc()[frame_idx];
+  if (!resrc.light_map_ms || !resrc.ds_ms)
+    throw std::runtime_error("missing required resources for: " + GetDbgName());
+
+  return {resrc.light_map_ms->GetImageView(), resrc.ds_ms->GetImageView()};
+}
+
+/*
  * ABuffPass
  */
 void ABuffPass::SetClearValues() { clear_values_.resize(2); }

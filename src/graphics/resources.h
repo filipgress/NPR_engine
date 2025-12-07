@@ -65,7 +65,7 @@ struct CameraUnif {
 
 struct DirLight {
   glm::vec4 dir;  // xyz = normalized view-space direction to light, w = unused
-  glm::vec4 color;  // rgb = color * intensity, a = unused
+  glm::vec4 color;  // rgb = color * intensity, a = intnensity
 };
 
 struct DirLightUnif {
@@ -82,13 +82,13 @@ struct DirLightUnif {
 
 struct PointLightUnif {
   glm::vec4 pos;    // xyz = view-space position, w = range
-  glm::vec4 color;  // rgb = color, a = unused
+  glm::vec4 color;  // rgb = color, a = intensity
 };
 
 struct SpotLightUnif {
   glm::vec4 pos;  // xyz = view-space position, w = range
   glm::vec4 dir;  // xyz = normalized view-space direction to light, w = unused
-  glm::vec4 color;   // rgb = color, a = unused
+  glm::vec4 color;   // rgb = color, a = intensity
   glm::vec4 params;  // x = angle_scale, y = angle_offset, zw = unused
 };
 
@@ -111,6 +111,19 @@ struct LightPC {
   uint32_t shading_mode;  // 0 = blinn-phong, 1 = pbr
   float diff_int;
   float spec_int;
+};
+
+struct ShadingPC {
+  glm::vec4 gooch_warm;
+  glm::vec4 gooch_cool;
+
+  uint32_t shading_mode;  // 0 = blinn-phong, 1 = pbr
+  float gooch_alpha;
+  float gooch_beta;
+
+  uint32_t toon_steps;
+  float toon_min_brightness;
+  float toon_threshold;
 };
 
 struct ABuffFillPC {
@@ -222,6 +235,7 @@ struct FrameProps {
   const vk::Format position_format = vk::Format::eR16G16B16A16Sfloat;
   const vk::Format normal_format = vk::Format::eR16G16B16A16Sfloat;
   const vk::Format coverage_format = vk::Format::eR16Sfloat;
+  const vk::Format light_map_format = vk::Format::eR16Sfloat;
 
   // ssao
   const vk::Format ssao_noise_format = vk::Format::eR16G16Sfloat;
@@ -252,6 +266,8 @@ struct FrameResources {
 
   // gpass
   std::unique_ptr<Texture> albedo_metallic_ms;
+  std::unique_ptr<Texture> albedo_metallic_res;
+
   std::unique_ptr<Texture> emissive_roughness_ms;
   std::unique_ptr<Texture> position_ms;
   std::unique_ptr<Texture> normal_ms;
@@ -265,6 +281,13 @@ struct FrameResources {
   std::unique_ptr<Image> ssao_ms;
   std::unique_ptr<Texture> ssao_res;
   std::unique_ptr<Texture> ssao_temp;  // for separable blur
+
+  // lighting
+  std::unique_ptr<Image> color_ms;
+  std::unique_ptr<Texture> color_res;
+
+  std::unique_ptr<Image> light_map_ms;
+  std::unique_ptr<Texture> light_map_res;
 
   // abuff
   std::unique_ptr<StorageBuffer<uint32_t>> abuff_heads;
@@ -285,9 +308,7 @@ struct FrameResources {
   // dof
   std::unique_ptr<Texture> coc_map;
 
-  // color targets
-  std::unique_ptr<Image> color_ms;
-  std::unique_ptr<Texture> color_res;
+  // final
   std::unique_ptr<Texture> present_color;
 };
 

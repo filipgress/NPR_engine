@@ -147,11 +147,8 @@ vk::CommandBuffer Renderer::Record(uint image_idx, const Camera& camera,
   } else {
     RecordGBuff(cmd_buff, frame_idx, frame_resrc, resrc_extent, camera, scene);
     RecordSSAO(cmd_buff, frame_idx, frame_resrc, resrc_extent);
-    RecordGlobLight(cmd_buff, frame_idx, frame_resrc, resrc_extent, cam_ubo,
-                    scene);
-    RecordLocalLight(cmd_buff, frame_idx, frame_resrc, resrc_extent, cam_ubo,
-                     camera, scene);
-
+    RecLights(cmd_buff, frame_idx, frame_resrc, resrc_extent, cam_ubo, camera,
+              scene);
     RecordABuff(cmd_buff, frame_idx, frame_resrc, resrc_extent, camera, scene);
     RecordWBoit(cmd_buff, frame_idx, frame_resrc, resrc_extent, camera, scene);
 
@@ -338,10 +335,9 @@ void Renderer::RecordSSAO(vk::CommandBuffer cmd_buff, const uint frame_idx,
   cmd_buff.endRenderPass();
 }
 
-void Renderer::RecordGlobLight(vk::CommandBuffer cmd_buff, const uint frame_idx,
-                               const npr_graphics::FrameResources& frame_resrc,
-                               const vk::Extent2D& resrc_extent,
-                               const CameraUnif& cam_ubo, Scene& scene) {
+void Renderer::PrepDirLights(const npr_graphics::FrameResources& frame_resrc,
+                             const CameraUnif& cam_ubo,
+                             npr_scene::Scene& scene) {
   DirLightUnif dir_lights{};
   dir_lights.ambient =
       glm::vec4(settings_.ambient_color * settings_.ambient_intensity,
@@ -368,16 +364,72 @@ void Renderer::RecordGlobLight(vk::CommandBuffer cmd_buff, const uint frame_idx,
 
     dir_lights.dir_lights[i].dir = glm::vec4(-view_dir, 0.0f);
     dir_lights.dir_lights[i].color =
-        glm::vec4(light.color * light.intensity, 1.0f);
+        glm::vec4(light.color * light.intensity, light.intensity);
 
     i++;
   });
 
   dir_lights.count = i;
-  dir_lights.use_ssao = settings_.enable_ssao ? 1 : 0;
+  dir_lights.use_ssao = settings_.enable_ssao;
 
   frame_resrc.dir_light_ubo->Write(dir_lights);
+}
 
+void Renderer::RecLights(vk::CommandBuffer cmd_buff, const uint frame_idx,
+                         const npr_graphics::FrameResources& frame_resrc,
+                         const vk::Extent2D& resrc_extent,
+                         const CameraUnif& cam_ubo,
+                         const npr_scene::Camera& camera,
+                         npr_scene::Scene& scene) {
+  PrepDirLights(frame_resrc, cam_ubo, scene);
+
+  if (settings_.shading_mode == ShadingMode::kBlinnPhong ||
+      settings_.shading_mode == ShadingMode::kPBR) {
+    RecGlobLights(cmd_buff, frame_idx, resrc_extent);
+    RecLocalLights(cmd_buff, frame_idx, frame_resrc, resrc_extent, cam_ubo,
+                   camera, scene);
+  } else {
+    RecGlobLightsInt(cmd_buff, frame_idx, resrc_extent);
+    RecLocalLightsInt(cmd_buff, frame_idx, frame_resrc, resrc_extent, cam_ubo,
+                      camera, scene);
+    RecShading(cmd_buff, frame_idx, resrc_extent);
+  }
+}
+
+void Renderer::RecShading(vk::CommandBuffer cmd_buff, const uint frame_idx,
+                          const vk::Extent2D& resrc_extent) {
+  cmd_buff.beginRenderPass(
+      passes_.color_res_.BeginInfo(frame_idx, resrc_extent),
+      vk::SubpassContents::eInline);
+
+  cmd_buff.bindPipeline(vk::PipelineBindPoint::eGraphics,
+                        pipelines_.stylized_shading_.GetPipeline());
+
+  cmd_buff.bindDescriptorSets(  // light_map_res
+      vk::PipelineBindPoint::eGraphics,
+      pipelines_.stylized_shading_.GetLayout(), 0,
+      desc_pool_.GetLightMapSets().GetSet(frame_idx), {});
+
+  ShadingPC shading_pc{
+      .gooch_warm = glm::vec4(settings_.gooch_warm, 1.0f),
+      .gooch_cool = glm::vec4(settings_.gooch_cool, 1.0f),
+      .shading_mode = static_cast<uint32_t>(settings_.shading_mode),
+      .gooch_alpha = settings_.gooch_alpha,
+      .gooch_beta = settings_.gooch_beta,
+      .toon_steps = settings_.toon_steps,
+      .toon_min_brightness = settings_.toon_min_brightness,
+      .toon_threshold = settings_.toon_threshold};
+
+  cmd_buff.pushConstants(pipelines_.stylized_shading_.GetLayout(),
+                         vk::ShaderStageFlagBits::eFragment, 0,
+                         sizeof(shading_pc), &shading_pc);
+
+  cmd_buff.draw(3, 1, 0, 0);
+  cmd_buff.endRenderPass();
+}
+
+void Renderer::RecGlobLights(vk::CommandBuffer cmd_buff, const uint frame_idx,
+                             const vk::Extent2D& resrc_extent) {
   cmd_buff.beginRenderPass(
       passes_.glob_light_.BeginInfo(frame_idx, resrc_extent),
       vk::SubpassContents::eInline);
@@ -393,34 +445,70 @@ void Renderer::RecordGlobLight(vk::CommandBuffer cmd_buff, const uint frame_idx,
                               pipelines_.glob_light_.GetLayout(), 1,
                               desc_pool_.GetGBuffSets().GetSet(frame_idx), {});
 
-  LightPC light_pc{.model = {},
-                   .shading_mode = settings_.shading_mode == ShadingMode::kPBR,
-                   .diff_int = settings_.diff_int,
-                   .spec_int = settings_.spec_int};
+  cmd_buff.bindDescriptorSets(  // dir lights
+      vk::PipelineBindPoint::eGraphics, pipelines_.glob_light_.GetLayout(), 2,
+      desc_pool_.GetDirLightSets().GetSet(frame_idx), {});
+
+  LightPC light_pc{
+      .model = {},
+      .shading_mode = static_cast<uint32_t>(settings_.shading_mode),
+      .diff_int = settings_.diff_int,
+      .spec_int = settings_.spec_int};
 
   cmd_buff.pushConstants(pipelines_.glob_light_.GetLayout(),
                          vk::ShaderStageFlagBits::eFragment, 0,
                          sizeof(light_pc), &light_pc);
 
+  cmd_buff.draw(3, 1, 0, 0);
+  cmd_buff.endRenderPass();
+}
+
+void Renderer::RecGlobLightsInt(vk::CommandBuffer cmd_buff,
+                                const uint frame_idx,
+                                const vk::Extent2D& resrc_extent) {
+  cmd_buff.beginRenderPass(
+      passes_.glob_light_map_.BeginInfo(frame_idx, resrc_extent),
+      vk::SubpassContents::eInline);
+
+  cmd_buff.bindPipeline(vk::PipelineBindPoint::eGraphics,
+                        pipelines_.glob_light_map_.GetPipeline());
+
+  cmd_buff.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,  // ao_res
+                              pipelines_.glob_light_map_.GetLayout(), 0,
+                              desc_pool_.GetAOResSets().GetSet(frame_idx), {});
+
+  cmd_buff.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,  // gbuff
+                              pipelines_.glob_light_map_.GetLayout(), 1,
+                              desc_pool_.GetGBuffSets().GetSet(frame_idx), {});
+
   cmd_buff.bindDescriptorSets(  // dir lights
-      vk::PipelineBindPoint::eGraphics, pipelines_.glob_light_.GetLayout(), 2,
-      desc_pool_.GetDirLightSets().GetSet(frame_idx), {});
+      vk::PipelineBindPoint::eGraphics, pipelines_.glob_light_map_.GetLayout(),
+      2, desc_pool_.GetDirLightSets().GetSet(frame_idx), {});
+
+  LightPC light_pc{
+      .model = {},
+      .shading_mode = static_cast<uint32_t>(settings_.shading_mode),
+      .diff_int = settings_.diff_int,
+      .spec_int = settings_.spec_int};
+
+  cmd_buff.pushConstants(pipelines_.glob_light_map_.GetLayout(),
+                         vk::ShaderStageFlagBits::eFragment, 0,
+                         sizeof(light_pc), &light_pc);
 
   cmd_buff.draw(3, 1, 0, 0);
   cmd_buff.endRenderPass();
 }
 
-void Renderer::RecordLocalLight(vk::CommandBuffer cmd_buff,
-                                const uint frame_idx,
-                                const npr_graphics::FrameResources& frame_resrc,
-                                const vk::Extent2D& resrc_extent,
-                                const CameraUnif& cam_ubo,
-                                const npr_scene::Camera& camera,
-                                npr_scene::Scene& scene) {
-  RecordPointLights(cmd_buff, frame_idx, frame_resrc, resrc_extent, cam_ubo,
-                    camera, scene);
-  RecordSpotLights(cmd_buff, frame_idx, frame_resrc, resrc_extent, cam_ubo,
-                   camera, scene);
+void Renderer::RecLocalLights(vk::CommandBuffer cmd_buff, const uint frame_idx,
+                              const npr_graphics::FrameResources& frame_resrc,
+                              const vk::Extent2D& resrc_extent,
+                              const CameraUnif& cam_ubo,
+                              const npr_scene::Camera& camera,
+                              npr_scene::Scene& scene) {
+  RecPointLights(cmd_buff, frame_idx, frame_resrc, resrc_extent, cam_ubo,
+                 camera, scene);
+  RecSpotLights(cmd_buff, frame_idx, frame_resrc, resrc_extent, cam_ubo, camera,
+                scene);
 
   // resolve color_ms to color_res
   auto& color_ms = *frame_resrc.color_ms;
@@ -433,11 +521,43 @@ void Renderer::RecordLocalLight(vk::CommandBuffer cmd_buff,
                        vk::ImageLayout::eShaderReadOnlyOptimal, 0, 1);
 }
 
-void Renderer::RecordPointLights(
+void Renderer::RecLocalLightsInt(
     vk::CommandBuffer cmd_buff, const uint frame_idx,
     const npr_graphics::FrameResources& frame_resrc,
     const vk::Extent2D& resrc_extent, const CameraUnif& cam_ubo,
     const npr_scene::Camera& camera, npr_scene::Scene& scene) {
+  RecPointLightsInt(cmd_buff, frame_idx, frame_resrc, resrc_extent, cam_ubo,
+                    camera, scene);
+  RecSpotLightsInt(cmd_buff, frame_idx, frame_resrc, resrc_extent, cam_ubo,
+                   camera, scene);
+
+  // 1.  Resolve light_map_ms → light_map_res
+  auto& light_map_ms = *frame_resrc.light_map_ms;
+  auto& light_map_res = *frame_resrc.light_map_res;
+
+  light_map_ms.Resolve(cmd_buff, light_map_res,
+                       vk::ImageLayout::eColorAttachmentOptimal,
+                       vk::ImageLayout::eUndefined);
+  light_map_res.Transition(cmd_buff, vk::ImageLayout::eTransferDstOptimal,
+                           vk::ImageLayout::eShaderReadOnlyOptimal, 0, 1);
+
+  // 2.  Resolve albedo_metallic_ms → albedo_metallic_res
+  auto& albedo_ms = *frame_resrc.albedo_metallic_ms;
+  auto& albedo_res = *frame_resrc.albedo_metallic_res;
+
+  albedo_ms.Resolve(cmd_buff, albedo_res,
+                    vk::ImageLayout::eShaderReadOnlyOptimal,
+                    vk::ImageLayout::eUndefined);
+  albedo_res.Transition(cmd_buff, vk::ImageLayout::eTransferDstOptimal,
+                        vk::ImageLayout::eShaderReadOnlyOptimal, 0, 1);
+}
+
+void Renderer::RecPointLights(vk::CommandBuffer cmd_buff, const uint frame_idx,
+                              const npr_graphics::FrameResources& frame_resrc,
+                              const vk::Extent2D& resrc_extent,
+                              const CameraUnif& cam_ubo,
+                              const npr_scene::Camera& camera,
+                              npr_scene::Scene& scene) {
   const auto& frustum = camera.GetFrustum();
   const auto& sphere_mesh = resrc_.GetSphereMesh();
   auto& point_ubo = *frame_resrc.point_light_ubo;
@@ -454,7 +574,7 @@ void Renderer::RecordPointLights(
 
         LightPC light_pc{
             .model = {tf.glob_mat},
-            .shading_mode = settings_.shading_mode == ShadingMode::kPBR,
+            .shading_mode = static_cast<uint32_t>(settings_.shading_mode),
             .diff_int = settings_.diff_int,
             .spec_int = settings_.spec_int};
 
@@ -462,9 +582,10 @@ void Renderer::RecordPointLights(
         glm::vec3 view_pos = cam_ubo.view * glm::vec4(world_pos, 1.0f);
 
         point_ubo.Write(
-            point_at, PointLightUnif{.pos = glm::vec4(view_pos, range.range),
-                                     .color = glm::vec4(
-                                         light.color * light.intensity, 1.0f)});
+            point_at,
+            PointLightUnif{.pos = glm::vec4(view_pos, range.range),
+                           .color = glm::vec4(light.color * light.intensity,
+                                              light.intensity)});
 
         vk::DeviceSize offset = 0;
         const auto vbo = sphere_mesh.vbo.GetBuffer();
@@ -530,13 +651,110 @@ void Renderer::RecordPointLights(
       });
 }
 
-void Renderer::RecordSpotLights(vk::CommandBuffer cmd_buff,
-                                const uint frame_idx,
-                                const npr_graphics::FrameResources& frame_resrc,
-                                const vk::Extent2D& resrc_extent,
-                                const CameraUnif& cam_ubo,
-                                const npr_scene::Camera& camera,
-                                npr_scene::Scene& scene) {
+void Renderer::RecPointLightsInt(
+    vk::CommandBuffer cmd_buff, const uint frame_idx,
+    const npr_graphics::FrameResources& frame_resrc,
+    const vk::Extent2D& resrc_extent, const CameraUnif& cam_ubo,
+    const npr_scene::Camera& camera, npr_scene::Scene& scene) {
+  const auto& frustum = camera.GetFrustum();
+  const auto& sphere_mesh = resrc_.GetSphereMesh();
+  auto& point_ubo = *frame_resrc.point_light_ubo;
+
+  const auto cam_set = desc_pool_.GetCameraSets().GetSet(frame_idx);
+  const auto gbuff_set = desc_pool_.GetGBuffSets().GetSet(frame_idx);
+  const auto point_set = desc_pool_.GetPointLightSets().GetSet(frame_idx);
+
+  uint32_t point_at{0};
+  scene.GetPointLightQuery().each(
+      [&](const PointLightTag&, const TransformComp& tf, const LightComp& light,
+          const RangeComp& range, BoundingBoxComp& bb) {
+        if (point_at >= kMaxPointLights || !frustum.IsVisible(bb)) return;
+
+        LightPC light_pc{
+            .model = {tf.glob_mat},
+            .shading_mode = static_cast<uint32_t>(settings_.shading_mode),
+            .diff_int = settings_.diff_int,
+            .spec_int = settings_.spec_int};
+
+        glm::vec3 world_pos = glm::vec3(tf.glob_mat[3]);
+        glm::vec3 view_pos = cam_ubo.view * glm::vec4(world_pos, 1.0f);
+
+        point_ubo.Write(
+            point_at,
+            PointLightUnif{.pos = glm::vec4(view_pos, range.range),
+                           .color = glm::vec4(light.color * light.intensity,
+                                              light.intensity)});
+
+        vk::DeviceSize offset = 0;
+        const auto vbo = sphere_mesh.vbo.GetBuffer();
+
+        // === BEGIN RENDER PASS FOR POINT LIGHT INTENSITY ===
+        cmd_buff.beginRenderPass(
+            passes_.local_light_map_.BeginInfo(frame_idx, resrc_extent),
+            vk::SubpassContents::eInline);
+
+        {  // write stencil
+          cmd_buff.bindPipeline(vk::PipelineBindPoint::eGraphics,
+                                pipelines_.local_light_map_.GetPipeline());
+
+          cmd_buff.bindDescriptorSets(  // camera
+              vk::PipelineBindPoint::eGraphics,
+              pipelines_.local_light_map_.GetLayout(), 0, cam_set, {});
+
+          cmd_buff.pushConstants(pipelines_.local_light_map_.GetLayout(),
+                                 vk::ShaderStageFlagBits::eVertex, 0,
+                                 sizeof(light_pc), &light_pc);
+
+          cmd_buff.bindVertexBuffers(0, 1, &vbo, &offset);
+          cmd_buff.bindIndexBuffer(sphere_mesh.ibo.GetBuffer(), 0,
+                                   vk::IndexType::eUint32);
+
+          cmd_buff.drawIndexed(sphere_mesh.ibo.GetCount(), 1, 0, 0, 0);
+        }
+
+        cmd_buff.nextSubpass(vk::SubpassContents::eInline);
+
+        {  // render point light intensity (additive)
+
+          cmd_buff.bindPipeline(vk::PipelineBindPoint::eGraphics,
+                                pipelines_.point_light_map_.GetPipeline());
+
+          cmd_buff.bindDescriptorSets(  // camera
+              vk::PipelineBindPoint::eGraphics,
+              pipelines_.point_light_map_.GetLayout(), 0, cam_set, {});
+
+          cmd_buff.bindDescriptorSets(  // gbuff
+              vk::PipelineBindPoint::eGraphics,
+              pipelines_.point_light_map_.GetLayout(), 1, gbuff_set, {});
+
+          cmd_buff.bindDescriptorSets(
+              vk::PipelineBindPoint::eGraphics,  // point light
+              pipelines_.point_light_map_.GetLayout(), 2, point_set,
+              point_ubo.GetElemOffset(point_at));
+
+          cmd_buff.pushConstants(pipelines_.point_light_map_.GetLayout(),
+                                 vk::ShaderStageFlagBits::eVertex |
+                                     vk::ShaderStageFlagBits::eFragment,
+                                 0, sizeof(light_pc), &light_pc);
+
+          cmd_buff.bindVertexBuffers(0, 1, &vbo, &offset);
+          cmd_buff.bindIndexBuffer(sphere_mesh.ibo.GetBuffer(), 0,
+                                   vk::IndexType::eUint32);
+
+          cmd_buff.drawIndexed(sphere_mesh.ibo.GetCount(), 1, 0, 0, 0);
+        }
+        cmd_buff.endRenderPass();
+
+        point_at++;
+      });
+}
+
+void Renderer::RecSpotLights(vk::CommandBuffer cmd_buff, const uint frame_idx,
+                             const npr_graphics::FrameResources& frame_resrc,
+                             const vk::Extent2D& resrc_extent,
+                             const CameraUnif& cam_ubo,
+                             const npr_scene::Camera& camera,
+                             npr_scene::Scene& scene) {
   const auto& frustum = camera.GetFrustum();
   const auto& cone_mesh = resrc_.GetConeMesh();
   auto& spot_ubo = *frame_resrc.spot_light_ubo;
@@ -553,7 +771,7 @@ void Renderer::RecordSpotLights(vk::CommandBuffer cmd_buff,
 
         LightPC light_pc{
             .model = {tf.glob_mat},
-            .shading_mode = settings_.shading_mode == ShadingMode::kPBR,
+            .shading_mode = static_cast<uint32_t>(settings_.shading_mode),
             .diff_int = settings_.diff_int,
             .spec_int = settings_.spec_int};
 
@@ -579,7 +797,8 @@ void Renderer::RecordSpotLights(vk::CommandBuffer cmd_buff,
             SpotLightUnif{
                 .pos = glm::vec4(view_pos, range.range),
                 .dir = glm::vec4(-view_dir, 0.0f),
-                .color = glm::vec4(light.color * light.intensity, 1.0f),
+                .color =
+                    glm::vec4(light.color * light.intensity, light.intensity),
                 .params = glm::vec4(angle_scale, angle_offset, 0.0f, 0.0f)});
 
         vk::DeviceSize offset = 0;
@@ -629,6 +848,122 @@ void Renderer::RecordSpotLights(vk::CommandBuffer cmd_buff,
               spot_ubo.GetElemOffset(spot_at));
 
           cmd_buff.pushConstants(pipelines_.spot_light_.GetLayout(),
+                                 vk::ShaderStageFlagBits::eVertex |
+                                     vk::ShaderStageFlagBits::eFragment,
+                                 0, sizeof(light_pc), &light_pc);
+
+          cmd_buff.bindVertexBuffers(0, 1, &vbo, &offset);
+          cmd_buff.bindIndexBuffer(cone_mesh.ibo.GetBuffer(), 0,
+                                   vk::IndexType::eUint32);
+
+          cmd_buff.drawIndexed(cone_mesh.ibo.GetCount(), 1, 0, 0, 0);
+        }
+        cmd_buff.endRenderPass();
+
+        spot_at++;
+      });
+}
+
+void Renderer::RecSpotLightsInt(vk::CommandBuffer cmd_buff,
+                                const uint frame_idx,
+                                const npr_graphics::FrameResources& frame_resrc,
+                                const vk::Extent2D& resrc_extent,
+                                const CameraUnif& cam_ubo,
+                                const npr_scene::Camera& camera,
+                                npr_scene::Scene& scene) {
+  const auto& frustum = camera.GetFrustum();
+  const auto& cone_mesh = resrc_.GetConeMesh();
+  auto& spot_ubo = *frame_resrc.spot_light_ubo;
+
+  const auto cam_set = desc_pool_.GetCameraSets().GetSet(frame_idx);
+  const auto gbuff_set = desc_pool_.GetGBuffSets().GetSet(frame_idx);
+  const auto spot_set = desc_pool_.GetSpotLightSets().GetSet(frame_idx);
+
+  uint32_t spot_at{0};
+  scene.GetSpotLightQuery().each(
+      [&](const SpotLightTag&, const TransformComp& tf, const LightComp& light,
+          const RangeComp& range, const SpotComp& spot, BoundingBoxComp& bb) {
+        if (spot_at >= kMaxSpotLights || !frustum.IsVisible(bb)) return;
+
+        LightPC light_pc{
+            .model = {tf.glob_mat},
+            .shading_mode = static_cast<uint32_t>(settings_.shading_mode),
+            .diff_int = settings_.diff_int,
+            .spec_int = settings_.spec_int};
+
+        glm::vec3 world_pos = glm::vec3(tf.glob_mat[3]);
+        glm::vec3 view_pos = cam_ubo.view * glm::vec4(world_pos, 1.0f);
+
+        glm::mat3 world_rot = glm::mat3(tf.glob_mat);
+        world_rot[0] = glm::normalize(world_rot[0]);
+        world_rot[1] = glm::normalize(world_rot[1]);
+        world_rot[2] = glm::normalize(world_rot[2]);
+
+        glm::vec3 world_dir = world_rot * glm::vec3(0, 0, -1);
+        glm::vec3 view_dir =
+            glm::normalize(glm::mat3(cam_ubo.view) * world_dir);
+
+        float inner = glm::cos(spot.inner_cone_angle);
+        float outer = glm::cos(spot.outer_cone_angle);
+        float angle_scale = 1.0f / std::max(0.001f, inner - outer);
+        float angle_offset = -outer * angle_scale;
+
+        spot_ubo.Write(
+            spot_at,
+            SpotLightUnif{
+                .pos = glm::vec4(view_pos, range.range),
+                .dir = glm::vec4(-view_dir, 0.0f),
+                .color =
+                    glm::vec4(light.color * light.intensity, light.intensity),
+                .params = glm::vec4(angle_scale, angle_offset, 0.0f, 0.0f)});
+
+        vk::DeviceSize offset = 0;
+        const auto vbo = cone_mesh.vbo.GetBuffer();
+
+        // === BEGIN RENDER PASS FOR SPOT LIGHT INTENSITY ===
+        cmd_buff.beginRenderPass(
+            passes_.local_light_map_.BeginInfo(frame_idx, resrc_extent),
+            vk::SubpassContents::eInline);
+
+        {  // write stencil
+          cmd_buff.bindPipeline(vk::PipelineBindPoint::eGraphics,
+                                pipelines_.local_light_map_.GetPipeline());
+
+          cmd_buff.bindDescriptorSets(  // camera
+              vk::PipelineBindPoint::eGraphics,
+              pipelines_.local_light_map_.GetLayout(), 0, cam_set, {});
+
+          cmd_buff.pushConstants(pipelines_.local_light_map_.GetLayout(),
+                                 vk::ShaderStageFlagBits::eVertex, 0,
+                                 sizeof(light_pc), &light_pc);
+
+          cmd_buff.bindVertexBuffers(0, 1, &vbo, &offset);
+          cmd_buff.bindIndexBuffer(cone_mesh.ibo.GetBuffer(), 0,
+                                   vk::IndexType::eUint32);
+
+          cmd_buff.drawIndexed(cone_mesh.ibo.GetCount(), 1, 0, 0, 0);
+        }
+
+        cmd_buff.nextSubpass(vk::SubpassContents::eInline);
+
+        {  // render spot light intensity (additive)
+          cmd_buff.bindPipeline(vk::PipelineBindPoint::eGraphics,
+                                pipelines_.spot_light_map_.GetPipeline());
+
+          cmd_buff.bindDescriptorSets(  // camera
+              vk::PipelineBindPoint::eGraphics,
+              pipelines_.spot_light_map_.GetLayout(), 0, cam_set, {});
+
+          cmd_buff.bindDescriptorSets(  // gbuff
+              vk::PipelineBindPoint::eGraphics,
+              pipelines_.spot_light_map_.GetLayout(), 1, gbuff_set, {});
+
+          cmd_buff.bindDescriptorSets(
+              vk::PipelineBindPoint::eGraphics,  // spot light
+              pipelines_.spot_light_map_.GetLayout(), 2, spot_set,
+              spot_ubo.GetElemOffset(spot_at));
+
+          cmd_buff.pushConstants(pipelines_.spot_light_map_.GetLayout(),
                                  vk::ShaderStageFlagBits::eVertex |
                                      vk::ShaderStageFlagBits::eFragment,
                                  0, sizeof(light_pc), &light_pc);

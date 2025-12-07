@@ -12,13 +12,19 @@ class PassManager : public npr_core::NonCopyable {
   PassManager(const Context& ctx, const Swapchain& swapchain,
               const Resources& resrc)
       : gpass_{ctx, resrc},
+
         ssao_{ctx, resrc},
         ao_temp_{ctx, resrc},
         ao_res_{ctx, resrc},
+
         glob_light_{ctx, resrc},
         local_light_{ctx, resrc},
+        glob_light_map_{ctx, resrc},
+        local_light_map_{ctx, resrc},
+
         abuff_{ctx, resrc},
         wboit_{ctx, resrc},
+
         bright_color_{ctx, resrc},
         bright_temp_{ctx, resrc},
         coc_map_{ctx, resrc},
@@ -37,6 +43,9 @@ class PassManager : public npr_core::NonCopyable {
 
     glob_light_.CreateFramebuffers();
     local_light_.CreateFramebuffers();
+
+    glob_light_map_.CreateFramebuffers();
+    local_light_map_.CreateFramebuffers();
 
     abuff_.CreateFramebuffers();
     wboit_.CreateFramebuffers();
@@ -60,6 +69,9 @@ class PassManager : public npr_core::NonCopyable {
 
   GlobLightPass glob_light_;
   LocalLightPass local_light_;
+
+  GlobLightMapPass glob_light_map_;
+  LocalLightMapPass local_light_map_;
 
   ABuffPass abuff_;
   WBoitPass wboit_;
