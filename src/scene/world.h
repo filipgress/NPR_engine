@@ -1,6 +1,7 @@
 #ifndef WORLD_H_
 #define WORLD_H_
 
+#include "core/frame_timer.h"
 #include "instance_map.h"
 #include <flecs.h>
 
@@ -11,10 +12,11 @@ class World : npr_core::NonCopyable {
   friend class Scene;
 
  private:
-  void Update();
+  void Update(const npr_core::FrameTimer& timer);
   void Reset();
   void BuildQueries();
 
+  void UpdateMotion(const npr_core::FrameTimer& timer);
   void UpdateTransforms();
   void UpdateInstances();
   void UpdateBB();
@@ -45,6 +47,9 @@ class World : npr_core::NonCopyable {
   flecs::query<const SpotLightTag, const TransformComp, const LightComp,
                const RangeComp, const SpotComp, BoundingBoxComp>
       spot_light_query_;
+
+  flecs::query<TransformComp, VelocityComp> velocity_query_;
+  flecs::query<TransformComp, OscillatingComp> oscillating_query_;
 };
 
 }  // namespace npr_scene

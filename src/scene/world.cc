@@ -15,6 +15,9 @@ void World::Reset() {
   dir_light_query_ = {};
   point_light_query_ = {};
   spot_light_query_ = {};
+
+  velocity_query_ = {};
+  oscillating_query_ = {};
 }
 
 void World::BuildQueries() {
@@ -63,15 +66,49 @@ void World::BuildQueries() {
                          BoundingBoxComp>()
           .cached()
           .build();
+
+  velocity_query_ =
+      entities_.query_builder<TransformComp, VelocityComp>().cached().build();
+  oscillating_query_ = entities_.query_builder<TransformComp, OscillatingComp>()
+                           .cached()
+                           .build();
 }
 
-void World::Update() {
+void World::Update(const npr_core::FrameTimer& timer) {
+  UpdateMotion(timer);
+
   if (tf_query_.changed()) {
     UpdateTransforms();
     UpdateBB();
   }
 
   if (renderable_query_.changed()) UpdateInstances();
+}
+
+void World::UpdateMotion(const npr_core::FrameTimer& timer) {
+  float dt = timer.GetDelta();
+  velocity_query_.each([dt](TransformComp& tf, VelocityComp& vel) {
+    tf.pos += vel.linear * dt;
+
+    if (glm::length(vel.angular) > 0.001f) {
+      float angle = glm::length(vel.angular) * dt;
+      glm::vec3 axis = glm::normalize(vel.angular);
+      glm::quat rotation = glm::angleAxis(angle, axis);
+      tf.rot = tf.rot * rotation;
+    }
+
+    tf.dirty = true;
+  });
+
+  float elapsed = timer.GetElapsed();
+  oscillating_query_.each([elapsed](TransformComp& tf, OscillatingComp& osc) {
+    float t = elapsed * osc.freq * glm::two_pi<float>() + osc.phase;
+    float offset = osc.amp * std::sin(t);
+
+    if (glm::length(osc.dir) > 0.001f)
+      tf.pos = osc.base_pos + normalize(osc.dir) * offset;
+    tf.dirty = true;
+  });
 }
 
 void World::UpdateTransforms() {

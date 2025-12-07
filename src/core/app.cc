@@ -38,7 +38,7 @@ void App::Update() {
   ProcessInput();
 
   camera_.Update(timer_.GetDelta());
-  active_scene_->Update();
+  active_scene_->Update(timer_);
 }
 
 void App::ProcessInput() {

@@ -964,6 +964,9 @@ void GuiManager::InspectorWindow(npr_scene::Camera& camera) {
   DrawMeshComp();
   DrawBoundingBoxComp();
 
+  DrawVelocityComp();
+  DrawOscillatingComp();
+
   ImGui::End();
 
   if (!open) selected_ent_ = flecs::entity::null();
@@ -1284,6 +1287,119 @@ void GuiManager::DrawSpotComp() {
     tf.scale = glm::vec3(base_radius, base_radius, range_comp.range);
     tf.dirty = true;
   }
+}
+
+void GuiManager::DrawVelocityComp() {
+  if (!selected_ent_.has<TransformComp>()) return;
+
+  bool has_velocity = selected_ent_.has<VelocityComp>();
+
+  ImGui::SeparatorText("velocity");
+  if (!has_velocity) {
+    if (ImGui::Button("add", ImVec2(-1, 0))) selected_ent_.add<VelocityComp>();
+    ImGui::Spacing();
+    return;
+  }
+
+  auto& velocity = selected_ent_.get_mut<VelocityComp>();
+
+  ImGui::Text("linear (units/sec):");
+  ImGui::DragFloat3("##linear", &velocity.linear.x, 0.1f, -100.0f, 100.0f);
+
+  ImGui::Spacing();
+
+  ImGui::Text("angular (degrees/sec):");
+  glm::vec3 angular_deg = glm::degrees(velocity.angular);
+  if (ImGui::DragFloat3("##angular", &angular_deg.x, 1.0f, -360.0f, 360.0f))
+    velocity.angular = glm::radians(angular_deg);
+
+  ImGui::Spacing();
+
+  // Quick preset buttons
+  if (ImGui::Button("spin-y##vel")) {
+    velocity.linear = glm::vec3(0.0f);
+    velocity.angular = glm::vec3(0.0f, glm::radians(90.0f), 0.0f);
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("tumble##vel")) {
+    velocity.linear = glm::vec3(0.0f);
+    velocity.angular = glm::vec3(glm::radians(60.0f), glm::radians(90.0f),
+                                 glm::radians(30.0f));
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("move##vel")) {
+    velocity.linear = glm::vec3(2.0f, 0.0f, 0.0f);
+    velocity.angular = glm::vec3(0.0f);
+  }
+
+  ImGui::Spacing();
+
+  if (ImGui::Button("remove##vel", ImVec2(-1, 0))) {
+    selected_ent_.remove<VelocityComp>();
+  }
+
+  ImGui::Spacing();
+}
+
+void GuiManager::DrawOscillatingComp() {
+  if (!selected_ent_.has<TransformComp>()) return;
+
+  bool has_oscillating = selected_ent_.has<OscillatingComp>();
+  ImGui::SeparatorText("oscillating");
+
+  if (!has_oscillating) {
+    if (ImGui::Button("add##osc", ImVec2(-1, 0))) {
+      selected_ent_.set<OscillatingComp>(
+          {.dir = glm::vec3(0.0f, 0.0f, 0.0f),
+           .amp = 1.0f,
+           .freq = 1.0f,
+           .phase = 0.0f,
+           .base_pos = selected_ent_.get<TransformComp>().pos});
+    }
+    ImGui::Spacing();
+    return;
+  }
+
+  auto& osc = selected_ent_.get_mut<OscillatingComp>();
+
+  ImGui::DragFloat3("direction##osc", &osc.dir.x, 0.01f, -1.0f, 1.0f);
+  if (ImGui::IsItemDeactivatedAfterEdit()) {
+    if (glm::length(osc.dir) > 0.001f)
+      osc.dir = glm::normalize(osc.dir);
+    else
+      osc.dir = glm::vec3(1.0f, 0.0f, 0.0f);
+  }
+
+  ImGui::SliderFloat("amplitude##osc", &osc.amp, 0.0f, 10.0f, "%.2f units");
+  ImGui::SliderFloat("frequency##osc", &osc.freq, 0.0f, 10.0f, "%.2f Hz");
+  float phase_deg = glm::degrees(osc.phase);
+  if (ImGui::SliderFloat("phase##osc", &phase_deg, 0.0f, 360.0f, "%.0f°"))
+    osc.phase = glm::radians(phase_deg);
+
+  ImGui::Spacing();
+
+  // presets
+  if (ImGui::Button("horizontal##osc")) {
+    osc.dir = glm::vec3(1.0f, 0.0f, 0.0f);
+    osc.amp = 2.0f;
+    osc.freq = 0.5f;
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("vertical##osc")) {
+    osc.dir = glm::vec3(0.0f, 1.0f, 0.0f);
+    osc.amp = 1.0f;
+    osc.freq = 1.0f;
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("fast##osc")) osc.freq = 2.0f;
+
+  ImGui::Spacing();
+
+  if (ImGui::Button("remove##osc", ImVec2(-1, 0))) {
+    selected_ent_.remove<OscillatingComp>();
+  }
+
+  ImGui::Spacing();
 }
 
 void GuiManager::CalcVisib(npr_scene::Scene& scene, const std::string& search,

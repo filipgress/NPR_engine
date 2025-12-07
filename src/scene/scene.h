@@ -28,8 +28,8 @@ class Scene : npr_core::NonCopyable {
   auto& GetPointLightQuery() const { return world_.point_light_query_; }
   auto& GetSpotLightQuery() const { return world_.spot_light_query_; }
 
-  void Update() {
-    if (success_) world_.Update();
+  void Update(const npr_core::FrameTimer& timer) {
+    if (success_) world_.Update(timer);
   }
 
   void Invalidate() { success_ = false; }

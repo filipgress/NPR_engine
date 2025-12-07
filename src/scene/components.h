@@ -42,6 +42,20 @@ struct PointLightTag {
   /* BoundingBoxComp */
 };
 
+struct VelocityComp {
+  glm::vec3 linear{0.0f};
+  glm::vec3 angular{0.0f};
+};
+
+struct OscillatingComp {
+  glm::vec3 dir{1.0f, 0.0f, 0.0f};
+  float amp{1.0f};
+  float freq{1.0f};
+  float phase{0.0f};
+
+  glm::vec3 base_pos{0.0f};
+};
+
 struct TransformComp {
   glm::vec3 pos{0.0f};
   glm::quat rot{1.0f, 0.0f, 0.0f, 0.0f};

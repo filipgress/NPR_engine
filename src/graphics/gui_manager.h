@@ -74,6 +74,9 @@ class GuiManager : public npr_core::NonCopyable {
   void DrawRangeComp();
   void DrawSpotComp();
 
+  void DrawVelocityComp();
+  void DrawOscillatingComp();
+
  private:
   ImGuiDescriptorPool desc_pool_;
   flecs::entity selected_ent_ = flecs::entity::null();
