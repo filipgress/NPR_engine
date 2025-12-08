@@ -91,8 +91,7 @@ void Resources::CreateImages() {
     resrc.coverage_ms = std::make_unique<Image>(
         ctx_, frame_props_.coverage_format, frame_props_.extent,
         vk::ImageUsageFlagBits::eColorAttachment |
-            vk::ImageUsageFlagBits::eTransientAttachment |
-            vk::ImageUsageFlagBits::eInputAttachment,
+            vk::ImageUsageFlagBits::eTransientAttachment,
         vk::ImageAspectFlagBits::eColor, vk::SharingMode::eExclusive,
         frame_props_.samples, 1, "coverage_ms_" + std::to_string(idx));
 
@@ -105,10 +104,16 @@ void Resources::CreateImages() {
 
     resrc.ds_ms = std::make_unique<Texture>(
         ctx_, frame_props_.ds_format, frame_props_.extent,
-        vk::ImageUsageFlagBits::eDepthStencilAttachment |
-            vk::ImageUsageFlagBits::eSampled,
+        vk::ImageUsageFlagBits::eDepthStencilAttachment,
         vk::ImageAspectFlagBits::eDepth, frame_props_.samples,
         "depth_stencil_ms_" + std::to_string(idx));
+
+    resrc.ds_res = std::make_unique<Texture>(
+        ctx_, frame_props_.ds_format, frame_props_.extent,
+        vk::ImageUsageFlagBits::eDepthStencilAttachment |
+            vk::ImageUsageFlagBits::eSampled,
+        vk::ImageAspectFlagBits::eDepth, vk::SampleCountFlagBits::e1,
+        "depth_stencil_res_" + std::to_string(idx));
 
     // ssao pass
     resrc.ssao_ms = std::make_unique<Image>(

@@ -29,9 +29,9 @@ class BasePass : public npr_core::NonCopyable {
   virtual void SetClearValues() = 0;
   virtual const std::string GetDbgName() const = 0;
 
-  virtual std::vector<vk::AttachmentDescription> GetAttachments() const = 0;
-  virtual std::vector<vk::SubpassDependency> GetDependencies() const = 0;
-  virtual std::vector<vk::SubpassDescription> GetSubpasses() = 0;
+  virtual std::vector<vk::AttachmentDescription2> GetAttachments() const = 0;
+  virtual std::vector<vk::SubpassDependency2> GetDependencies() const = 0;
+  virtual std::vector<vk::SubpassDescription2> GetSubpasses() = 0;
 
  protected:
   const Context& ctx_;
@@ -65,13 +65,13 @@ class SingleColorPass : public RenderPass {
 
  private:
   void SetClearValues() override;
-  std::vector<vk::AttachmentDescription> GetAttachments() const override;
-  std::vector<vk::SubpassDependency> GetDependencies() const override;
-  std::vector<vk::SubpassDescription> GetSubpasses() override;
+  std::vector<vk::AttachmentDescription2> GetAttachments() const override;
+  std::vector<vk::SubpassDependency2> GetDependencies() const override;
+  std::vector<vk::SubpassDescription2> GetSubpasses() override;
 
  protected:
   vk::Format format_;
-  vk::AttachmentReference color_ref_{};
+  vk::AttachmentReference2 color_ref_{};
 };
 
 class GPass : public RenderPass {
@@ -84,15 +84,19 @@ class GPass : public RenderPass {
   const std::string GetDbgName() const override { return "gbuffer_pass"; }
   void SetClearValues() override;
 
-  std::vector<vk::AttachmentDescription> GetAttachments() const override;
-  std::vector<vk::SubpassDependency> GetDependencies() const override;
-  std::vector<vk::SubpassDescription> GetSubpasses() override;
+  std::vector<vk::AttachmentDescription2> GetAttachments() const override;
+  std::vector<vk::SubpassDependency2> GetDependencies() const override;
+  std::vector<vk::SubpassDescription2> GetSubpasses() override;
   std::vector<vk::ImageView> GetAttachmentViews(int frame_idx) const override;
 
  private:
-  std::array<vk::AttachmentReference, 5> color_refs_{};
-  std::array<vk::AttachmentReference, 5> resolve_refs_{};
-  vk::AttachmentReference depth_ref_{};
+  std::array<vk::AttachmentReference2, 5> color_refs_{};
+  std::array<vk::AttachmentReference2, 5> resolve_refs_{};
+
+  vk::AttachmentReference2 depth_ref_{};
+  vk::AttachmentReference2 depth_res_ref_{};
+
+  vk::SubpassDescriptionDepthStencilResolve depth_resolve_{};
 };
 
 class SSAOPass : public RenderPass {
@@ -106,15 +110,15 @@ class SSAOPass : public RenderPass {
   const std::string GetDbgName() const override { return "ssao_pass"; }
   void SetClearValues() override;
 
-  std::vector<vk::AttachmentDescription> GetAttachments() const override;
-  std::vector<vk::SubpassDependency> GetDependencies() const override;
-  std::vector<vk::SubpassDescription> GetSubpasses() override;
+  std::vector<vk::AttachmentDescription2> GetAttachments() const override;
+  std::vector<vk::SubpassDependency2> GetDependencies() const override;
+  std::vector<vk::SubpassDescription2> GetSubpasses() override;
   std::vector<vk::ImageView> GetAttachmentViews(int frame_idx) const override;
 
  private:
-  vk::AttachmentReference ssao_ms_ref_{};
-  vk::AttachmentReference ssao_res_ref_{};
-  vk::AttachmentReference depth_ref_{};
+  vk::AttachmentReference2 ssao_ms_ref_{};
+  vk::AttachmentReference2 ssao_res_ref_{};
+  vk::AttachmentReference2 depth_ref_{};
 };
 
 class SSAOTempPass : public SingleColorPass {
@@ -152,14 +156,14 @@ class GlobLightPass : public RenderPass {
   const std::string GetDbgName() const override { return "glob_light_pass"; }
   void SetClearValues() override;
 
-  std::vector<vk::AttachmentDescription> GetAttachments() const override;
-  std::vector<vk::SubpassDependency> GetDependencies() const override;
-  std::vector<vk::SubpassDescription> GetSubpasses() override;
+  std::vector<vk::AttachmentDescription2> GetAttachments() const override;
+  std::vector<vk::SubpassDependency2> GetDependencies() const override;
+  std::vector<vk::SubpassDescription2> GetSubpasses() override;
   std::vector<vk::ImageView> GetAttachmentViews(int frame_idx) const override;
 
  private:
-  vk::AttachmentReference color_ref_{};
-  vk::AttachmentReference ds_ref_{};
+  vk::AttachmentReference2 color_ref_{};
+  vk::AttachmentReference2 ds_ref_{};
 };
 
 class LocalLightPass : public RenderPass {
@@ -173,14 +177,14 @@ class LocalLightPass : public RenderPass {
   const std::string GetDbgName() const override { return "local_light_pass"; }
   void SetClearValues() override;
 
-  std::vector<vk::AttachmentDescription> GetAttachments() const override;
-  std::vector<vk::SubpassDependency> GetDependencies() const override;
-  std::vector<vk::SubpassDescription> GetSubpasses() override;
+  std::vector<vk::AttachmentDescription2> GetAttachments() const override;
+  std::vector<vk::SubpassDependency2> GetDependencies() const override;
+  std::vector<vk::SubpassDescription2> GetSubpasses() override;
   std::vector<vk::ImageView> GetAttachmentViews(int frame_idx) const override;
 
  private:
-  vk::AttachmentReference color_ref_{};
-  vk::AttachmentReference ds_ref_{};
+  vk::AttachmentReference2 color_ref_{};
+  vk::AttachmentReference2 ds_ref_{};
 };
 
 class GlobLightMapPass : public RenderPass {
@@ -196,14 +200,14 @@ class GlobLightMapPass : public RenderPass {
   }
   void SetClearValues() override;
 
-  std::vector<vk::AttachmentDescription> GetAttachments() const override;
-  std::vector<vk::SubpassDependency> GetDependencies() const override;
-  std::vector<vk::SubpassDescription> GetSubpasses() override;
+  std::vector<vk::AttachmentDescription2> GetAttachments() const override;
+  std::vector<vk::SubpassDependency2> GetDependencies() const override;
+  std::vector<vk::SubpassDescription2> GetSubpasses() override;
   std::vector<vk::ImageView> GetAttachmentViews(int frame_idx) const override;
 
  private:
-  vk::AttachmentReference light_map_ref_{};
-  vk::AttachmentReference ds_ref_{};
+  vk::AttachmentReference2 light_map_ref_{};
+  vk::AttachmentReference2 ds_ref_{};
 };
 
 class LocalLightMapPass : public RenderPass {
@@ -219,14 +223,14 @@ class LocalLightMapPass : public RenderPass {
   }
   void SetClearValues() override;
 
-  std::vector<vk::AttachmentDescription> GetAttachments() const override;
-  std::vector<vk::SubpassDependency> GetDependencies() const override;
-  std::vector<vk::SubpassDescription> GetSubpasses() override;
+  std::vector<vk::AttachmentDescription2> GetAttachments() const override;
+  std::vector<vk::SubpassDependency2> GetDependencies() const override;
+  std::vector<vk::SubpassDescription2> GetSubpasses() override;
   std::vector<vk::ImageView> GetAttachmentViews(int frame_idx) const override;
 
  private:
-  vk::AttachmentReference light_map_ref_{};
-  vk::AttachmentReference ds_ref_{};
+  vk::AttachmentReference2 light_map_ref_{};
+  vk::AttachmentReference2 ds_ref_{};
 };
 
 class ABuffPass : public RenderPass {
@@ -240,14 +244,14 @@ class ABuffPass : public RenderPass {
   const std::string GetDbgName() const override { return "abuff_pass"; }
   void SetClearValues() override;
 
-  std::vector<vk::AttachmentDescription> GetAttachments() const override;
-  std::vector<vk::SubpassDependency> GetDependencies() const override;
-  std::vector<vk::SubpassDescription> GetSubpasses() override;
+  std::vector<vk::AttachmentDescription2> GetAttachments() const override;
+  std::vector<vk::SubpassDependency2> GetDependencies() const override;
+  std::vector<vk::SubpassDescription2> GetSubpasses() override;
   std::vector<vk::ImageView> GetAttachmentViews(int frame_idx) const override;
 
  private:
-  vk::AttachmentReference color_ref_{};
-  vk::AttachmentReference depth_ref_{};
+  vk::AttachmentReference2 color_ref_{};
+  vk::AttachmentReference2 depth_ref_{};
 };
 
 class WBoitPass : public RenderPass {
@@ -261,18 +265,18 @@ class WBoitPass : public RenderPass {
   const std::string GetDbgName() const override { return "wboit_pass"; }
   void SetClearValues() override;
 
-  std::vector<vk::AttachmentDescription> GetAttachments() const override;
-  std::vector<vk::SubpassDependency> GetDependencies() const override;
-  std::vector<vk::SubpassDescription> GetSubpasses() override;
+  std::vector<vk::AttachmentDescription2> GetAttachments() const override;
+  std::vector<vk::SubpassDependency2> GetDependencies() const override;
+  std::vector<vk::SubpassDescription2> GetSubpasses() override;
   std::vector<vk::ImageView> GetAttachmentViews(int frame_idx) const override;
 
  private:
-  std::array<vk::AttachmentReference, 2> acc_refs_{};
-  std::array<vk::AttachmentReference, 2> resolve_refs_{};
-  vk::AttachmentReference depth_ref_{};
+  std::array<vk::AttachmentReference2, 2> acc_refs_{};
+  std::array<vk::AttachmentReference2, 2> resolve_refs_{};
+  vk::AttachmentReference2 depth_ref_{};
 
-  vk::AttachmentReference color_ref_{};
-  std::array<vk::AttachmentReference, 2> input_refs_{};
+  vk::AttachmentReference2 color_ref_{};
+  std::array<vk::AttachmentReference2, 2> input_refs_{};
 };
 
 class BrightColorPass : public SingleColorPass {
@@ -331,7 +335,7 @@ class BlendPresentPass : public SingleColorPass {
   }
 
  private:
-  std::vector<vk::AttachmentDescription> GetAttachments() const override;
+  std::vector<vk::AttachmentDescription2> GetAttachments() const override;
   std::vector<vk::ImageView> GetAttachmentViews(int frame_idx) const override;
   const std::string GetDbgName() const override { return "blend_present_pass"; }
 };
@@ -362,14 +366,14 @@ class SwapPass : public BasePass {
 
   const std::string GetDbgName() const override { return "swap_pass"; }
 
-  std::vector<vk::AttachmentDescription> GetAttachments() const override;
-  std::vector<vk::SubpassDependency> GetDependencies() const override;
-  std::vector<vk::SubpassDescription> GetSubpasses() override;
+  std::vector<vk::AttachmentDescription2> GetAttachments() const override;
+  std::vector<vk::SubpassDependency2> GetDependencies() const override;
+  std::vector<vk::SubpassDescription2> GetSubpasses() override;
 
  private:
   const Swapchain& swapchain_;
 
-  vk::AttachmentReference color_ref_{};
+  vk::AttachmentReference2 color_ref_{};
 };
 
 }  // namespace npr_graphics

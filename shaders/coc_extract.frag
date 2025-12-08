@@ -5,7 +5,7 @@ layout(constant_id = 0) const int SAMPLES = 4;
 layout(location = 0) in vec2 frag_uv;
 layout(location = 0) out float out_coc;
 
-layout(set = 0, binding = 0) uniform sampler2DMS depth_tex;
+layout(set = 0, binding = 0) uniform sampler2D depth_tex;
 
 layout(push_constant) uniform CocPC {
   float focus_dist;
@@ -35,13 +35,7 @@ float linearize_depth(float depth) {
 }
 
 void main() {
-  ivec2 texel_coords = ivec2(frag_uv * textureSize(depth_tex));
-
-  float depth = 0.0;
-  for (int i = 0; i < SAMPLES; i++) // avg depth over samples
-    depth += texelFetch(depth_tex, texel_coords, i).r;
-  depth /= float(SAMPLES);
-
+  float depth = texture(depth_tex, frag_uv).r;
   float linear_depth = linearize_depth(depth);
 
   float focus_near = focus_dist - focus_range * 0.5;

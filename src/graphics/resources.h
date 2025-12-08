@@ -276,6 +276,7 @@ struct FrameResources {
   std::unique_ptr<Texture> coverage_res;
 
   std::unique_ptr<Texture> ds_ms;  // depth-stencil
+  std::unique_ptr<Texture> ds_res;
 
   // ssao
   std::unique_ptr<Image> ssao_ms;

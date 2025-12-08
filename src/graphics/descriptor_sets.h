@@ -123,7 +123,7 @@ class DepthSets : public SingleTexSets {
   void Update(const Resources& resrc) const override final;
   const Texture* GetAttach(const Resources& resrc,
                            int frame_idx) const override {
-    return resrc.GetResrc()[frame_idx].ds_ms.get();
+    return resrc.GetResrc()[frame_idx].ds_res.get();
   }
 };
 
