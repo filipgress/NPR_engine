@@ -64,7 +64,10 @@ struct TransformComp {
   glm::mat4 local_mat;
   glm::mat4 glob_mat;
 
+  glm::mat4 prev_glob_mat;
+
   bool dirty{true};
+  bool init{false};
 };
 
 struct MeshComp {

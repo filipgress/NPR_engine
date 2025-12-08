@@ -51,7 +51,7 @@ class GuiManager : public npr_core::NonCopyable {
   void GlobalSettingsWindow(npr_graphics::RenderSettings& settings,
                             npr_core::FrameTimer& timer, float cam_aspect);
   void SceneWindow(npr_scene::Camera& camera, npr_scene::Scene& scene);
-  void InspectorWindow(npr_scene::Camera& camera);
+  void InspectorWindow(npr_scene::Camera& camera, npr_scene::Scene& scene);
 
   void DrawEntTree(flecs::entity ent, npr_scene::Camera& camera, bool filter,
                    const std::unordered_set<uint64_t>& visible_entities);
@@ -74,8 +74,8 @@ class GuiManager : public npr_core::NonCopyable {
   void DrawRangeComp();
   void DrawSpotComp();
 
-  void DrawVelocityComp();
-  void DrawOscillatingComp();
+  void DrawVelocityComp(npr_scene::Scene& scene);
+  void DrawOscillatingComp(npr_scene::Scene& scene);
 
  private:
   ImGuiDescriptorPool desc_pool_;

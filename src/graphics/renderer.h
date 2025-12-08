@@ -46,7 +46,7 @@ class Renderer : public npr_core::NonCopyable {
   std::pair<vk::Viewport, vk::Rect2D> CalcViewportScissor(
       vk::Extent2D swap_extent, const npr_scene::Camera& camera) const;
 
-  vk::CommandBuffer Record(uint image_idx, const npr_scene::Camera& camera,
+  vk::CommandBuffer Record(uint image_idx, npr_scene::Camera& camera,
                            npr_scene::Scene& scene, bool is_loading, float dt);
 
   void RecordGBuff(vk::CommandBuffer cmd_buff, const uint frame_idx,
@@ -135,6 +135,11 @@ class Renderer : public npr_core::NonCopyable {
                  const npr_graphics::FrameResources& frame_resrc,
                  const vk::Extent2D& resrc_extent,
                  const npr_scene::Camera& camera);
+
+  void RecordMotionBlur(vk::CommandBuffer cmd_buff, const uint frame_idx,
+                        const npr_graphics::FrameResources& frame_resrc,
+                        const vk::Extent2D& resrc_extent,
+                        const npr_scene::Camera& camera);
 
   void RecordSwap(vk::CommandBuffer cmd_buff, uint image_idx,
                   const uint frame_idx, const npr_scene::Camera& camera,

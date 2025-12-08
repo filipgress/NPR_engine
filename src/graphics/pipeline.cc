@@ -169,17 +169,28 @@ void Pipeline::AddObjectInstanceAttribs() {
   AddVertexBinding(0, sizeof(Vertex));
   AddVertexBinding(1, sizeof(InstanceData), vk::VertexInputRate::eInstance);
 
+  // vertex attributes
   AddVertexAttrib(0, 0, vk::Format::eR32G32B32Sfloat, offsetof(Vertex, pos));
   AddVertexAttrib(1, 0, vk::Format::eR32G32Sfloat, offsetof(Vertex, uv));
   AddVertexAttrib(2, 0, vk::Format::eR32G32B32Sfloat, offsetof(Vertex, normal));
   AddVertexAttrib(3, 0, vk::Format::eR32G32B32A32Sfloat,
                   offsetof(Vertex, tangent));
 
+  // instance attributes
+
+  // mat4 model
   for (int i = 0; i < 4; i++)
     AddVertexAttrib(4 + i, 1, vk::Format::eR32G32B32A32Sfloat,
-                    i * sizeof(glm::vec4));
+                    offsetof(InstanceData, model) + i * sizeof(glm::vec4));
+
+  // mat4 prev_model
+  for (int i = 0; i < 4; i++)
+    AddVertexAttrib(8 + i, 1, vk::Format::eR32G32B32A32Sfloat,
+                    offsetof(InstanceData, prev_model) + i * sizeof(glm::vec4));
+
+  // mat3 normal
   for (int i = 0; i < 3; i++)
-    AddVertexAttrib(8 + i, 1, vk::Format::eR32G32B32Sfloat,
+    AddVertexAttrib(12 + i, 1, vk::Format::eR32G32B32Sfloat,
                     offsetof(InstanceData, normal) + i * sizeof(glm::vec3));
 }
 

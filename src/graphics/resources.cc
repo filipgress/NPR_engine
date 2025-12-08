@@ -88,6 +88,20 @@ void Resources::CreateImages() {
         vk::ImageAspectFlagBits::eColor, frame_props_.samples,
         "normal_ms_" + std::to_string(idx));
 
+    resrc.velocity_ms = std::make_unique<Texture>(
+        ctx_, frame_props_.velocity_format, frame_props_.extent,
+        vk::ImageUsageFlagBits::eColorAttachment |
+            vk::ImageUsageFlagBits::eTransientAttachment,
+        vk::ImageAspectFlagBits::eColor, frame_props_.samples,
+        "velocity_ms_" + std::to_string(idx));
+
+    resrc.velocity_res = std::make_unique<Texture>(
+        ctx_, frame_props_.velocity_format, frame_props_.extent,
+        vk::ImageUsageFlagBits::eColorAttachment |
+            vk::ImageUsageFlagBits::eSampled,
+        vk::ImageAspectFlagBits::eColor, vk::SampleCountFlagBits::e1,
+        "velocity_res_" + std::to_string(idx));
+
     resrc.coverage_ms = std::make_unique<Image>(
         ctx_, frame_props_.coverage_format, frame_props_.extent,
         vk::ImageUsageFlagBits::eColorAttachment |

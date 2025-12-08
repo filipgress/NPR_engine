@@ -29,7 +29,10 @@ class Scene : npr_core::NonCopyable {
   auto& GetSpotLightQuery() const { return world_.spot_light_query_; }
 
   void Update(const npr_core::FrameTimer& timer) {
-    if (success_) world_.Update(timer);
+    if (success_) world_.Update(&timer);
+  }
+  void UpdateInstances() {
+    if (success_) world_.UpdateInstances();
   }
 
   void Invalidate() { success_ = false; }

@@ -61,6 +61,7 @@ struct CameraUnif {
   glm::mat4 view;
   glm::mat4 proj;
   glm::mat4 proj_view;
+  glm::mat4 prev_proj_view;
 };
 
 struct DirLight {
@@ -171,9 +172,8 @@ struct CocPC {
   float near_falloff;
   float far_falloff;
 
-  float near_plane;
-  float far_plane;
-
+  float near;
+  float far;
   uint32_t is_persp;  // 1 = persp, 0 = ortho
 };
 
@@ -182,6 +182,18 @@ struct DofPC {
   float coc_threshold;
   float coc_falloff;
   uint32_t debug_mode;
+};
+
+struct MotionBlurPC {
+  float blur_strength;
+  uint32_t num_samples;
+  float max_velocity;
+  uint32_t debug_mode;  // 0 = off, 1 = show velocity buffer
+  float depth_threshold;
+
+  float near;
+  float far;
+  uint32_t is_persp;  // 1 = persp, 0 = ortho
 };
 
 struct PostProcessPC {
@@ -235,6 +247,8 @@ struct FrameProps {
   const vk::Format position_format = vk::Format::eR16G16B16A16Sfloat;
   const vk::Format normal_format = vk::Format::eR16G16B16A16Sfloat;
   const vk::Format coverage_format = vk::Format::eR16Sfloat;
+  const vk::Format velocity_format = vk::Format::eR16G16Sfloat;
+
   const vk::Format light_map_format = vk::Format::eR16Sfloat;
 
   // ssao
@@ -271,6 +285,9 @@ struct FrameResources {
   std::unique_ptr<Texture> emissive_roughness_ms;
   std::unique_ptr<Texture> position_ms;
   std::unique_ptr<Texture> normal_ms;
+
+  std::unique_ptr<Texture> velocity_ms;
+  std::unique_ptr<Texture> velocity_res;
 
   std::unique_ptr<Image> coverage_ms;
   std::unique_ptr<Texture> coverage_res;

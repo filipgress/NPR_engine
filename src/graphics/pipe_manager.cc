@@ -44,6 +44,8 @@ PipeManager::PipeManager(const Context& ctx, const Resources& resrc,
       coc_{ctx, pipe_cache_, passes.coc_map_, "coc_pipe"},
       dof_{ctx, pipe_cache_, passes.present_color_, "dof_pipe"},
 
+      motion_blur_{ctx, pipe_cache_, passes.present_color_, "motion_blur_pipe"},
+
       swap_{ctx, pipe_cache_, passes.swap_, "swap_pipe"} {
   auto samples = resrc.GetProps().samples;
 
@@ -87,6 +89,8 @@ PipeManager::PipeManager(const Context& ctx, const Resources& resrc,
   BuildCoC(shaders.quad_vert_, shaders.coc_extract_frag_, samples, desc_pool);
   BuildDof(shaders.quad_vert_, shaders.dof_poisson_frag_, desc_pool);
 
+  BuildMotionBlur(shaders.quad_vert_, shaders.motion_frag_, desc_pool);
+
   BuildSwap(shaders.quad_vert_, shaders.swap_frag_, desc_pool);
 }
 
@@ -113,6 +117,7 @@ void PipeManager::RebuildPipes() {
   if (!blur_color_blend_.IsUpToDate()) blur_color_blend_.BuildPipeline();
   if (!coc_.IsUpToDate()) coc_.BuildPipeline();
   if (!dof_.IsUpToDate()) dof_.BuildPipeline();
+  if (!motion_blur_.IsUpToDate()) motion_blur_.BuildPipeline();
   if (!swap_.IsUpToDate()) swap_.BuildPipeline();
 }
 
@@ -152,14 +157,14 @@ void PipeManager::BuildGBuff(const VertexShader& vert_shader,
   state.depth_stencil.front.reference = BIT(1);
   state.depth_stencil.back = state.depth_stencil.front;
 
-  state.color_attachments.resize(5);
+  state.color_attachments.resize(6);
   for (auto& att : gbuff_.state_.color_attachments) {
     att.blendEnable = VK_FALSE;
     att.colorWriteMask =
         vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
         vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
   }
-  state.color_attachments[4].colorWriteMask = vk::ColorComponentFlagBits::eR;
+  state.color_attachments[5].colorWriteMask = vk::ColorComponentFlagBits::eR;
 
   state.subpass = 0;
   gbuff_.BuildPipeline();
@@ -927,6 +932,32 @@ void PipeManager::BuildDof(const VertexShader& vert_shader,
 
   state.subpass = 0;
   dof_.BuildPipeline();
+}
+
+void PipeManager::BuildMotionBlur(const VertexShader& vert_shader,
+                                  const FragmentShader& frag_shader,
+                                  const DescriptorPool& desc_pool) {
+  motion_blur_.CreateLayout({desc_pool.GetColorSets().GetLayout(),
+                             desc_pool.GetVelocitySets().GetLayout(),
+                             desc_pool.GetDepthSets().GetLayout()},
+                            {Pipeline::MakePushConst<MotionBlurPC>(
+                                vk::ShaderStageFlagBits::eFragment)});
+
+  motion_blur_.AddShader(vert_shader);
+  motion_blur_.AddShader(frag_shader);
+
+  auto& state = motion_blur_.state_;
+
+  state.color_attachments.resize(1);
+  auto& att = state.color_attachments[0];
+
+  att.blendEnable = VK_FALSE;
+  att.colorWriteMask =
+      vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+      vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+
+  state.subpass = 0;
+  motion_blur_.BuildPipeline();
 }
 
 void PipeManager::BuildSwap(const VertexShader& vert_shader,

@@ -12,7 +12,7 @@ class World : npr_core::NonCopyable {
   friend class Scene;
 
  private:
-  void Update(const npr_core::FrameTimer& timer);
+  void Update(const npr_core::FrameTimer* timer = nullptr);
   void Reset();
   void BuildQueries();
 

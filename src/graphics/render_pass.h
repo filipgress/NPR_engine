@@ -90,8 +90,8 @@ class GPass : public RenderPass {
   std::vector<vk::ImageView> GetAttachmentViews(int frame_idx) const override;
 
  private:
-  std::array<vk::AttachmentReference2, 5> color_refs_{};
-  std::array<vk::AttachmentReference2, 5> resolve_refs_{};
+  std::array<vk::AttachmentReference2, 6> color_refs_{};
+  std::array<vk::AttachmentReference2, 6> resolve_refs_{};
 
   vk::AttachmentReference2 depth_ref_{};
   vk::AttachmentReference2 depth_res_ref_{};

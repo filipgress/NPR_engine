@@ -47,6 +47,19 @@ float Camera::GetFar() const {
   assert(false);
 }
 
+npr_graphics::CameraUnif Camera::GetCameraUnif() {
+  auto proj_view = proj_ * view_;
+  if (!init_) {
+    prev_proj_view_ = proj_view;
+    init_ = true;
+  }
+
+  npr_graphics::CameraUnif cam_ubo = {view_, proj_, proj_view, prev_proj_view_};
+  prev_proj_view_ = proj_view;
+
+  return cam_ubo;
+}
+
 void Camera::SetEntity(flecs::entity ent) {
   if (!ent.is_valid() || !ent.has<CameraTag>()) return;
 

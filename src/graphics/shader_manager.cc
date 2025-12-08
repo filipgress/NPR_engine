@@ -40,6 +40,8 @@ ShaderManager::ShaderManager(const Context& ctx)
                         "../shaders/coc_extract.frag"},
       dof_poisson_frag_{ctx, "shaders/dof_poisson_frag.spv",
                         "../shaders/dof_poisson.frag"},
+      motion_frag_{ctx, "shaders/motion_blur_frag.spv",
+                   "../shaders/motion_blur.frag"},
       swap_frag_{ctx, "shaders/swap_frag.spv", "../shaders/swap.frag"},
       shaders_{
           &quad_vert_,           &gbuff_vert_,       &light_vert_,
@@ -49,7 +51,7 @@ ShaderManager::ShaderManager(const Context& ctx)
           &shading_frag_,        &abuff_fill_frag_,  &abuff_res_frag_,
           &wboit_acc_frag_,      &wboit_res_frag_,   &post_process_frag_,
           &bright_extract_frag_, &coc_extract_frag_, &dof_poisson_frag_,
-          &swap_frag_,
+          &motion_frag_,         &swap_frag_,
       } {}
 
 void ShaderManager::Recompile() {

@@ -118,8 +118,8 @@ void Renderer::Render(npr_core::FrameTimer& timer, Camera& camera, Scene& scene,
   sync_.Increment();
 }
 
-vk::CommandBuffer Renderer::Record(uint image_idx, const Camera& camera,
-                                   Scene& scene, bool is_loading, float dt) {
+vk::CommandBuffer Renderer::Record(uint image_idx, Camera& camera, Scene& scene,
+                                   bool is_loading, float dt) {
   auto frame_idx = sync_.GetFrameIdx();
   auto cmd_buff = cmd_pool_.GetCmdBuff(frame_idx);
 
@@ -138,11 +138,11 @@ vk::CommandBuffer Renderer::Record(uint image_idx, const Camera& camera,
   cmd_buff.setViewport(0, viewport);
 
   if (!scene.IsValid() || !scene.IsInit()) {
-    auto& color_res = *frame_resrc.color_res;
-    color_res.Clear(cmd_buff, {0.0f, 0.0f, 0.0f, 1.0f},
-                    vk::ImageLayout::eUndefined);
-    color_res.Transition(cmd_buff, vk::ImageLayout::eTransferDstOptimal,
-                         vk::ImageLayout::eShaderReadOnlyOptimal, 0, 1);
+    auto& present_color = *frame_resrc.present_color;
+    present_color.Clear(cmd_buff, {0.0f, 0.0f, 0.0f, 1.0f},
+                        vk::ImageLayout::eUndefined);
+    present_color.Transition(cmd_buff, vk::ImageLayout::eTransferDstOptimal,
+                             vk::ImageLayout::eShaderReadOnlyOptimal, 0, 1);
 
   } else {
     RecordGBuff(cmd_buff, frame_idx, frame_resrc, resrc_extent, camera, scene);
@@ -155,6 +155,7 @@ vk::CommandBuffer Renderer::Record(uint image_idx, const Camera& camera,
     RecordPostProcess(cmd_buff, frame_idx, frame_resrc, resrc_extent, dt);
     RecordBloom(cmd_buff, frame_idx, resrc_extent);
     RecordDoF(cmd_buff, frame_idx, frame_resrc, resrc_extent, camera);
+    RecordMotionBlur(cmd_buff, frame_idx, frame_resrc, resrc_extent, camera);
   }
 
   RecordSwap(cmd_buff, image_idx, frame_idx, camera, is_loading, dt);
@@ -203,6 +204,7 @@ void Renderer::RecordOpaque(vk::CommandBuffer cmd_buff, const uint frame_idx,
     for (const auto& [tf, bb] : instances) {
       if (!frustum.IsVisible(bb)) continue;
       visible.push_back({.model = tf.glob_mat,
+                         .prev_model = tf.prev_glob_mat,
                          .normal = glm::transpose(glm::inverse(tf.glob_mat))});
     }
 
@@ -510,7 +512,7 @@ void Renderer::RecLocalLights(vk::CommandBuffer cmd_buff, const uint frame_idx,
   RecSpotLights(cmd_buff, frame_idx, frame_resrc, resrc_extent, cam_ubo, camera,
                 scene);
 
-  // resolve color_ms to color_res
+  // resolve color_ms -> color_res
   auto& color_ms = *frame_resrc.color_ms;
   auto& color_res = *frame_resrc.color_res;
 
@@ -531,7 +533,7 @@ void Renderer::RecLocalLightsInt(
   RecSpotLightsInt(cmd_buff, frame_idx, frame_resrc, resrc_extent, cam_ubo,
                    camera, scene);
 
-  // 1.  Resolve light_map_ms → light_map_res
+  // resolve light_map_ms → light_map_res
   auto& light_map_ms = *frame_resrc.light_map_ms;
   auto& light_map_res = *frame_resrc.light_map_res;
 
@@ -1125,6 +1127,7 @@ void Renderer::RecordTrans(vk::CommandBuffer cmd_buff, const uint frame_idx,
     for (const auto& [tf, bb] : instances) {
       if (!frustum.IsVisible(bb)) continue;
       visible.push_back({.model = tf.glob_mat,
+                         .prev_model = tf.prev_glob_mat,
                          .normal = glm::transpose(glm::inverse(tf.glob_mat))});
     }
 
@@ -1182,8 +1185,6 @@ void Renderer::RecordPostProcess(
     const npr_graphics::FrameResources& frame_resrc,
     const vk::Extent2D& resrc_extent, float dt) {
   if (!settings_.enable_post_process) {
-    if (!settings_.enable_bloom && !settings_.enable_dof) return;
-
     // copy color_res to present_color
     frame_resrc.color_res->CopyTo(cmd_buff, *frame_resrc.present_color,
                                   vk::ImageLayout::eShaderReadOnlyOptimal,
@@ -1327,7 +1328,6 @@ void Renderer::RecordDoF(vk::CommandBuffer cmd_buff, const uint frame_idx,
                          const vk::Extent2D& resrc_extent,
                          const npr_scene::Camera& camera) {
   if (!settings_.enable_dof) {
-    if (!settings_.enable_post_process && !settings_.enable_bloom) return;
     // copy present_color to color_res
     frame_resrc.present_color->CopyTo(cmd_buff, *frame_resrc.color_res,
                                       vk::ImageLayout::eShaderReadOnlyOptimal,
@@ -1350,16 +1350,15 @@ void Renderer::RecordDoF(vk::CommandBuffer cmd_buff, const uint frame_idx,
       vk::PipelineBindPoint::eGraphics, pipelines_.coc_.GetLayout(), 0,
       desc_pool_.GetDepthSets().GetSet(frame_idx), {});
 
-  CocPC coc_pc{};
-  coc_pc.focus_dist = settings_.dof_focus_distance;
-  coc_pc.focus_range = settings_.dof_focus_range;
-  coc_pc.near_int = settings_.dof_near_int;
-  coc_pc.far_int = settings_.dof_far_int;
-  coc_pc.near_falloff = settings_.dof_near_falloff;
-  coc_pc.far_falloff = settings_.dof_far_falloff;
-  coc_pc.near_plane = camera.GetNear();
-  coc_pc.far_plane = camera.GetFar();
-  coc_pc.is_persp = !camera.IsOrtho();
+  CocPC coc_pc{.focus_dist = settings_.dof_focus_distance,
+               .focus_range = settings_.dof_focus_range,
+               .near_int = settings_.dof_near_int,
+               .far_int = settings_.dof_far_int,
+               .near_falloff = settings_.dof_near_falloff,
+               .far_falloff = settings_.dof_far_falloff,
+               .near = camera.GetNear(),
+               .far = camera.GetFar(),
+               .is_persp = !camera.IsOrtho()};
 
   cmd_buff.pushConstants(pipelines_.coc_.GetLayout(),
                          vk::ShaderStageFlagBits::eFragment, 0, sizeof(coc_pc),
@@ -1403,6 +1402,61 @@ void Renderer::RecordDoF(vk::CommandBuffer cmd_buff, const uint frame_idx,
   cmd_buff.endRenderPass();
 }
 
+void Renderer::RecordMotionBlur(vk::CommandBuffer cmd_buff,
+                                const uint frame_idx,
+                                const npr_graphics::FrameResources& frame_resrc,
+                                const vk::Extent2D& resrc_extent,
+                                const npr_scene::Camera& camera) {
+  if (!settings_.enable_motion_blur) {
+    // copy color_res to present_color
+    frame_resrc.color_res->CopyTo(cmd_buff, *frame_resrc.present_color,
+                                  vk::ImageLayout::eShaderReadOnlyOptimal,
+                                  vk::ImageLayout::eUndefined);
+    // frame_resrc.color_res->Transition(
+    //     cmd_buff, vk::ImageLayout::eTransferSrcOptimal,
+    //     vk::ImageLayout::eShaderReadOnlyOptimal, 0, 1);
+    frame_resrc.present_color->Transition(
+        cmd_buff, vk::ImageLayout::eTransferDstOptimal,
+        vk::ImageLayout::eShaderReadOnlyOptimal, 0, 1);
+    return;
+  }
+
+  cmd_buff.beginRenderPass(
+      passes_.present_color_.BeginInfo(frame_idx, resrc_extent),
+      vk::SubpassContents::eInline);
+
+  cmd_buff.bindPipeline(vk::PipelineBindPoint::eGraphics,
+                        pipelines_.motion_blur_.GetPipeline());
+
+  cmd_buff.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,  // color_res
+                              pipelines_.motion_blur_.GetLayout(), 0,
+                              desc_pool_.GetColorSets().GetSet(frame_idx), {});
+
+  cmd_buff.bindDescriptorSets(  // velocity_res
+      vk::PipelineBindPoint::eGraphics, pipelines_.motion_blur_.GetLayout(), 1,
+      desc_pool_.GetVelocitySets().GetSet(frame_idx), {});
+
+  cmd_buff.bindDescriptorSets(  // depth_tex
+      vk::PipelineBindPoint::eGraphics, pipelines_.motion_blur_.GetLayout(), 2,
+      desc_pool_.GetDepthSets().GetSet(frame_idx), {});
+
+  MotionBlurPC mb_pc{.blur_strength = settings_.motion_blur_strength,
+                     .num_samples = settings_.motion_blur_samples,
+                     .max_velocity = settings_.motion_blur_max_velocity,
+                     .debug_mode = settings_.motion_blur_debug,
+                     .depth_threshold = settings_.motion_blur_depth_threshold,
+                     .near = camera.GetNear(),
+                     .far = camera.GetFar(),
+                     .is_persp = !camera.IsOrtho()};
+
+  cmd_buff.pushConstants(pipelines_.motion_blur_.GetLayout(),
+                         vk::ShaderStageFlagBits::eFragment, 0,
+                         sizeof(MotionBlurPC), &mb_pc);
+
+  cmd_buff.draw(3, 1, 0, 0);
+  cmd_buff.endRenderPass();
+}
+
 void Renderer::RecordSwap(vk::CommandBuffer cmd_buff, uint image_idx,
                           const uint frame_idx, const npr_scene::Camera& camera,
                           bool is_loading, float dt) {
@@ -1433,9 +1487,9 @@ void Renderer::RecordSwap(vk::CommandBuffer cmd_buff, uint image_idx,
   cmd_buff.bindPipeline(vk::PipelineBindPoint::eGraphics,
                         pipelines_.swap_.GetPipeline());
 
-  cmd_buff.bindDescriptorSets(  // color_res
+  cmd_buff.bindDescriptorSets(  // present_color
       vk::PipelineBindPoint::eGraphics, pipelines_.swap_.GetLayout(), 0,
-      desc_pool_.GetColorSets().GetSet(frame_idx), {});
+      desc_pool_.GetPresentColorSets().GetSet(frame_idx), {});
 
   cmd_buff.draw(3, 1, 0, 0);
   cmd_buff.nextSubpass(vk::SubpassContents::eInline);

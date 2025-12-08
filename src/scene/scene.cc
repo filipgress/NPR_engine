@@ -17,9 +17,7 @@ void Scene::StopLoading() {
 void Scene::Init(npr_core::TaskManager& tasks,
                  std::function<void()> on_complete) {
   world_.BuildQueries();
-  world_.UpdateTransforms();
-  world_.UpdateBB();
-  world_.UpdateInstances();
+  world_.Update();
 
   resrc_->Submit(tasks, on_complete);
 }

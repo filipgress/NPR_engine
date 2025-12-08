@@ -108,6 +108,7 @@ class IndexBuffer : public Buffer {
 
 struct InstanceData {
   glm::mat4 model;
+  glm::mat4 prev_model;
   glm::mat3 normal;
 };
 

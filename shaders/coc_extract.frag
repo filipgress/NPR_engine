@@ -17,21 +17,17 @@ layout(push_constant) uniform CocPC {
   float near_falloff;
   float far_falloff;
 
-  float near_plane;
-  float far_plane;
-
+  float near;
+  float far;
   uint is_persp; // 1 = presp, 0 = ortho
 };
 
 // linearize depth value from [0, 1] to view space depth
 float linearize_depth(float depth) {
-  if (is_persp == 1) {
-    float z_ndc = depth * 2.0 - 1.0;
-    return (2.0 * near_plane * far_plane) /
-      (far_plane + near_plane - z_ndc * (far_plane - near_plane));
-  } else {
-    return mix(near_plane, far_plane, depth);
-  }
+  if (is_persp == 1)
+    return near * far / (far - depth * (far - near));
+  else
+    return near + depth * (far - near);
 }
 
 void main() {

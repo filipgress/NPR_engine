@@ -107,6 +107,10 @@ class PipeManager : public npr_core::NonCopyable {
                 const FragmentShader& frag_shader,
                 const DescriptorPool& desc_pool);
 
+  void BuildMotionBlur(const VertexShader& vert_shader,
+                       const FragmentShader& frag_shader,
+                       const DescriptorPool& desc_pool);
+
   void BuildSwap(const VertexShader& vert_shader,
                  const FragmentShader& frag_shader,
                  const DescriptorPool& desc_pool);
@@ -144,6 +148,8 @@ class PipeManager : public npr_core::NonCopyable {
 
   Pipeline coc_;
   Pipeline dof_;
+
+  Pipeline motion_blur_;
 
   Pipeline swap_;
 };

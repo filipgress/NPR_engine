@@ -66,9 +66,7 @@ class Camera {
   float GetFar() const;
 
   const Frustum& GetFrustum() const { return frustum_; }
-  npr_graphics::CameraUnif GetCameraUnif() const {
-    return {view_, proj_, proj_ * view_};
-  }
+  npr_graphics::CameraUnif GetCameraUnif();
 
   void SetEntity(flecs::entity ent);
   void SetTrackTarget(flecs::entity ent);
@@ -91,6 +89,9 @@ class Camera {
  private:
   glm::mat4 proj_{1.0f};
   glm::mat4 view_{1.0f};
+
+  glm::mat4 prev_proj_view_{1.0f};
+  bool init_{false};
 
   CameraState curr_{};
   CameraState dest_{};

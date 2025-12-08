@@ -73,6 +73,16 @@ class PresentColorSets : public SingleTexSets {
   }
 };
 
+class VelocitySets : public SingleTexSets {
+ public:
+  VelocitySets(const Context& ctx, uint count) : SingleTexSets{ctx, count} {}
+
+  const Texture* GetAttach(const Resources& resrc,
+                           int frame_idx) const override {
+    return resrc.GetResrc()[frame_idx].velocity_res.get();
+  }
+};
+
 // ao
 class AOResSets : public SingleTexSets {
  public:

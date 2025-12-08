@@ -41,6 +41,8 @@ class DescriptorPool : public npr_core::NonCopyable {
   }
 
   const DepthSets& GetDepthSets() const { return depth_sets_; }
+  const VelocitySets& GetVelocitySets() const { return velocity_sets_; }
+
   const CocMapSets& GetCocMapSets() const { return coc_sets_; }
   const DofSet& GetDofSet() const { return dof_set_; }
 
@@ -82,6 +84,7 @@ class DescriptorPool : public npr_core::NonCopyable {
   BrightTempSets bright_temp_sets_;
 
   DepthSets depth_sets_;
+  VelocitySets velocity_sets_;
   CocMapSets coc_sets_;
   DofSet dof_set_;
 

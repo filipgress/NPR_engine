@@ -74,8 +74,8 @@ void World::BuildQueries() {
                            .build();
 }
 
-void World::Update(const npr_core::FrameTimer& timer) {
-  UpdateMotion(timer);
+void World::Update(const npr_core::FrameTimer* timer_ptr) {
+  if (timer_ptr) UpdateMotion(*timer_ptr);
 
   if (tf_query_.changed()) {
     UpdateTransforms();
@@ -126,10 +126,17 @@ void World::UpdateTransforms() {
   });
 
   tf_query_.each([](TransformComp& out_tf, const TransformComp* parent_tf) {
+    out_tf.prev_glob_mat = out_tf.glob_mat;
+
     if (parent_tf)
       out_tf.glob_mat = parent_tf->glob_mat * out_tf.local_mat;
     else
       out_tf.glob_mat = out_tf.local_mat;
+
+    if (!out_tf.init) {  // first update
+      out_tf.prev_glob_mat = out_tf.glob_mat;
+      out_tf.init = true;
+    }
   });
 }
 

@@ -4,14 +4,17 @@ layout(constant_id = 0) const uint SAMPLES = 4;
 layout(constant_id = 1) const uint MAX_TEXTURES = 128;
 
 layout(location = 0) in vec2 frag_uv;
-layout(location = 1) in vec3 frag_pos; // view space position
+layout(location = 1) in vec3 frag_pos; // view-space position
 layout(location = 2) in mat3 TBN;
+layout(location = 5) in vec4 curr_clip_pos;
+layout(location = 6) in vec4 prev_clip_pos;
 
 layout(location = 0) out vec4 out_albedo; // rgb = albedo, a = metallic
 layout(location = 1) out vec4 out_emissive; // rgb = emissive, a = roughness
 layout(location = 2) out vec4 out_position; // xyz = view space position, w = unused
 layout(location = 3) out vec4 out_normal; // xyz = view space normal, w = unused
-layout(location = 4) out float out_coverage; // Coverage for MSAA resolve
+layout(location = 4) out vec2 out_velocity; // screen-space velocity
+layout(location = 5) out float out_coverage; // coverage for MSAA resolve
 
 layout(set = 1, binding = 0) uniform sampler2D textures[MAX_TEXTURES];
 layout(set = 2, binding = 0) uniform MaterialUnif {
@@ -66,6 +69,10 @@ void main() {
   if (material.maps.w != -1)
     emissive *= texture(textures[material.maps.w], frag_uv).rgb;
 
+  // velocity
+  vec2 curr_ndc = curr_clip_pos.xy / curr_clip_pos.w;
+  vec2 prev_ndc = prev_clip_pos.xy / prev_clip_pos.w;
+
   // output to gbuffer
   out_albedo = vec4(albedo.rgb, metallic);
   out_emissive = vec4(emissive, roughness);
@@ -73,4 +80,5 @@ void main() {
   out_normal = vec4(normal, 0.0);
   out_coverage = (gl_SampleMaskIn[0] == coverage_mask) ? 1.0 // simple pixel
     : 0.0; // complex pixel
+  out_velocity = (curr_ndc - prev_ndc) * 0.5;
 }

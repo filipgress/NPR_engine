@@ -22,7 +22,7 @@ enum class QuantMode : uint32_t {
 };
 
 struct RenderSettings {
-  vk::Extent2D target_size{500, 400};
+  vk::Extent2D target_size{600, 500};
 
   glm::vec3 ambient_color{0.3f, 0.3f, 0.3f};
   float ambient_intensity{0.225f};
@@ -30,7 +30,7 @@ struct RenderSettings {
   glm::vec3 rim_color{1.0f, 1.0f, 1.0f};
   float rim_intensity{0.0f};
 
-  ShadingMode shading_mode{ShadingMode::kPBR};
+  ShadingMode shading_mode{ShadingMode::kBlinnPhong};
 
   float diff_int{1.0f};
   float spec_int{1.0f};
@@ -50,7 +50,7 @@ struct RenderSettings {
   float ssao_radius{0.5f};
   float ssao_bias{0.025f};
 
-  TransparencyMode trans_mode{TransparencyMode::kWBoit};
+  TransparencyMode trans_mode{TransparencyMode::kNone};
   float alpha_cutoff{0.001f};
 
   uint32_t abuff_avg_nodes{4};
@@ -63,7 +63,7 @@ struct RenderSettings {
   float wboit_weight_min{1e-2};
   float wboit_weight_max{3e3};
 
-  bool enable_post_process{true};
+  bool enable_post_process{false};
   uint32_t pixel_size{1};
   DitherMode dither_mode{DitherMode::kNone};
   uint32_t bayer_size{2};
@@ -102,6 +102,13 @@ struct RenderSettings {
   float dof_blur_radius{5.0f};
   float dof_coc_threshold{0.05f};
   float dof_coc_falloff{10.0f};
+
+  bool enable_motion_blur{false};
+  float motion_blur_strength{4.0f};
+  uint32_t motion_blur_samples{12};
+  float motion_blur_max_velocity{0.05f};
+  bool motion_blur_debug{false};  // show velocity vectors
+  float motion_blur_depth_threshold{0.1f};
 
   bool dirty_target_size{false};
   bool dirty_abuff_size{false};

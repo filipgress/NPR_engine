@@ -103,9 +103,7 @@ void GuiManager::NewFrame(npr_graphics::RenderSettings& settings,
 
   GlobalSettingsWindow(settings, timer, camera.GetAspect());
   SceneWindow(camera, scene);
-  InspectorWindow(camera);
-
-  // ImGui::ShowDemoWindow();
+  InspectorWindow(camera, scene);
 }
 
 void GuiManager::FpsOverlay(float fps) {
@@ -530,6 +528,73 @@ void GuiManager::GlobalSettingsWindow(npr_graphics::RenderSettings& settings,
     ImGui::Spacing();
   }
 
+  if (ImGui::CollapsingHeader("motion blur")) {
+    ImGui::Spacing();
+
+    ImGui::Checkbox("enable##mb", &settings.enable_motion_blur);
+
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    ImGui::BeginDisabled(!settings.enable_motion_blur);
+
+    static int selected_debug_mb = settings.motion_blur_debug;
+    if (ImGui::Selectable("normal##mb_debug", selected_debug_mb == 0)) {
+      selected_debug_mb = 0;
+      settings.motion_blur_debug = false;
+    }
+
+    if (ImGui::Selectable("show velocity##mb_debug", selected_debug_mb == 1)) {
+      selected_debug_mb = 1;
+      settings.motion_blur_debug = true;
+    }
+
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    if (ImGui::SliderFloat("strength##mb", &settings.motion_blur_strength, 0.0f,
+                           10.0f, "%.2f"))
+      settings.motion_blur_strength =
+          glm::clamp(settings.motion_blur_strength, 0.0f, 10.0f);
+
+    int mb_samples = static_cast<int>(settings.motion_blur_samples);
+    if (ImGui::SliderInt("samples##mb", &mb_samples, 4, 32)) {
+      settings.motion_blur_samples = static_cast<uint32_t>(mb_samples);
+    }
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+      ImGui::SetTooltip(
+          "number of samples along motion vector\n"
+          "higher = smoother but slower (8-16 recommended)");
+
+    if (ImGui::SliderFloat("max velocity##mb",
+                           &settings.motion_blur_max_velocity, 0.01f, 0.2f,
+                           "%.3f")) {
+      settings.motion_blur_max_velocity =
+          glm::clamp(settings.motion_blur_max_velocity, 0.01f, 0.2f);
+    }
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+      ImGui::SetTooltip(
+          "maximum blur radius in screen space\n"
+          "prevents excessive blur from fast motion");
+
+    if (ImGui::DragFloat("depth threshold##mb",
+                         &settings.motion_blur_depth_threshold, 0.005f, 0.001f,
+                         1.0f, "%.3f"))
+      settings.motion_blur_depth_threshold =
+          glm::clamp(settings.motion_blur_depth_threshold, 0.001f, 1.0f);
+
+    ImGui::EndDisabled();
+
+    if (!settings.enable_motion_blur) {
+      ImGui::SameLine();
+      ImGui::TextDisabled("(disabled)");
+    }
+
+    ImGui::Spacing();
+  }
+
   if (ImGui::CollapsingHeader("post processing")) {
     ImGui::Spacing();
 
@@ -933,7 +998,8 @@ void GuiManager::SceneWindow(Camera& camera, Scene& scene) {
   ImGui::End();
 }
 
-void GuiManager::InspectorWindow(npr_scene::Camera& camera) {
+void GuiManager::InspectorWindow(npr_scene::Camera& camera,
+                                 npr_scene::Scene& scene) {
   if (!selected_ent_.is_valid()) return;
 
   ImVec2 win_size{300, 400};
@@ -964,8 +1030,8 @@ void GuiManager::InspectorWindow(npr_scene::Camera& camera) {
   DrawMeshComp();
   DrawBoundingBoxComp();
 
-  DrawVelocityComp();
-  DrawOscillatingComp();
+  DrawVelocityComp(scene);
+  DrawOscillatingComp(scene);
 
   ImGui::End();
 
@@ -1099,6 +1165,7 @@ void GuiManager::DrawTransformComp(npr_scene::Camera& camera) {
   if (changed) {
     selected_ent_.modified<TransformComp>();
     tf.dirty = true;
+    tf.init = false;
 
     camera.SetEntity(
         selected_ent_);  // if camera is tracking this entity, update
@@ -1289,14 +1356,18 @@ void GuiManager::DrawSpotComp() {
   }
 }
 
-void GuiManager::DrawVelocityComp() {
+void GuiManager::DrawVelocityComp(npr_scene::Scene& scene) {
   if (!selected_ent_.has<TransformComp>()) return;
 
   bool has_velocity = selected_ent_.has<VelocityComp>();
 
   ImGui::SeparatorText("velocity");
   if (!has_velocity) {
-    if (ImGui::Button("add", ImVec2(-1, 0))) selected_ent_.add<VelocityComp>();
+    if (ImGui::Button("add", ImVec2(-1, 0))) {
+      selected_ent_.add<VelocityComp>();
+      scene.UpdateInstances();
+    }
+
     ImGui::Spacing();
     return;
   }
@@ -1336,12 +1407,13 @@ void GuiManager::DrawVelocityComp() {
 
   if (ImGui::Button("remove##vel", ImVec2(-1, 0))) {
     selected_ent_.remove<VelocityComp>();
+    scene.UpdateInstances();
   }
 
   ImGui::Spacing();
 }
 
-void GuiManager::DrawOscillatingComp() {
+void GuiManager::DrawOscillatingComp(npr_scene::Scene& scene) {
   if (!selected_ent_.has<TransformComp>()) return;
 
   bool has_oscillating = selected_ent_.has<OscillatingComp>();
@@ -1355,7 +1427,9 @@ void GuiManager::DrawOscillatingComp() {
            .freq = 1.0f,
            .phase = 0.0f,
            .base_pos = selected_ent_.get<TransformComp>().pos});
+      scene.UpdateInstances();
     }
+
     ImGui::Spacing();
     return;
   }
@@ -1397,6 +1471,7 @@ void GuiManager::DrawOscillatingComp() {
 
   if (ImGui::Button("remove##osc", ImVec2(-1, 0))) {
     selected_ent_.remove<OscillatingComp>();
+    scene.UpdateInstances();
   }
 
   ImGui::Spacing();
