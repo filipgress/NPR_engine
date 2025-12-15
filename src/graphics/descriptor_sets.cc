@@ -690,7 +690,7 @@ void HatchingArraySets::CreateLayout() {
   vk::DescriptorSetLayoutBinding binding{};
   binding.binding = 0;
   binding.descriptorType = vk::DescriptorType::eCombinedImageSampler;
-  binding.descriptorCount = kHatchLevels;
+  binding.descriptorCount = 1;  // single sampler2DArray
   binding.stageFlags = vk::ShaderStageFlagBits::eFragment;
 
   vk::DescriptorSetLayoutCreateInfo layout_info{};
@@ -704,86 +704,23 @@ void HatchingArraySets::CreateLayout() {
 }
 
 void HatchingArraySets::Update(const Resources& resrc) const {
-  std::array<std::vector<vk::DescriptorImageInfo>, 4> all_image_infos;
+  std::array<const TextureArray*, 4> arrays = {
+      &resrc.GetHatchTexArr(), &resrc.GetCrossHatchTexArr(),
+      &resrc.GetScribbleTexArr(), &resrc.GetStippleTexArr()};
 
-  // Set 0: Hatch textures
-  {
-    uint32_t hatch_count = resrc.GetHatchTexCount();
-    all_image_infos[0].resize(kHatchLevels);
-
-    for (uint32_t i = 0; i < kHatchLevels; ++i) {
-      uint32_t tex_idx = (hatch_count > 0) ? (i % hatch_count) : 0;
-      const auto& tex = (hatch_count > 0) ? resrc.GetHatchTex(tex_idx)
-                                          : resrc.GetDefColorTex();
-
-      all_image_infos[0][i].imageLayout =
-          vk::ImageLayout::eShaderReadOnlyOptimal;
-      all_image_infos[0][i].imageView = tex.GetImageView();
-      all_image_infos[0][i].sampler = tex.GetSampler();
-    }
-  }
-
-  // Set 1: Cross-hatch textures
-  {
-    uint32_t cross_hatch_count = resrc.GetCrossHatchTexCount();
-    all_image_infos[1].resize(kHatchLevels);
-
-    for (uint32_t i = 0; i < kHatchLevels; ++i) {
-      uint32_t tex_idx = (cross_hatch_count > 0) ? (i % cross_hatch_count) : 0;
-      const auto& tex = (cross_hatch_count > 0)
-                            ? resrc.GetCrossHatchTex(tex_idx)
-                            : resrc.GetDefColorTex();
-
-      all_image_infos[1][i].imageLayout =
-          vk::ImageLayout::eShaderReadOnlyOptimal;
-      all_image_infos[1][i].imageView = tex.GetImageView();
-      all_image_infos[1][i].sampler = tex.GetSampler();
-    }
-  }
-
-  // Set 2: Scribble textures
-  {
-    uint32_t scribble_count = resrc.GetScribbleTexCount();
-    all_image_infos[2].resize(kHatchLevels);
-
-    for (uint32_t i = 0; i < kHatchLevels; ++i) {
-      uint32_t tex_idx = (scribble_count > 0) ? (i % scribble_count) : 0;
-      const auto& tex = (scribble_count > 0) ? resrc.GetScribbleTex(tex_idx)
-                                             : resrc.GetDefColorTex();
-
-      all_image_infos[2][i].imageLayout =
-          vk::ImageLayout::eShaderReadOnlyOptimal;
-      all_image_infos[2][i].imageView = tex.GetImageView();
-      all_image_infos[2][i].sampler = tex.GetSampler();
-    }
-  }
-
-  // Set 3: Stipple textures
-  {
-    uint32_t stipple_count = resrc.GetStippleTexCount();
-    all_image_infos[3].resize(kHatchLevels);
-
-    for (uint32_t i = 0; i < kHatchLevels; ++i) {
-      uint32_t tex_idx = (stipple_count > 0) ? (i % stipple_count) : 0;
-      const auto& tex = (stipple_count > 0) ? resrc.GetStippleTex(tex_idx)
-                                            : resrc.GetDefColorTex();
-
-      all_image_infos[3][i].imageLayout =
-          vk::ImageLayout::eShaderReadOnlyOptimal;
-      all_image_infos[3][i].imageView = tex.GetImageView();
-      all_image_infos[3][i].sampler = tex.GetSampler();
-    }
-  }
-
-  // update all 4 sets
   for (uint32_t set_idx = 0; set_idx < 4; ++set_idx) {
+    vk::DescriptorImageInfo image_info{};
+    image_info.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+    image_info.imageView = arrays[set_idx]->GetImageView();
+    image_info.sampler = arrays[set_idx]->GetSampler();
+
     vk::WriteDescriptorSet desc_write{};
     desc_write.dstSet = sets_[set_idx];
     desc_write.dstBinding = 0;
     desc_write.dstArrayElement = 0;
     desc_write.descriptorType = vk::DescriptorType::eCombinedImageSampler;
-    desc_write.descriptorCount = kHatchLevels;
-    desc_write.pImageInfo = all_image_infos[set_idx].data();
+    desc_write.descriptorCount = 1;
+    desc_write.pImageInfo = &image_info;
 
     ctx_.GetDevice().updateDescriptorSets(1, &desc_write, 0, nullptr);
   }

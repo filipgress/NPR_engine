@@ -360,10 +360,10 @@ class PaletteSets : public BaseDescSets {
 
 /*
  * HatchingArraySets - 4 descriptor sets, one for each hatching type
- * Set 0: Hatch textures (9 levels)
- * Set 1: Cross-hatch textures (9 levels)
- * Set 2: Scribble textures (9 levels)
- * Set 3: Stipple textures (9 levels)
+ * Set 0: Hatch textures
+ * Set 1: Cross-hatch textures
+ * Set 2: Scribble textures
+ * Set 3: Stipple textures
  */
 class HatchingArraySets : public BaseDescSets {
  public:
@@ -373,7 +373,7 @@ class HatchingArraySets : public BaseDescSets {
 
   void Update(const Resources& resrc) const;
   std::vector<vk::DescriptorPoolSize> GetPoolSizes() const override {
-    return {{vk::DescriptorType::eCombinedImageSampler, 4 * kHatchLevels}};
+    return {{vk::DescriptorType::eCombinedImageSampler, 4}};
   }
 
  private:

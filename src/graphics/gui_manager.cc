@@ -664,9 +664,8 @@ void GuiManager::GlobalSettingsWindow(npr_graphics::RenderSettings& settings,
         settings.hatch_int = glm::clamp(settings.hatch_int, 0.0f, 1.0f);
 
       if (ImGui::DragFloat("density##hatch_density", &settings.hatch_density,
-                           0.1f, 1.0f, 16.0f, "%.1f"))
-        settings.hatch_density =
-            glm::clamp(settings.hatch_density, 1.0f, 16.0f);
+                           0.01f, 0.5f, 3.0f, "%.1f"))
+        settings.hatch_density = glm::clamp(settings.hatch_density, 0.5f, 3.0f);
 
       if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
         ImGui::SetTooltip("How many times the pattern tiles across the screen");

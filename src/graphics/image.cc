@@ -6,11 +6,19 @@ Image::Image(const Context& ctx, vk::Format format, vk::Extent2D extent,
              vk::ImageUsageFlags usage, vk::ImageAspectFlags aspect,
              vk::SharingMode sharing_mode, vk::SampleCountFlagBits samples,
              uint32_t mip_levels, std::string dbg_name)
+    : Image(ctx, format, extent, usage, aspect, sharing_mode, samples,
+            mip_levels, 1, dbg_name) {}
+
+Image::Image(const Context& ctx, vk::Format format, vk::Extent2D extent,
+             vk::ImageUsageFlags usage, vk::ImageAspectFlags aspect,
+             vk::SharingMode sharing_mode, vk::SampleCountFlagBits samples,
+             uint32_t mip_levels, uint32_t array_layers, std::string dbg_name)
     : ctx_{ctx},
       format_{format},
       aspect_{aspect},
       extent_{extent},
       mip_levels_{CalculateMipLevels(mip_levels)},
+      array_layers_{array_layers},
       dbg_name_{dbg_name} {
   CreateImage(usage, samples, sharing_mode);
   AllocMem();
@@ -27,11 +35,13 @@ Image::Image(Image&& other) noexcept
       aspect_(other.aspect_),
       extent_(other.extent_),
       mip_levels_(other.mip_levels_),
+      array_layers_(other.array_layers_),
       dbg_name_(std::move(other.dbg_name_)) {
   other.image_ = nullptr;
   other.image_mem_ = nullptr;
   other.image_view_ = nullptr;
   other.mip_levels_ = 0;
+  other.array_layers_ = 0;
 }
 
 Image::~Image() {
@@ -52,7 +62,7 @@ void Image::CreateImage(vk::ImageUsageFlags usage,
   image_info.samples = samples;
   image_info.extent = vk::Extent3D(extent_, 1);
   image_info.mipLevels = mip_levels_;
-  image_info.arrayLayers = 1;
+  image_info.arrayLayers = array_layers_;
   image_info.tiling = vk::ImageTiling::eOptimal;
   image_info.usage = usage;
 
@@ -76,13 +86,14 @@ void Image::CreateImage(vk::ImageUsageFlags usage,
 void Image::CreateImageView() {
   vk::ImageViewCreateInfo view_info{};
   view_info.image = image_;
-  view_info.viewType = vk::ImageViewType::e2D;
+  view_info.viewType = (array_layers_ > 1) ? vk::ImageViewType::e2DArray
+                                           : vk::ImageViewType::e2D;
   view_info.format = format_;
   view_info.subresourceRange.aspectMask = aspect_;
   view_info.subresourceRange.baseMipLevel = 0;
   view_info.subresourceRange.levelCount = mip_levels_;
   view_info.subresourceRange.baseArrayLayer = 0;
-  view_info.subresourceRange.layerCount = 1;
+  view_info.subresourceRange.layerCount = array_layers_;
 
   image_view_ = ctx_.GetDevice().createImageView(view_info);
 }
@@ -100,6 +111,49 @@ void Image::AllocMem() {
   device.bindImageMemory(image_, image_mem_, 0);
 }
 
+void Image::TransitionLayer(vk::CommandBuffer cmd_buff, uint32_t layer,
+                            vk::ImageLayout old_layout,
+                            vk::ImageLayout new_layout) {
+  assert(layer < array_layers_);
+
+  vk::ImageMemoryBarrier barrier{};
+  barrier.image = image_;
+  barrier.oldLayout = old_layout;
+  barrier.newLayout = new_layout;
+  barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  barrier.subresourceRange.aspectMask = aspect_;
+  barrier.subresourceRange.baseMipLevel = 0;
+  barrier.subresourceRange.levelCount = mip_levels_;
+  barrier.subresourceRange.baseArrayLayer = layer;
+  barrier.subresourceRange.layerCount = 1;
+
+  vk::PipelineStageFlags src_stage, dst_stage;
+
+  if (old_layout == vk::ImageLayout::eUndefined &&
+      new_layout == vk::ImageLayout::eTransferDstOptimal) {
+    barrier.srcAccessMask = vk::AccessFlagBits::eNone;
+    barrier.dstAccessMask = vk::AccessFlagBits::eTransferWrite;
+    src_stage = vk::PipelineStageFlagBits::eTopOfPipe;
+    dst_stage = vk::PipelineStageFlagBits::eTransfer;
+
+  } else if (old_layout == vk::ImageLayout::eTransferDstOptimal &&
+             new_layout == vk::ImageLayout::eShaderReadOnlyOptimal) {
+    barrier.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
+    barrier.dstAccessMask = vk::AccessFlagBits::eShaderRead;
+    src_stage = vk::PipelineStageFlagBits::eTransfer;
+    dst_stage = vk::PipelineStageFlagBits::eFragmentShader;
+
+  } else {
+    throw std::runtime_error("unsupported layer transition:  " +
+                             std::to_string(static_cast<int>(old_layout)) +
+                             " -> " +
+                             std::to_string(static_cast<int>(new_layout)));
+  }
+
+  cmd_buff.pipelineBarrier(src_stage, dst_stage, {}, nullptr, nullptr, barrier);
+}
+
 void Image::Transition(vk::CommandBuffer cmd_buff, vk::ImageLayout old_layout,
                        vk::ImageLayout new_layout, uint32_t start_mip_level,
                        uint32_t mip_levels) {
@@ -115,7 +169,7 @@ void Image::Transition(vk::CommandBuffer cmd_buff, vk::ImageLayout old_layout,
   barrier.subresourceRange.baseMipLevel = start_mip_level;
   barrier.subresourceRange.levelCount = mip_levels;
   barrier.subresourceRange.baseArrayLayer = 0;
-  barrier.subresourceRange.layerCount = 1;
+  barrier.subresourceRange.layerCount = array_layers_;
 
   barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
   barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -238,7 +292,7 @@ void Image::Clear(vk::CommandBuffer cmd_buff, vk::ClearColorValue clear_color,
   range.baseMipLevel = 0;
   range.levelCount = mip_levels_;
   range.baseArrayLayer = 0;
-  range.layerCount = 1;
+  range.layerCount = array_layers_;
 
   if (layout != vk::ImageLayout::eTransferDstOptimal)
     Transition(cmd_buff, layout, vk::ImageLayout::eTransferDstOptimal, 0,
@@ -290,9 +344,9 @@ void Image::CopyTo(vk::CommandBuffer cmd_buff, Image& dst,
 Texture::Texture(const Context& ctx, vk::Format format, vk::Extent2D extent,
                  vk::ImageUsageFlags usage, vk::ImageAspectFlags aspect,
                  vk::SampleCountFlagBits samples, std::string dbg_name,
-                 const SamplerProps& sampler_props)
+                 const SamplerProps& sampler_props, uint32_t array_layers)
     : Image(ctx, format, extent, usage, aspect, vk::SharingMode::eExclusive,
-            samples, 1, dbg_name) {
+            samples, 1, array_layers, dbg_name) {
   CreateSampler(sampler_props);
 }
 
@@ -308,6 +362,7 @@ Texture::Texture(const Context& ctx, const TextureProps& data,
             vk::SharingMode::eExclusive,
             vk::SampleCountFlagBits::e1,
             UINT32_MAX,
+            1,
             data.name} {
   CreateSampler(sampler_props);
 }
@@ -454,4 +509,59 @@ void Texture::GenerateMipmaps(vk::CommandBuffer cmd_buff) {
   }
 }
 
+/*
+ * TextureArray
+ */
+TextureArray::TextureArray(const Context& ctx, vk::Format format,
+                           vk::Extent2D extent, uint32_t layer_count,
+                           vk::ImageUsageFlags usage,
+                           vk::ImageAspectFlags aspect,
+                           const std::string& dbg_name,
+                           const SamplerProps& sampler_props)
+    : Texture(ctx, format, extent, usage, aspect, vk::SampleCountFlagBits::e1,
+              dbg_name, sampler_props, layer_count),
+      layer_layouts_(layer_count, vk::ImageLayout::eUndefined) {}
+
+void TextureArray::WriteLayer(vk::CommandBuffer cmd_buff, uint32_t layer,
+                              const void* data, vk::DeviceSize size) {
+  if (layer >= array_layers_)
+    throw std::runtime_error("texture array layer index out of bounds");
+
+  // if (!staging_buff_ || staging_buff_->GetSize() < size)
+  //   staging_buff_ = std::make_unique<StagingBuffer>(ctx_, size);
+  // staging_buff_->Write(nullptr, data);
+  auto temp_staging = std::make_unique<StagingBuffer>(ctx_, size);
+  temp_staging->Write(nullptr, data);
+
+  TransitionLayer(cmd_buff, layer, layer_layouts_[layer],
+                  vk::ImageLayout::eTransferDstOptimal);
+
+  vk::BufferImageCopy region{};
+  region.bufferOffset = 0;
+  region.bufferRowLength = 0;
+  region.bufferImageHeight = 0;
+  region.imageSubresource.aspectMask = aspect_;
+  region.imageSubresource.mipLevel = 0;
+  region.imageSubresource.baseArrayLayer = layer;
+  region.imageSubresource.layerCount = 1;
+  region.imageOffset = vk::Offset3D{0, 0, 0};
+  region.imageExtent = vk::Extent3D{extent_.width, extent_.height, 1};
+
+  cmd_buff.copyBufferToImage(temp_staging->GetBuffer(), image_,
+                             vk::ImageLayout::eTransferDstOptimal, region);
+
+  vk::MemoryBarrier barrier{};
+  barrier.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
+  barrier.dstAccessMask = vk::AccessFlagBits::eTransferRead;
+
+  cmd_buff.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
+                           vk::PipelineStageFlagBits::eTransfer, {}, 1,
+                           &barrier, 0, nullptr, 0, nullptr);
+
+  TransitionLayer(cmd_buff, layer, vk::ImageLayout::eTransferDstOptimal,
+                  vk::ImageLayout::eShaderReadOnlyOptimal);
+
+  layer_layouts_[layer] = vk::ImageLayout::eShaderReadOnlyOptimal;
+  temp_staging_buffers_.push_back(std::move(temp_staging));
+}
 }  // namespace npr_graphics

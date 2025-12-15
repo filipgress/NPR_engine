@@ -34,7 +34,7 @@ layout(set = 0, binding = 0) uniform sampler2D color_tex;
 layout(set = 1, binding = 0) uniform sampler2D white_noise_tex;
 layout(set = 1, binding = 1) uniform sampler2D blue_noise_tex;
 layout(set = 2, binding = 0) uniform sampler2D palette_tex;
-layout(set = 3, binding = 0) uniform sampler2D hatch_textures[HATCH_LEVELS];
+layout(set = 3, binding = 0) uniform sampler2DArray hatch_textures;
 
 layout(push_constant) uniform PostPC {
   uint pixel_size;
@@ -228,13 +228,15 @@ vec3 apply_hatching(vec2 uv, vec3 color) {
   if (hatch_mode == HATCH_NONE) return color;
 
   float lum = get_lum(color);
-  float level_f = (1.0 - lum) * float(HATCH_LEVELS - 1);
-  int level = int(clamp(level_f, 0.0, float(HATCH_LEVELS - 1)));
+  float level_f = (1.0 - lum) * float(HATCH_LEVELS);
+  int level = int(clamp(level_f, 0.0, float(HATCH_LEVELS)));
 
-  vec2 hatch_size = textureSize(hatch_textures[0], 0);
+  if (level == 0) return color;
 
+  ivec3 hatch_size_3d = textureSize(hatch_textures, 0);
+  vec2 hatch_size = hatch_size_3d.xy;
   vec2 hatch_uv = (uv * textureSize(color_tex, 0)) / (hatch_size / hatch_density);
-  float hatch_value = texture(hatch_textures[level], hatch_uv).r;
+  float hatch_value = texture(hatch_textures, vec3(hatch_uv, level - 1)).r;
 
   // vec2 tex_scale = textureSize(color_tex, 0) / textureSize(hatch_textures[0], 0);
   // float hatch_value = texture(hatch_textures[level], frag_uv * tex_scale).r;

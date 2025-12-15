@@ -511,28 +511,51 @@ void Resources::LoadBlueTextures(vk::CommandBuffer cmd_buff) {
 }
 
 void Resources::LoadPatternTextures(vk::CommandBuffer cmd_buff) {
-  hatch_texs_.resize(kHatchLevels);
-  cross_hatch_texs_.resize(kHatchLevels);
-  scribble_texs_.resize(kHatchLevels);
-  stipple_texs_.resize(kHatchLevels);
-
-  for (uint i = 0; i < kHatchLevels; ++i) {
-    LoadTex(cmd_buff, frame_props_.hatch_format,
-            "../assets/textures/hatch" + std::to_string(i) + ".jpg",
-            hatch_texs_[i], "hatch_" + std::to_string(i));
-
-    LoadTex(cmd_buff, frame_props_.hatch_format,
-            "../assets/textures/crosshatch" + std::to_string(i) + ".jpg",
-            cross_hatch_texs_[i], "cross_hatch_" + std::to_string(i));
-
-    LoadTex(cmd_buff, frame_props_.hatch_format,
-            "../assets/textures/scribble" + std::to_string(i) + ".jpg",
-            scribble_texs_[i], "scribble_" + std::to_string(i));
-
-    LoadTex(cmd_buff, frame_props_.hatch_format,
-            "../assets/textures/stipple" + std::to_string(i) + ".jpg",
-            stipple_texs_[i], "stipple_" + std::to_string(i));
+  for (uint32_t i = 0; i < kHatchLevels; ++i) {
+    LoadTexLayer(cmd_buff, hatch_tex_arr_, i,
+                 "../assets/textures/hatch" + std::to_string(i) + ".jpg",
+                 "hatch_array");
+    LoadTexLayer(cmd_buff, c_hatch_tex_arr_, i,
+                 "../assets/textures/crosshatch" + std::to_string(i) + ".jpg",
+                 "cross_hatch_array");
+    LoadTexLayer(cmd_buff, scribble_tex_arr_, i,
+                 "../assets/textures/scribble" + std::to_string(i) + ".jpg",
+                 "scribble_array");
+    LoadTexLayer(cmd_buff, stipple_tex_arr_, i,
+                 "../assets/textures/stipple" + std::to_string(i) + ".jpg",
+                 "stipple_array");
   }
+}
+
+void Resources::LoadTexLayer(vk::CommandBuffer cmd_buff,
+                             std::unique_ptr<TextureArray>& array,
+                             uint32_t layer, const std::string& filepath,
+                             const std::string& array_name) {
+  int width, height, channels;
+  unsigned char* data =
+      stbi_load(filepath.c_str(), &width, &height, &channels, STBI_grey);
+
+  if (!data)
+    throw std::runtime_error("failed to load texture:  " +
+                             npr_core::GetFilename(filepath));
+
+  if (!array) {
+    vk::Extent2D extent{static_cast<uint32_t>(width),
+                        static_cast<uint32_t>(height)};
+
+    SamplerProps props;
+    props.address_mode_U = vk::SamplerAddressMode::eRepeat;
+    props.address_mode_V = vk::SamplerAddressMode::eRepeat;
+    props.min_filter = props.mag_filter = vk::Filter::eLinear;
+
+    array = std::make_unique<TextureArray>(
+        ctx_, frame_props_.hatch_format, extent, kHatchLevels,
+        vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
+        vk::ImageAspectFlagBits::eColor, array_name, props);
+  }
+
+  array->WriteLayer(cmd_buff, layer, data, width * height * sizeof(uint8_t));
+  stbi_image_free(data);
 }
 
 void Resources::LoadTex(vk::CommandBuffer cmd_buff, vk::Format format,

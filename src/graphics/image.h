@@ -12,6 +12,11 @@ class Image : public npr_core::NonCopyable {
         vk::ImageUsageFlags usage, vk::ImageAspectFlags aspect,
         vk::SharingMode sharing_mode, vk::SampleCountFlagBits samples,
         uint32_t mip_levels, std::string dbg_name);
+  Image(const Context& ctx, vk::Format format, vk::Extent2D extent,
+        vk::ImageUsageFlags usage, vk::ImageAspectFlags aspect,
+        vk::SharingMode sharing_mode, vk::SampleCountFlagBits samples,
+        uint32_t mip_levels, uint32_t array_layers, std::string dbg_name);
+
   Image(Image&&) noexcept;
   virtual ~Image();
 
@@ -20,6 +25,9 @@ class Image : public npr_core::NonCopyable {
   void Transition(vk::CommandBuffer cmd_buff, vk::ImageLayout old_layout,
                   vk::ImageLayout new_layout, uint32_t start_mip_level,
                   uint32_t mip_level_count);
+  void TransitionLayer(vk::CommandBuffer cmd_buff, uint32_t layer,
+                       vk::ImageLayout old_layout, vk::ImageLayout new_layout);
+
   void Resolve(vk::CommandBuffer cmd_buff, Image& dst,
                vk::ImageLayout src_layout, vk::ImageLayout dst_layout);
   void Clear(vk::CommandBuffer cmd_buff, vk::ClearColorValue clear_color,
@@ -49,7 +57,9 @@ class Image : public npr_core::NonCopyable {
   vk::Format format_;
   vk::ImageAspectFlags aspect_;
   vk::Extent2D extent_;
+
   uint32_t mip_levels_;
+  uint32_t array_layers_;
 
   std::string dbg_name_;
 };
@@ -83,7 +93,8 @@ class Texture : public Image {
   Texture(const Context& ctx, vk::Format format, vk::Extent2D extent,
           vk::ImageUsageFlags usage, vk::ImageAspectFlags aspect,
           vk::SampleCountFlagBits samples, std::string dbg_name,
-          const SamplerProps& sampler_props = SamplerProps());
+          const SamplerProps& sampler_props = SamplerProps(),
+          uint32_t array_layers = 1);
   Texture(const Context& ctx, const TextureProps& data,
           const SamplerProps& sampler_props = SamplerProps());
   Texture(Texture&&) noexcept;
@@ -98,15 +109,34 @@ class Texture : public Image {
   void Write(vk::CommandBuffer cmd_buff, const std::vector<unsigned char>& data,
              vk::ImageLayout src_layout = vk::ImageLayout::eUndefined);
 
- private:
+ protected:
   void CreateSampler(const SamplerProps& props = SamplerProps());
 
   void CopyFromBuffer(vk::CommandBuffer cmd_buff);
   void GenerateMipmaps(vk::CommandBuffer cmd_buff);
 
- private:
+ protected:
   vk::Sampler sampler_;
   std::unique_ptr<StagingBuffer> staging_buff_;
+};
+
+class TextureArray : public Texture {
+ public:
+  TextureArray(const Context& ctx, vk::Format format, vk::Extent2D extent,
+               uint32_t layer_count, vk::ImageUsageFlags usage,
+               vk::ImageAspectFlags aspect, const std::string& dbg_name,
+               const SamplerProps& sampler_props = SamplerProps());
+  TextureArray(TextureArray&& o) noexcept
+      : Texture(std::move(o)), layer_layouts_(std::move(o.layer_layouts_)) {}
+
+  ~TextureArray() = default;
+
+  void WriteLayer(vk::CommandBuffer cmd_buff, uint32_t layer, const void* data,
+                  vk::DeviceSize size);
+
+ private:
+  std::vector<vk::ImageLayout> layer_layouts_;
+  std::vector<std::unique_ptr<StagingBuffer>> temp_staging_buffers_;
 };
 
 }  // namespace npr_graphics

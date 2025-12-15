@@ -15,6 +15,7 @@ class Buffer : public npr_core::NonCopyable {
   virtual ~Buffer();
 
   vk::Buffer GetBuffer() const { return buff_; }
+  uint32_t GetSize() const { return size_; }
 
   void Write(vk::CommandBuffer cmd_buff, const void* data);
 

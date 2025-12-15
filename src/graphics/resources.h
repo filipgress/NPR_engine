@@ -375,23 +375,10 @@ class Resources : public npr_core::NonCopyable {
     return *palette_texs_[idx];
   }
 
-  uint32_t GetHatchTexCount() const { return hatch_texs_.size(); }
-  const Texture& GetHatchTex(uint32_t idx) const { return *hatch_texs_[idx]; }
-
-  uint32_t GetCrossHatchTexCount() const { return cross_hatch_texs_.size(); }
-  const Texture& GetCrossHatchTex(uint32_t idx) const {
-    return *cross_hatch_texs_[idx];
-  }
-
-  uint32_t GetScribbleTexCount() const { return scribble_texs_.size(); }
-  const Texture& GetScribbleTex(uint32_t idx) const {
-    return *scribble_texs_[idx];
-  }
-
-  uint32_t GetStippleTexCount() const { return stipple_texs_.size(); }
-  const Texture& GetStippleTex(uint32_t idx) const {
-    return *stipple_texs_[idx];
-  }
+  const TextureArray& GetHatchTexArr() const { return *hatch_tex_arr_; }
+  const TextureArray& GetCrossHatchTexArr() const { return *c_hatch_tex_arr_; }
+  const TextureArray& GetScribbleTexArr() const { return *scribble_tex_arr_; }
+  const TextureArray& GetStippleTexArr() const { return *stipple_tex_arr_; }
 
   const LightMesh& GetSphereMesh() const { return *sphere_mesh_; }
   const LightMesh& GetConeMesh() const { return *cone_mesh_; }
@@ -422,6 +409,9 @@ class Resources : public npr_core::NonCopyable {
   void LoadTex(vk::CommandBuffer cmd_buff, vk::Format format,
                const std::string& filepath,
                std::unique_ptr<Texture>& out_texture, const std::string& name);
+  void LoadTexLayer(vk::CommandBuffer cmd_buff,
+                    std::unique_ptr<TextureArray>& array, uint32_t layer,
+                    const std::string& filepath, const std::string& array_name);
   void CreatePalette(vk::CommandBuffer cmd_buff, const std::string& name,
                      const std::vector<glm::vec4>& colors);
 
@@ -455,10 +445,10 @@ class Resources : public npr_core::NonCopyable {
   std::unique_ptr<Texture> blue_noise_tex_64_3;
   std::unique_ptr<Texture> blue_noise_tex_128_4;
 
-  std::vector<std::unique_ptr<Texture>> hatch_texs_;
-  std::vector<std::unique_ptr<Texture>> cross_hatch_texs_;
-  std::vector<std::unique_ptr<Texture>> scribble_texs_;
-  std::vector<std::unique_ptr<Texture>> stipple_texs_;
+  std::unique_ptr<TextureArray> hatch_tex_arr_;
+  std::unique_ptr<TextureArray> c_hatch_tex_arr_;
+  std::unique_ptr<TextureArray> scribble_tex_arr_;
+  std::unique_ptr<TextureArray> stipple_tex_arr_;
 
   std::vector<std::unique_ptr<Texture>> palette_texs_;
 
