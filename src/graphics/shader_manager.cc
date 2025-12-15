@@ -26,11 +26,11 @@ ShaderManager::ShaderManager(const Context& ctx)
 
       abuff_fill_frag_{ctx, "shaders/abuff_fill_frag.spv",
                        "../shaders/abuff_fill.frag"},
-      abuff_res_frag_{ctx, "shaders/abuff_res.spv",
+      abuff_res_frag_{ctx, "shaders/abuff_res_frag.spv",
                       "../shaders/abuff_res.frag"},
       wboit_acc_frag_{ctx, "shaders/wboit_acc_frag.spv",
                       "../shaders/wboit_acc.frag"},
-      wboit_res_frag_{ctx, "shaders/wboit_res.spv",
+      wboit_res_frag_{ctx, "shaders/wboit_res_frag.spv",
                       "../shaders/wboit_res.frag"},
       post_process_frag_{ctx, "shaders/post_process_frag.spv",
                          "../shaders/post_process.frag"},
