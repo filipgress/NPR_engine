@@ -25,8 +25,11 @@ layout(push_constant) uniform ShadingPC {
 };
 
 vec3 apply_gooch_shading(float intensity, vec3 albedo) {
-  vec3 cool = gooch_cool.rgb * albedo * gooch_beta;
-  vec3 warm = gooch_warm.rgb * albedo * gooch_alpha;
+  vec3 cool = gooch_cool.rgb + albedo * gooch_beta;
+  vec3 warm = gooch_warm.rgb + albedo * gooch_alpha;
+
+  // vec3 cool = gooch_cool.rgb * albedo * gooch_beta;
+  // vec3 warm = gooch_warm.rgb * albedo * gooch_alpha;
 
   return mix(cool, warm, intensity);
 }
