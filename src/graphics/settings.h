@@ -93,7 +93,7 @@ struct RenderSettings {
 
   bool enable_crt{false};
   float crt_curve_int{0.35f};
-  float crt_scanline_int{0.1f};
+  float crt_scanline_int{0.2f};
   float crt_chroma{0.25f};
   float crt_mask_int{0.0f};
   float crt_distortion_speed{0.35f};

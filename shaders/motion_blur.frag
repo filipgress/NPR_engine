@@ -46,6 +46,19 @@ void main() {
     return;
   }
 
+  // Simple box filter motion blur
+  // vec2 sample_uv = frag_uv;
+  // vec3 sample_color = vec3(0.0);
+  //
+  // for (uint i = 0u; i < num_samples; ++i) {
+  //   sample_uv -= velocity / float(num_samples - 1u);
+  //   sample_uv = clamp(sample_uv, vec2(0.001), vec2(0.999));
+  //   sample_color += texture(color_tex, sample_uv).rgb;
+  // }
+  //
+  // out_color = vec4(sample_color / float(num_samples), 1.0);
+  // return;
+
   float center_depth = texture(depth_tex, frag_uv).r;
   float center_linear = linearize_depth(center_depth);
 

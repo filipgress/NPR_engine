@@ -555,9 +555,9 @@ void GuiManager::GlobalSettingsWindow(npr_graphics::RenderSettings& settings,
     ImGui::Spacing();
 
     if (ImGui::SliderFloat("strength##mb", &settings.motion_blur_strength, 0.0f,
-                           10.0f, "%.2f"))
+                           100.0f, "%.2f"))
       settings.motion_blur_strength =
-          glm::clamp(settings.motion_blur_strength, 0.0f, 10.0f);
+          glm::clamp(settings.motion_blur_strength, 0.0f, 100.0f);
 
     int mb_samples = static_cast<int>(settings.motion_blur_samples);
     if (ImGui::SliderInt("samples##mb", &mb_samples, 4, 32)) {
@@ -876,9 +876,9 @@ void GuiManager::GlobalSettingsWindow(npr_graphics::RenderSettings& settings,
       ImGui::Spacing();
 
       if (ImGui::SliderFloat("intensity##crt_scan", &settings.crt_scanline_int,
-                             0.0f, 0.5f, "%.2f")) {
+                             0.0f, 1.0f, "%.2f")) {
         settings.crt_scanline_int =
-            glm::clamp(settings.crt_scanline_int, 0.0f, 5.0f);
+            glm::clamp(settings.crt_scanline_int, 0.0f, 1.0f);
       }
 
       ImGui::Spacing();

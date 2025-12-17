@@ -307,7 +307,7 @@ vec3 apply_rgb_cell_mask(vec2 uv, vec3 color) {
 vec3 apply_scanlines(vec2 uv, vec3 color) {
   if (crt_scanline_int < EPSILON) return color;
 
-  float lines = sin(uv.y * 2000.0 + t * 100.0);
+  float lines = sin(uv.y * 500.0 + t * 70.0);
   return color * (1.0 + lines * crt_scanline_int);
 }
 
@@ -328,6 +328,10 @@ vec3 sample_with_chroma(vec2 uv) {
 // ============================================================================
 
 void main() {
+  // float threshold = get_dither_threshold();
+  // out_color = vec4(threshold, threshold, threshold, 1.0);
+  // return;
+  //
   vec2 uv = frag_uv;
 
   if (enable_crt == 0u) {
